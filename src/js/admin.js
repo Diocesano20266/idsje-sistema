@@ -12,7 +12,7 @@ let materiasCache = [];
 let vistaActual   = 'grados';
 
 // ── INICIO ──────────────────────────────────
-export async function init() {
+async function init() {
     const res = await verificarSesion('admin');
     if (!res) return;
     usuarioActual = res.usuario;

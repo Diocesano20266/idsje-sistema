@@ -420,3 +420,46 @@ document.addEventListener('click', e => {
 window.cerrarSesionAdmin = cerrarSesion;
 
 init();
+
+// ── IMPORTAR ALUMNOS DESDE EXCEL ─────────────
+window.importarAlumnosExcel = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const gradoId = document.getElementById('filtro-grado')?.value;
+    if (!gradoId) {
+        alert('Seleccioná un grado en el filtro antes de importar.');
+        event.target.value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const wb   = XLSX.read(e.target.result, { type: 'binary' });
+            const ws   = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+            const nuevos = [];
+            for (const row of rows) {
+                const nie       = (row[0] || '').toString().trim();
+                const apellidos = (row[1] || '').toString().trim().toUpperCase();
+                const nombres   = (row[2] || '').toString().trim().toUpperCase();
+                if (!nie || !apellidos || !nombres) continue;
+                nuevos.push({ nie, apellidos, nombres, grado_id: gradoId, activo: true, anio_ingreso: 2026 });
+            }
+
+            if (!nuevos.length) { alert('No se encontraron alumnos en el archivo.'); return; }
+
+            const { error } = await supabase.from('alumnos').insert(nuevos);
+            if (error) { alert('Error: ' + error.message); return; }
+
+            alert(`✅ ${nuevos.length} alumno(s) importado(s) correctamente.`);
+            await renderAlumnos();
+        } catch(err) {
+            alert('Error leyendo el archivo: ' + err.message);
+        }
+    };
+    reader.readAsBinaryString(file);
+    event.target.value = '';
+};

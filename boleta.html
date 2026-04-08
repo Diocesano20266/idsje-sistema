@@ -34,7 +34,7 @@
         .loading{text-align:center;padding:40px;color:#94a3b8;font-size:13px}
         .hidden{display:none!important}
 
-        #contenedor-boletas{max-width:900px;margin:0 auto;padding:0 24px 40px}
+        #contenedor-boletas{max-width:820px;margin:0 auto;padding:0 24px 40px}
 
         /* ── BOLETA ── */
         .boleta-page{
@@ -47,6 +47,10 @@
             font-size:11px;
         }
 
+        @page {
+            size: letter portrait;
+            margin: 10mm 12mm;
+        }
         @media print {
             .topbar,.gold-bar,.controles,#loading-boletas{display:none!important}
             body{background:white}

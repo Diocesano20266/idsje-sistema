@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDSJE — Administración</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'DM Sans',sans-serif;background:#f0f4f8;color:#1e293b;min-height:100vh}
+
+        /* ── SIDEBAR ── */
+        .sidebar{position:fixed;top:0;left:0;width:240px;height:100vh;background:#1B3A6B;display:flex;flex-direction:column;z-index:100}
+        .sidebar-brand{padding:28px 24px 20px;border-bottom:1px solid rgba(255,255,255,.08)}
+        .brand-name{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:#fff}
+        .brand-sub{font-size:10px;color:rgba(255,255,255,.4);letter-spacing:2px;text-transform:uppercase;margin-top:3px}
+        .nav{flex:1;padding:16px 12px;overflow-y:auto}
+        .nav-btn{display:flex;align-items:center;gap:10px;width:100%;padding:11px 14px;background:transparent;border:none;border-radius:10px;color:rgba(255,255,255,.6);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;text-align:left;margin-bottom:2px}
+        .nav-btn:hover{background:rgba(255,255,255,.08);color:#fff}
+        .nav-btn.active{background:rgba(255,255,255,.12);color:#fff;font-weight:600}
+        .nav-btn .icon{font-size:16px;width:20px;text-align:center}
+        .sidebar-footer{padding:16px 12px;border-top:1px solid rgba(255,255,255,.08)}
+        .user-info{padding:10px 14px;margin-bottom:8px}
+        .user-name{font-size:12px;color:rgba(255,255,255,.8);font-weight:500}
+        .user-role{font-size:10px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:1px}
+        .btn-logout{display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:10px;color:#f87171;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}
+        .btn-logout:hover{background:rgba(239,68,68,.2)}
+
+        /* ── MAIN ── */
+        .main{margin-left:240px;padding:32px;min-height:100vh}
+        .page-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px}
+        .page-title{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:#1B3A6B}
+        .btn-primary{background:#1B3A6B;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-family:'Syne',sans-serif;font-weight:700;font-size:12px;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;transition:background .2s;display:inline-flex;align-items:center;gap:6px}
+        .btn-primary:hover{background:#2E5FAC}
+        .btn-secondary{background:#e2e8f0;color:#475569;border:none;padding:9px 16px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}
+        .btn-secondary:hover{background:#cbd5e1}
+
+        /* ── VISTAS ── */
+        .vista{display:none}.vista.active,.vista:not(.hidden){display:block}.hidden{display:none!important}
+
+        /* ── TABLA ── */
+        .tabla-wrap{background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);overflow:hidden}
+        table{width:100%;border-collapse:collapse}
+        thead{background:#1B3A6B;color:#fff}
+        th{padding:14px 16px;text-align:left;font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+        td{padding:13px 16px;font-size:13px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+        tr:last-child td{border-bottom:none}
+        tr:hover td{background:#f8fafc}
+        .btn-sm{padding:5px 10px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;border:none;transition:all .2s;margin-right:4px}
+        .btn-edit{background:#e0f2fe;color:#0369a1}.btn-edit:hover{background:#bae6fd}
+        .btn-del{background:#fee2e2;color:#dc2626}.btn-del:hover{background:#fecaca}
+        .btn-info{background:#e0e7ff;color:#4338ca}.btn-info:hover{background:#c7d2fe}
+        .badge{padding:3px 8px;border-radius:100px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+        .badge-admin{background:#fef3c7;color:#d97706}
+        .badge-docente{background:#e0f2fe;color:#0369a1}
+        .foto-mini{width:36px;height:36px;border-radius:50%;object-fit:cover}
+        .foto-placeholder{width:36px;height:36px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:14px;color:#94a3b8}
+        .text-muted{color:#94a3b8;font-size:12px}
+        .text-center{text-align:center}
+
+        /* ── FILTROS ── */
+        .filtros{display:flex;gap:12px;margin-bottom:20px;align-items:center;flex-wrap:wrap}
+        .filtros select,.filtros input{padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;outline:none;background:#fff;transition:border-color .2s;min-width:200px}
+        .filtros select:focus,.filtros input:focus{border-color:#1B3A6B}
+        .btn-danger{background:#fee2e2;color:#dc2626;border:1px solid #fecaca;padding:9px 16px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer}
+        .btn-danger:hover{background:#fecaca}
+
+        /* ── MATERIAS ASIGNADAS ── */
+        .materia-asignada{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#f8fafc;border-radius:10px;margin-bottom:6px;font-size:13px}
+        .materia-asignada span:first-child{flex:1;font-weight:500}
+
+        /* ── MODALES ── */
+        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);z-index:200;align-items:center;justify-content:center;padding:20px}
+        .modal-overlay.open{display:flex}
+        .modal{background:#fff;border-radius:20px;padding:28px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto}
+        .modal-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:#1B3A6B;margin-bottom:20px}
+        .field{margin-bottom:14px}
+        .field label{display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:6px}
+        .field input,.field select,.field textarea{width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;color:#1e293b;outline:none;transition:border-color .2s;background:#fff}
+        .field input:focus,.field select:focus{border-color:#1B3A6B}
+        .modal-actions{display:flex;gap:10px;margin-top:20px}
+        .foto-preview-wrap{text-align:center;margin-bottom:10px}
+        #alumno-foto-preview{width:80px;height:80px;border-radius:50%;object-fit:cover;display:none}
+
+        /* Nav boletas */
+        .btn-boletas{display:flex;align-items:center;gap:8px;padding:10px 16px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.2);border-radius:10px;color:#059669;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;transition:all .2s}
+        .btn-boletas:hover{background:rgba(16,185,129,.2)}
+
+        /* Responsive */
+        @media(max-width:768px){.sidebar{transform:translateX(-100%)}.main{margin-left:0;padding:20px}}
+    </style>
+</head>
+<body>
+
+    <!-- SIDEBAR -->
+    <nav class="sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-name">IDSJE</div>
+            <div class="brand-sub">Panel Administrador</div>
+        </div>
+        <div class="nav">
+            <button class="nav-btn active" data-vista="grados" onclick="mostrarVista('grados')">
+                <span class="icon">🏫</span> Grados y Secciones
+            </button>
+            <button class="nav-btn" data-vista="alumnos" onclick="mostrarVista('alumnos')">
+                <span class="icon">👨‍🎓</span> Alumnos
+            </button>
+            <button class="nav-btn" data-vista="docentes" onclick="mostrarVista('docentes')">
+                <span class="icon">👨‍🏫</span> Docentes
+            </button>
+            <button class="nav-btn" data-vista="materias" onclick="mostrarVista('materias')">
+                <span class="icon">📚</span> Materias
+            </button>
+        </div>
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-name" id="admin-nombre"></div>
+                <div class="user-role">Administrador</div>
+            </div>
+            <a href="./boleta.html" class="btn-boletas">🧾 Generar Boletas</a>
+            <br><br>
+            <button class="btn-logout" onclick="cerrarSesionAdmin()">↩ Cerrar sesión</button>
+        </div>
+    </nav>
+
+    <!-- MAIN -->
+    <main class="main">
+
+        <!-- VISTA: GRADOS -->
+        <div id="vista-grados" class="vista">
+            <div class="page-header">
+                <h1 class="page-title">Grados y Secciones</h1>
+                <button class="btn-primary" onclick="abrirModalGrado()">+ Nuevo Grado</button>
+            </div>
+            <div class="tabla-wrap">
+                <table>
+                    <thead><tr>
+                        <th>Nombre</th><th>Sección</th><th>Modalidad</th><th>Año</th><th>Docente Guía</th><th>Acciones</th>
+                    </tr></thead>
+                    <tbody id="tbody-grados"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- VISTA: ALUMNOS -->
+        <div id="vista-alumnos" class="vista hidden">
+            <div class="page-header">
+                <h1 class="page-title">Alumnos</h1>
+                <button class="btn-primary" onclick="abrirModalAlumno()">+ Nuevo Alumno</button>
+            </div>
+            <div class="filtros">
+                <select id="filtro-grado" onchange="renderAlumnos()">
+                    <option value="">— Todos los grados —</option>
+                </select>
+                <button class="btn-danger" onclick="eliminarAlumnosMasivo()">🗑 Eliminar sección completa</button>
+            </div>
+            <div class="tabla-wrap">
+                <table>
+                    <thead><tr>
+                        <th>Foto</th><th>Apellidos</th><th>Nombres</th><th>NIE</th><th>Grado</th><th>Acciones</th>
+                    </tr></thead>
+                    <tbody id="tbody-alumnos"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- VISTA: DOCENTES -->
+        <div id="vista-docentes" class="vista hidden">
+            <div class="page-header">
+                <h1 class="page-title">Docentes</h1>
+                <button class="btn-primary" onclick="abrirModalDocente()">+ Nuevo Docente</button>
+            </div>
+            <div class="tabla-wrap">
+                <table>
+                    <thead><tr>
+                        <th>Nombre</th><th>Correo</th><th>Rol</th><th>Acciones</th>
+                    </tr></thead>
+                    <tbody id="tbody-docentes"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- VISTA: MATERIAS -->
+        <div id="vista-materias" class="vista hidden">
+            <div class="page-header">
+                <h1 class="page-title">Materias</h1>
+                <div style="display:flex;gap:10px">
+                    <button class="btn-secondary" onclick="cargarMateriasDefault()">Cargar materias IDSJE</button>
+                    <button class="btn-primary" onclick="abrirModalMateria()">+ Nueva Materia</button>
+                </div>
+            </div>
+            <div class="tabla-wrap">
+                <table>
+                    <thead><tr><th>Nombre</th><th>Código</th><th>Acciones</th></tr></thead>
+                    <tbody id="tbody-materias"></tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODAL: GRADO -->
+    <div class="modal-overlay" id="modal-grado">
+        <div class="modal">
+            <div class="modal-title" id="modal-grado-title">Nuevo Grado</div>
+            <input type="hidden" id="grado-id">
+            <div class="field"><label>Nombre</label>
+                <input type="text" id="grado-nombre" placeholder="Ej: PRIMER AÑO DE BACHILLERATO"></div>
+            <div class="field"><label>Sección</label>
+                <input type="text" id="grado-seccion" placeholder="A"></div>
+            <div class="field"><label>Modalidad</label>
+                <select id="grado-modalidad">
+                    <option>General</option><option>Técnico</option><option>Vocacional</option>
+                </select>
+            </div>
+            <div class="field"><label>Año</label>
+                <input type="number" id="grado-anio" value="2026"></div>
+            <div class="field"><label>Docente Guía</label>
+                <select id="grado-guia"></select></div>
+            <div class="modal-actions">
+                <button class="btn-primary" onclick="guardarGrado()">Guardar</button>
+                <button class="btn-secondary" onclick="cerrarModal('modal-grado')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: MATERIAS DEL GRADO -->
+    <div class="modal-overlay" id="modal-grado-materias">
+        <div class="modal" style="max-width:560px">
+            <div class="modal-title" id="mgrado-titulo">Materias del Grado</div>
+            <input type="hidden" id="mgrado-id">
+            <div style="display:flex;gap:10px;margin-bottom:16px;align-items:flex-end">
+                <div class="field" style="flex:1;margin:0">
+                    <label>Materia</label>
+                    <select id="mgrado-materia"></select>
+                </div>
+                <div class="field" style="flex:1;margin:0">
+                    <label>Docente</label>
+                    <select id="mgrado-docente"></select>
+                </div>
+                <button class="btn-primary" onclick="agregarMateriaGrado()" style="white-space:nowrap">+ Agregar</button>
+            </div>
+            <div id="lista-grado-materias"></div>
+            <div class="modal-actions" style="margin-top:16px">
+                <button class="btn-secondary" onclick="cerrarModal('modal-grado-materias')">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: DOCENTE -->
+    <div class="modal-overlay" id="modal-docente">
+        <div class="modal">
+            <div class="modal-title" id="modal-docente-title">Nuevo Docente</div>
+            <input type="hidden" id="docente-id">
+            <div class="field"><label>Nombre completo</label>
+                <input type="text" id="docente-nombre" placeholder="Ej: Juan Carlos Pérez"></div>
+            <div class="field"><label>Correo</label>
+                <input type="email" id="docente-correo" placeholder="docente@idsje.com"></div>
+            <div class="field"><label>Contraseña</label>
+                <input type="password" id="docente-pass" placeholder="Mínimo 6 caracteres"></div>
+            <div class="field"><label>Rol</label>
+                <select id="docente-rol">
+                    <option value="docente">Docente</option>
+                    <option value="admin">Administrador</option>
+                </select>
+            </div>
+            <div style="background:#fef9c3;border:1px solid #fde047;border-radius:10px;padding:12px;font-size:12px;color:#854d0e;margin-bottom:8px">
+                ⚠️ Después de crear el docente aquí, creá también su cuenta en <strong>Supabase → Authentication → Users → Add user</strong> con el mismo correo y contraseña, marcando <strong>Auto Confirm User</strong>.
+            </div>
+            <div class="modal-actions">
+                <button class="btn-primary" onclick="guardarDocente()">Guardar</button>
+                <button class="btn-secondary" onclick="cerrarModal('modal-docente')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: MATERIA -->
+    <div class="modal-overlay" id="modal-materia">
+        <div class="modal">
+            <div class="modal-title" id="modal-materia-title">Nueva Materia</div>
+            <input type="hidden" id="materia-id">
+            <div class="field"><label>Nombre</label>
+                <input type="text" id="materia-nombre" placeholder="Ej: Lenguaje y Literatura"></div>
+            <div class="field"><label>Código (opcional)</label>
+                <input type="text" id="materia-codigo" placeholder="Ej: LEN"></div>
+            <div class="modal-actions">
+                <button class="btn-primary" onclick="guardarMateria()">Guardar</button>
+                <button class="btn-secondary" onclick="cerrarModal('modal-materia')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ALUMNO -->
+    <div class="modal-overlay" id="modal-alumno">
+        <div class="modal">
+            <div class="modal-title" id="modal-alumno-title">Nuevo Alumno</div>
+            <input type="hidden" id="alumno-id">
+            <div class="foto-preview-wrap">
+                <img id="alumno-foto-preview" alt="Foto del alumno">
+            </div>
+            <div class="field"><label>Foto del alumno</label>
+                <input type="file" id="alumno-foto" accept="image/*" onchange="previsualizarFoto(this)"></div>
+            <div class="field"><label>NIE</label>
+                <input type="text" id="alumno-nie" placeholder="Número de Identificación Estudiantil"></div>
+            <div class="field"><label>Apellidos</label>
+                <input type="text" id="alumno-apellidos" placeholder="APELLIDOS"></div>
+            <div class="field"><label>Nombres</label>
+                <input type="text" id="alumno-nombres" placeholder="NOMBRES"></div>
+            <div class="field"><label>Grado y Sección</label>
+                <select id="alumno-grado"></select></div>
+            <div class="field"><label>Año de ingreso</label>
+                <input type="number" id="alumno-anio" value="2026"></div>
+            <div class="modal-actions">
+                <button class="btn-primary" onclick="guardarAlumno()">Guardar</button>
+                <button class="btn-secondary" onclick="cerrarModal('modal-alumno')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module">
+        import { init, mostrarVista as mv } from './src/js/admin.js';
+        window.mostrarVista = (v) => {
+            document.querySelectorAll('.vista').forEach(el => el.classList.add('hidden'));
+            document.getElementById('vista-' + v).classList.remove('hidden');
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector('[data-vista="' + v + '"]')?.classList.add('active');
+            mv(v);
+        };
+
+        // Poblar filtro grado en alumnos
+        const origMV = window.mostrarVista;
+        window.mostrarVista = async (v) => {
+            origMV(v);
+            if (v === 'alumnos') {
+                const { supabase } = await import('./src/js/auth.js');
+                const { data } = await supabase.from('grados').select('*').order('nombre');
+                const sel = document.getElementById('filtro-grado');
+                sel.innerHTML = '<option value="">— Todos los grados —</option>' +
+                    (data || []).map(g => `<option value="${g.id}">${g.nombre} ${g.seccion}</option>`).join('');
+            }
+        };
+    </script>
+</body>
+</html>

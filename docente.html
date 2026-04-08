@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDSJE — Panel Docente</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'DM Sans',sans-serif;background:#f0f4f8;color:#1e293b;min-height:100vh}
+
+        /* TOPBAR */
+        .topbar{background:#1B3A6B;color:#fff;padding:14px 28px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+        .topbar-brand{font-family:'Syne',sans-serif;font-size:18px;font-weight:800}
+        .topbar-right{display:flex;align-items:center;gap:16px}
+        .topbar-user{font-size:12px;color:rgba(255,255,255,.7)}
+        .btn-logout{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:#fff;padding:7px 14px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;transition:background .2s}
+        .btn-logout:hover{background:rgba(255,255,255,.2)}
+
+        /* CONTENIDO */
+        .contenido{max-width:1100px;margin:0 auto;padding:32px 24px}
+        .hidden{display:none!important}
+
+        /* VISTA GRADOS */
+        .vista-titulo{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:#1B3A6B;margin-bottom:24px}
+        .grados-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px}
+        .grado-card-doc{background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);overflow:hidden}
+        .grado-card-header{padding:20px 20px 12px;border-bottom:1px solid #f1f5f9}
+        .grado-nombre{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:#1B3A6B;text-transform:uppercase}
+        .grado-sub{font-size:11px;color:#94a3b8;margin-top:3px}
+        .materias-list{padding:12px}
+        .materia-btn{display:flex;justify-content:space-between;align-items:center;width:100%;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:6px;cursor:pointer;transition:all .2s;font-family:'DM Sans',sans-serif}
+        .materia-btn:hover{background:#e0f2fe;border-color:#7dd3fc}
+        .materia-nombre{font-size:13px;font-weight:500;color:#1e293b}
+        .materia-arrow{color:#94a3b8;font-size:14px}
+        .empty-state{text-align:center;padding:60px 20px;color:#94a3b8;font-size:14px;line-height:1.8}
+
+        /* VISTA NOTAS */
+        .notas-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+        .notas-titulo{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:#1B3A6B}
+        .notas-subtitulo{font-size:12px;color:#94a3b8;margin-top:3px}
+        .btn-volver{background:#e2e8f0;color:#475569;border:none;padding:9px 16px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s}
+        .btn-volver:hover{background:#cbd5e1}
+
+        /* Periodos */
+        .periodos{display:flex;background:#e2e8f0;border-radius:10px;padding:3px;margin-bottom:20px;width:fit-content}
+        .periodo-btn{padding:7px 18px;border-radius:8px;border:none;background:transparent;font-family:'Syne',sans-serif;font-weight:700;font-size:11px;cursor:pointer;color:#64748b;transition:all .2s}
+        .periodo-btn.active{background:#1B3A6B;color:#fff;box-shadow:0 2px 4px rgba(0,0,0,.15)}
+
+        /* Tabla notas */
+        .tabla-wrap{background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);overflow:hidden;overflow-x:auto}
+        table{width:100%;border-collapse:collapse;min-width:700px}
+        thead{background:#1B3A6B;color:#fff}
+        th{padding:13px 14px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;white-space:nowrap}
+        td{padding:11px 14px;font-size:13px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+        tr:last-child td{border-bottom:none}
+        tr:hover td{background:#f8fafc}
+        .td-num{width:40px;text-align:center;color:#94a3b8;font-size:11px}
+        .td-nombre{font-weight:500;min-width:200px}
+        .nota-input{width:72px;padding:7px 8px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;text-align:center;outline:none;transition:border-color .2s}
+        .nota-input:focus{border-color:#1B3A6B}
+        .nota-input:disabled{background:#f8fafc;color:#94a3b8;cursor:not-allowed}
+        .nota-rec{border-style:dashed;background:#fff9f0}
+        .td-nf{font-family:'Syne',sans-serif;font-weight:800;font-size:15px;text-align:center}
+        .nf-aprobado{color:#059669}
+        .nf-reprobado{color:#dc2626}
+        .th-nf{background:#2E5FAC!important;text-align:center}
+
+        /* Info de rango */
+        .info-rangos{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+        .rango-tag{padding:5px 12px;border-radius:100px;font-size:11px;font-weight:600;background:#e0f2fe;color:#0369a1}
+    </style>
+</head>
+<body>
+
+    <!-- TOPBAR -->
+    <nav class="topbar">
+        <div class="topbar-brand">IDSJE · Panel Docente</div>
+        <div class="topbar-right">
+            <span class="topbar-user" id="docente-nombre"></span>
+            <button class="btn-logout" onclick="cerrarSesionDocente()">↩ Salir</button>
+        </div>
+    </nav>
+
+    <div class="contenido">
+
+        <!-- VISTA: MIS GRADOS -->
+        <div id="vista-grados-doc">
+            <h1 class="vista-titulo">Mis Materias</h1>
+            <div class="grados-grid" id="mis-grados"></div>
+        </div>
+
+        <!-- VISTA: NOTAS -->
+        <div id="vista-notas" class="hidden">
+            <div class="notas-header">
+                <div>
+                    <div class="notas-titulo" id="titulo-materia">Materia</div>
+                    <div class="notas-subtitulo" id="subtitulo-materia"></div>
+                </div>
+                <button class="btn-volver" onclick="volverAGrados()">← Mis Materias</button>
+            </div>
+
+            <!-- Selector de periodo -->
+            <div class="periodos">
+                <button class="periodo-btn active" onclick="setPeriodo(1)">Periodo 1</button>
+                <button class="periodo-btn" onclick="setPeriodo(2)">Periodo 2</button>
+                <button class="periodo-btn" onclick="setPeriodo(3)">Periodo 3</button>
+                <button class="periodo-btn" onclick="setPeriodo(4)">Periodo 4</button>
+            </div>
+
+            <!-- Rangos de notas -->
+            <div class="info-rangos">
+                <span class="rango-tag">Actividades: máx 3.5</span>
+                <span class="rango-tag">Laboratorio: máx 3.5</span>
+                <span class="rango-tag">Examen: máx 3.0</span>
+                <span class="rango-tag">Nota Final: suma de los tres</span>
+            </div>
+
+            <!-- Tabla -->
+            <div class="tabla-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nº</th>
+                            <th>Apellidos y Nombres</th>
+                            <th>Actividades<br><small>35%</small></th>
+                            <th>Laboratorio<br><small>35%</small></th>
+                            <th>Examen<br><small>30%</small></th>
+                            <th class="th-nf">NF</th>
+                            <th>Recuperación</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-notas"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- VISTA: COMPETENCIAS CIUDADANAS -->
+        <div id="vista-competencias" class="hidden">
+            <div class="notas-header">
+                <div>
+                    <div class="notas-titulo" id="comp-titulo">Competencias</div>
+                    <div class="notas-subtitulo">Competencias Ciudadanas e Inasistencias</div>
+                </div>
+                <button class="btn-volver" onclick="volverDeCompetencias()">← Mis Materias</button>
+            </div>
+
+            <div class="periodos">
+                <button class="comp-periodo-btn active" onclick="setCompPeriodo(1)">Periodo 1</button>
+                <button class="comp-periodo-btn" onclick="setCompPeriodo(2)">Periodo 2</button>
+                <button class="comp-periodo-btn" onclick="setCompPeriodo(3)">Periodo 3</button>
+                <button class="comp-periodo-btn" onclick="setCompPeriodo(4)">Periodo 4</button>
+            </div>
+
+            <div class="tabla-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nº</th>
+                            <th>Apellidos y Nombres</th>
+                            <th class="th-comp-label">Convivencia y paz</th>
+                            <th class="th-comp-label">Autonomía</th>
+                            <th class="th-comp-label">Expresión</th>
+                            <th class="th-comp-label">Pertenencia</th>
+                            <th>Inasistencias</th>
+                            <th>Observación</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-comp"></tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module" src="./src/js/docente.js"></script>
+</body>
+</html>

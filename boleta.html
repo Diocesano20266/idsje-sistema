@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDSJE — Boletas de Notas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'DM Sans',sans-serif;background:#f0f4f8;color:#1e293b}
+
+        /* TOPBAR */
+        .topbar{background:#1B3A6B;color:#fff;padding:14px 28px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100}
+        .topbar-brand{font-family:'Syne',sans-serif;font-size:18px;font-weight:800}
+        .topbar-right{display:flex;gap:12px;align-items:center}
+        .btn-imprimir{background:#10b981;border:none;color:#fff;padding:9px 20px;border-radius:10px;font-family:'Syne',sans-serif;font-weight:700;font-size:12px;cursor:pointer;transition:background .2s}
+        .btn-imprimir:hover{background:#059669}
+        .btn-volver-link{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:#fff;padding:9px 16px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none}
+        .btn-logout{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.7);padding:7px 14px;border-radius:8px;font-size:11px;cursor:pointer}
+
+        /* CONTROLES */
+        .controles{max-width:900px;margin:28px auto;padding:0 24px}
+        .controles-card{background:#fff;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,.08);display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap}
+        .ctrl-field{flex:1;min-width:200px}
+        .ctrl-field label{display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:8px}
+        .ctrl-field select{width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;outline:none;background:#fff;transition:border-color .2s}
+        .ctrl-field select:focus{border-color:#1B3A6B}
+        .periodos{display:flex;background:#e2e8f0;border-radius:10px;padding:3px}
+        .periodo-btn-b{padding:8px 16px;border-radius:8px;border:none;background:transparent;font-family:'Syne',sans-serif;font-weight:700;font-size:11px;cursor:pointer;color:#64748b;transition:all .2s}
+        .periodo-btn-b.active{background:#1B3A6B;color:#fff}
+        .btn-generar{background:#1B3A6B;color:#fff;border:none;padding:11px 24px;border-radius:10px;font-family:'Syne',sans-serif;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;transition:background .2s}
+        .btn-generar:hover{background:#2E5FAC}
+
+        /* LOADING */
+        #loading-boletas{text-align:center;padding:40px;color:#94a3b8;display:none}
+        #loading-boletas.show,#loading-boletas:not(.hidden){display:block}
+        .hidden{display:none!important}
+
+        /* ═══════════════════════════════════
+           BOLETA — Estilos de impresión
+        ═══════════════════════════════════ */
+        .boleta-page{
+            background:#fff;
+            max-width:760px;
+            margin:24px auto;
+            padding:24px 28px;
+            box-shadow:0 2px 12px rgba(0,0,0,.1);
+            border-radius:8px;
+            position:relative;
+            font-size:11px;
+        }
+
+        /* Encabezado */
+        .boleta-header{display:flex;align-items:center;gap:16px;border-bottom:2px solid #1B3A6B;padding-bottom:12px;margin-bottom:8px}
+        .header-logos{flex-shrink:0}
+        .logo-placeholder{width:60px;height:60px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px;text-align:center}
+        .logo-idsje{background:#1B3A6B;color:#fff}
+        .logo-mined{background:#003087;color:#fff}
+        .header-info{flex:1;text-align:center}
+        .inst-nombre{font-family:'Syne',sans-serif;font-weight:800;font-size:13px;color:#1B3A6B}
+        .inst-dir{font-size:10px;color:#64748b;margin-top:2px}
+
+        .boleta-titulo{text-align:center;font-family:'Syne',sans-serif;font-weight:800;font-size:13px;background:#f1f5f9;padding:8px;border-radius:6px;margin:10px 0 4px}
+        .boleta-subtitulo{text-align:center;font-size:11px;font-weight:600;color:#64748b;margin-bottom:12px}
+
+        /* Datos alumno */
+        .alumno-datos{position:relative;padding-right:90px;margin-bottom:12px}
+        .dato-row{display:flex;gap:6px;margin-bottom:4px;font-size:11px}
+        .dato-label{font-weight:700;white-space:nowrap}
+        .dato-valor{font-weight:600;color:#1B3A6B}
+        .foto-alumno{position:absolute;top:0;right:0;width:80px;height:96px;object-fit:cover;border:1px solid #e2e8f0;border-radius:4px}
+        .foto-vacia{position:absolute;top:0;right:0;width:80px;height:96px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px}
+
+        /* Tabla notas */
+        .tabla-notas{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:10px}
+        .tabla-notas th{background:#1B3A6B;color:#fff;padding:6px 8px;text-align:center;font-weight:700;font-size:10px}
+        .tabla-notas .th-materia{text-align:left}
+        .tabla-notas td{padding:5px 8px;border:1px solid #e2e8f0;text-align:center}
+        .tabla-notas .td-num{width:24px;font-size:10px;color:#94a3b8}
+        .tabla-notas .td-materia{text-align:left;font-weight:500}
+        .tabla-notas .td-nf{font-weight:800;font-size:12px}
+        .tabla-notas .reprobado{color:#dc2626;background:#fef2f2}
+        .tabla-notas tfoot td{background:#f8fafc;font-weight:600;font-size:10px}
+        .td-reprobadas{text-align:right;padding-right:16px}
+
+        /* Competencias */
+        .tabla-competencias{width:100%;border-collapse:collapse;margin-bottom:8px;font-size:10px}
+        .tabla-competencias th{background:#334155;color:#fff;padding:5px 10px;font-size:10px;font-weight:700}
+        .tabla-competencias .th-comp{text-align:left}
+        .tabla-competencias .th-concepto{width:80px;text-align:center}
+        .tabla-competencias td{padding:5px 10px;border:1px solid #e2e8f0}
+        .td-concepto{text-align:center;font-weight:700}
+
+        /* Observación */
+        .tabla-obs{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:10px}
+        .tabla-obs td{padding:5px 10px;border:1px solid #e2e8f0}
+        .td-obs-label{font-weight:700;width:140px;background:#f8fafc}
+        .td-promedio{font-family:'Syne',sans-serif;font-weight:800;font-size:14px;color:#1B3A6B;text-align:right}
+
+        /* Firmas */
+        .firmas{display:flex;justify-content:space-around;margin-top:32px;margin-bottom:12px}
+        .firma-bloque{text-align:center;min-width:220px}
+        .firma-linea{border-top:1px solid #1e293b;margin-bottom:6px}
+        .firma-nombre{font-size:10px;font-weight:600}
+        .firma-cargo{font-size:10px;color:#64748b}
+
+        .boleta-footer{text-align:center;font-size:9px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:8px}
+
+        /* ═══ IMPRESIÓN ═══ */
+        @media print {
+            .topbar,.controles,#loading-boletas{display:none!important}
+            body{background:white}
+            .boleta-page{
+                box-shadow:none;
+                margin:0;
+                padding:16px 20px;
+                border-radius:0;
+                page-break-after:always;
+                max-width:100%;
+            }
+            .boleta-page:last-child{page-break-after:avoid}
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="topbar">
+        <div class="topbar-brand">IDSJE · Boletas de Notas</div>
+        <div class="topbar-right">
+            <button class="btn-imprimir" onclick="imprimirBoletas()">🖨 Imprimir / PDF</button>
+            <a href="./admin.html" class="btn-volver-link">← Admin</a>
+            <button class="btn-logout" onclick="cerrarSesionBoleta()">Salir</button>
+        </div>
+    </nav>
+
+    <div class="controles">
+        <div class="controles-card">
+            <div class="ctrl-field">
+                <label>Grado y Sección</label>
+                <select id="sel-grado">
+                    <option value="">— Seleccionar —</option>
+                </select>
+            </div>
+            <div class="ctrl-field">
+                <label>Periodo</label>
+                <div class="periodos">
+                    <button class="periodo-btn-b active" onclick="setPeriodoBoleta(1)">P1</button>
+                    <button class="periodo-btn-b" onclick="setPeriodoBoleta(2)">P2</button>
+                    <button class="periodo-btn-b" onclick="setPeriodoBoleta(3)">P3</button>
+                    <button class="periodo-btn-b" onclick="setPeriodoBoleta(4)">P4</button>
+                </div>
+            </div>
+            <button class="btn-generar" onclick="generarBoletas()">Generar Boletas</button>
+        </div>
+    </div>
+
+    <div id="loading-boletas" class="hidden">
+        ⏳ Generando boletas, por favor espera...
+    </div>
+
+    <div id="contenedor-boletas"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module" src="./src/js/boleta.js"></script>
+</body>
+</html>

@@ -5,225 +5,285 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IDSJE — Administración</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'DM Sans',sans-serif;background:#f0f4f8;color:#1e293b;min-height:100vh}
+        body{font-family:'Plus Jakarta Sans',sans-serif;background:#f0f3f9;color:#1e293b;min-height:100vh;display:flex}
 
         /* ── SIDEBAR ── */
-        .sidebar{position:fixed;top:0;left:0;width:240px;height:100vh;background:#1B3A6B;display:flex;flex-direction:column;z-index:100}
-        .sidebar-brand{padding:28px 24px 20px;border-bottom:1px solid rgba(255,255,255,.08)}
-        .brand-name{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:#fff}
-        .brand-sub{font-size:10px;color:rgba(255,255,255,.4);letter-spacing:2px;text-transform:uppercase;margin-top:3px}
-        .nav{flex:1;padding:16px 12px;overflow-y:auto}
-        .nav-btn{display:flex;align-items:center;gap:10px;width:100%;padding:11px 14px;background:transparent;border:none;border-radius:10px;color:rgba(255,255,255,.6);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;text-align:left;margin-bottom:2px}
-        .nav-btn:hover{background:rgba(255,255,255,.08);color:#fff}
-        .nav-btn.active{background:rgba(255,255,255,.12);color:#fff;font-weight:600}
-        .nav-btn .icon{font-size:16px;width:20px;text-align:center}
-        .sidebar-footer{padding:16px 12px;border-top:1px solid rgba(255,255,255,.08)}
-        .user-info{padding:10px 14px;margin-bottom:8px}
-        .user-name{font-size:12px;color:rgba(255,255,255,.8);font-weight:500}
-        .user-role{font-size:10px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:1px}
-        .btn-logout{display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:10px;color:#f87171;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}
-        .btn-logout:hover{background:rgba(239,68,68,.2)}
+        .sidebar{position:fixed;top:0;left:0;width:220px;height:100vh;background:#0a1628;display:flex;flex-direction:column;z-index:100;border-right:1px solid rgba(212,175,55,.1)}
+        .sb-brand{padding:18px 16px 14px;border-bottom:1px solid rgba(212,175,55,.12)}
+        .sb-logo-row{display:flex;align-items:center;gap:10px}
+        .sb-seal{width:38px;height:38px;border-radius:50%;border:1.5px solid rgba(212,175,55,.6);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .sb-name{font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:#fff}
+        .sb-tagline{font-size:8.5px;color:rgba(212,175,55,.6);letter-spacing:2px;text-transform:uppercase;margin-top:2px}
+        .sb-nav{flex:1;padding:14px 8px;overflow-y:auto}
+        .nav-group-label{font-size:8.5px;font-weight:700;color:rgba(212,175,55,.4);letter-spacing:2.5px;text-transform:uppercase;padding:0 8px;margin:10px 0 5px}
+        .nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:7px;cursor:pointer;margin-bottom:1px;position:relative;transition:all .2s}
+        .nav-item:hover{background:rgba(255,255,255,.05)}
+        .nav-item.active{background:rgba(212,175,55,.1)}
+        .nav-item.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:2.5px;height:18px;background:#d4af37;border-radius:2px}
+        .nav-ico{width:15px;height:15px;opacity:.45;flex-shrink:0}
+        .nav-item.active .nav-ico{opacity:1}
+        .nav-txt{font-size:11.5px;font-weight:500;color:rgba(255,255,255,.55)}
+        .nav-item.active .nav-txt{color:#fff;font-weight:600}
+        .nav-item.gold{background:rgba(212,175,55,.07);border:1px solid rgba(212,175,55,.15)}
+        .nav-item.gold .nav-txt{color:#d4af37}
+        .nav-item.gold .nav-ico{opacity:1}
+        .sb-foot{padding:12px 10px;border-top:1px solid rgba(212,175,55,.08)}
+        .user-pill{display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(255,255,255,.04);border-radius:8px;border:1px solid rgba(255,255,255,.06)}
+        .u-av{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#d4af37,#a07c0a);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#0a1628;flex-shrink:0}
+        .u-name{font-size:11px;font-weight:600;color:#fff}
+        .u-role{font-size:9px;color:rgba(212,175,55,.6);text-transform:uppercase;letter-spacing:.8px}
+        .btn-exit{width:100%;margin-top:7px;padding:7px;background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.15);border-radius:7px;color:rgba(255,120,120,.8);font-size:10px;font-weight:600;cursor:pointer;transition:all .2s}
+        .btn-exit:hover{background:rgba(239,68,68,.15)}
 
         /* ── MAIN ── */
-        .main{margin-left:240px;padding:32px;min-height:100vh}
-        .page-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px}
-        .page-title{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:#1B3A6B}
-        .btn-primary{background:#1B3A6B;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-family:'Syne',sans-serif;font-weight:700;font-size:12px;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;transition:background .2s;display:inline-flex;align-items:center;gap:6px}
-        .btn-primary:hover{background:#2E5FAC}
-        .btn-secondary{background:#e2e8f0;color:#475569;border:none;padding:9px 16px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}
-        .btn-secondary:hover{background:#cbd5e1}
+        .main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh}
+        .gold-bar{height:2.5px;background:linear-gradient(90deg,#d4af37 0%,#f5d97a 40%,transparent 100%)}
+        .topbar{background:#fff;height:56px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e8ecf5;position:sticky;top:0;z-index:50}
+        .tb-title{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:#0a1628}
+        .tb-sub{font-size:10px;color:#94a3b8;margin-top:1px}
+        .topbar-actions{display:flex;gap:8px;align-items:center}
+        .btn-primary{background:#0a1628;color:#d4af37;border:1px solid rgba(212,175,55,.3);padding:8px 16px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:5px}
+        .btn-primary:hover{background:#d4af37;color:#0a1628}
+        .btn-secondary{background:#fff;color:#475569;border:1px solid #e2e8f0;padding:7px 14px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s}
+        .btn-secondary:hover{background:#f8fafc;border-color:#cbd5e1}
 
-        /* ── VISTAS ── */
-        .vista{display:none}.vista.active,.vista:not(.hidden){display:block}.hidden{display:none!important}
+        /* ── CONTENIDO ── */
+        .content{padding:22px 24px;flex:1}
+        .hidden{display:none!important}
 
-        /* ── TABLA ── */
-        .tabla-wrap{background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);overflow:hidden}
+        /* ── STATS ── */
+        .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px}
+        .sc{background:#fff;border-radius:10px;padding:16px;border:1px solid rgba(27,58,107,.12);position:relative;overflow:hidden}
+        .sc::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#1B3A6B,#2E5FAC)}
+        .sc-label{font-size:9.5px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1.2px}
+        .sc-val{font-family:'Playfair Display',serif;font-size:26px;font-weight:700;color:#0a1628;margin:6px 0 3px}
+        .sc-note{font-size:10px;color:#64748b}
+
+        /* ── GRADOS BURBUJAS ── */
+        .grados-section{background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden}
+        .gs-header{padding:14px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f1f5fb}
+        .gs-title{font-size:13px;font-weight:700;color:#0a1628;display:flex;align-items:center;gap:8px}
+        .gs-dot{width:7px;height:7px;border-radius:50%;background:#d4af37}
+        .gs-body{padding:20px}
+        .grados-group{margin-bottom:20px}
+        .grados-group:last-child{margin-bottom:0}
+        .group-label{font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #f1f5fb}
+        .bubbles{display:flex;flex-wrap:wrap;gap:12px}
+        .grado-bubble{display:flex;flex-direction:column;align-items:center;cursor:pointer;transition:all .2s}
+        .bubble-circle{width:72px;height:72px;border-radius:50%;background:#fff;border:2px solid #1B3A6B;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:all .25s;position:relative}
+        .grado-bubble:hover .bubble-circle{background:#0a1628;border-color:#d4af37;transform:translateY(-4px);box-shadow:0 8px 20px rgba(10,22,40,.2)}
+        .grado-bubble:hover .bubble-code{color:#d4af37}
+        .grado-bubble:hover .bubble-sub{color:rgba(255,255,255,.5)}
+        .bubble-code{font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:#0a1628;line-height:1;transition:color .25s}
+        .bubble-sub{font-size:9px;color:#94a3b8;margin-top:2px;letter-spacing:.5px;transition:color .25s}
+        .bubble-label{font-size:10px;color:#64748b;margin-top:7px;font-weight:500;text-align:center}
+        .badge-mod{position:absolute;top:-5px;right:-5px;padding:2px 6px;border-radius:100px;font-size:8px;font-weight:700}
+        .mod-gen{background:#e8f4fd;color:#1a5f9a;border:1px solid #c3ddf5}
+        .mod-tec{background:#fef3e2;color:#a06010;border:1px solid #f5ddb0}
+        .mod-voc{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
+        .bubble-actions{display:none;flex-direction:column;gap:4px;margin-top:6px}
+        .grado-bubble:hover .bubble-actions{display:flex}
+        .ba-btn{padding:3px 8px;border-radius:5px;font-size:9px;font-weight:600;cursor:pointer;border:none;transition:all .2s;text-align:center}
+        .ba-edit{background:#e8f4fd;color:#1a5f9a}
+        .ba-mat{background:#e8fdf0;color:#1a7a40}
+        .ba-del{background:#fde8e8;color:#b52828}
+        .empty-bubbles{padding:32px;text-align:center;color:#94a3b8;font-size:13px}
+
+        /* ── TABLA GENÉRICA ── */
+        .tabla-wrap{background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden}
+        .tabla-header{padding:14px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f1f5fb}
+        .tabla-title{font-size:13px;font-weight:700;color:#0a1628;display:flex;align-items:center;gap:8px}
         table{width:100%;border-collapse:collapse}
-        thead{background:#1B3A6B;color:#fff}
-        th{padding:14px 16px;text-align:left;font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
-        td{padding:13px 16px;font-size:13px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+        thead{background:#f8fafc}
+        th{padding:10px 16px;text-align:left;font-size:9.5px;font-weight:700;color:#94a3b8;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid #f1f5fb}
+        td{padding:12px 16px;font-size:12px;color:#1e293b;border-bottom:1px solid #f7f9fc;vertical-align:middle}
         tr:last-child td{border-bottom:none}
-        tr:hover td{background:#f8fafc}
-        .btn-sm{padding:5px 10px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;border:none;transition:all .2s;margin-right:4px}
-        .btn-edit{background:#e0f2fe;color:#0369a1}.btn-edit:hover{background:#bae6fd}
-        .btn-del{background:#fee2e2;color:#dc2626}.btn-del:hover{background:#fecaca}
-        .btn-info{background:#e0e7ff;color:#4338ca}.btn-info:hover{background:#c7d2fe}
-        .badge{padding:3px 8px;border-radius:100px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
-        .badge-admin{background:#fef3c7;color:#d97706}
-        .badge-docente{background:#e0f2fe;color:#0369a1}
-        .foto-mini{width:36px;height:36px;border-radius:50%;object-fit:cover}
-        .foto-placeholder{width:36px;height:36px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:14px;color:#94a3b8}
-        .text-muted{color:#94a3b8;font-size:12px}
-        .text-center{text-align:center}
+        tr:hover td{background:#fafbfd}
+        .btn-sm{padding:5px 10px;border-radius:6px;font-size:10px;font-weight:600;cursor:pointer;border:none;transition:all .2s;margin-right:3px}
+        .btn-edit{background:#e8f4fd;color:#1a5f9a}.btn-edit:hover{background:#bfdbfe}
+        .btn-del{background:#fde8e8;color:#b52828}.btn-del:hover{background:#fecaca}
+        .btn-info{background:#e8fdf0;color:#1a7a40}.btn-info:hover{background:#bbf7d0}
+        .badge{padding:3px 8px;border-radius:100px;font-size:10px;font-weight:600}
+        .badge-admin{background:#fef3e2;color:#a06010}
+        .badge-docente{background:#e8f4fd;color:#1a5f9a}
+        .foto-mini{width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid #e2e8f0}
+        .foto-placeholder{width:36px;height:36px;border-radius:50%;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:14px;color:#94a3b8;border:2px solid #e2e8f0}
+        .text-muted{color:#94a3b8;font-size:11px}
+        .td-bold{font-weight:600;color:#0a1628}
 
         /* ── FILTROS ── */
-        .filtros{display:flex;gap:12px;margin-bottom:20px;align-items:center;flex-wrap:wrap}
-        .filtros select,.filtros input{padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;outline:none;background:#fff;transition:border-color .2s;min-width:200px}
+        .filtros{display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
+        .filtros select,.filtros input{padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;outline:none;background:#fff;transition:border-color .2s;min-width:180px}
         .filtros select:focus,.filtros input:focus{border-color:#1B3A6B}
-        .btn-danger{background:#fee2e2;color:#dc2626;border:1px solid #fecaca;padding:9px 16px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer}
+        .btn-danger{background:#fde8e8;color:#b52828;border:1px solid #fecaca;padding:8px 14px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s}
         .btn-danger:hover{background:#fecaca}
 
         /* ── MATERIAS ASIGNADAS ── */
-        .materia-asignada{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#f8fafc;border-radius:10px;margin-bottom:6px;font-size:13px}
+        .materia-asignada{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#f8fafc;border-radius:8px;margin-bottom:6px;font-size:12px;border:1px solid #f1f5fb}
         .materia-asignada span:first-child{flex:1;font-weight:500}
 
         /* ── MODALES ── */
-        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);z-index:200;align-items:center;justify-content:center;padding:20px}
+        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(10,22,40,.6);backdrop-filter:blur(4px);z-index:200;align-items:center;justify-content:center;padding:20px}
         .modal-overlay.open{display:flex}
-        .modal{background:#fff;border-radius:20px;padding:28px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto}
-        .modal-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:#1B3A6B;margin-bottom:20px}
+        .modal{background:#fff;border-radius:16px;padding:28px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+        .modal-title{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:#0a1628;margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid #f1f5fb}
         .field{margin-bottom:14px}
-        .field label{display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:6px}
-        .field input,.field select,.field textarea{width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;color:#1e293b;outline:none;transition:border-color .2s;background:#fff}
+        .field label{display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#64748b;margin-bottom:6px}
+        .field input,.field select,.field textarea{width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:9px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;color:#1e293b;outline:none;transition:border-color .2s;background:#fff}
         .field input:focus,.field select:focus{border-color:#1B3A6B}
-        .modal-actions{display:flex;gap:10px;margin-top:20px}
-        .foto-preview-wrap{text-align:center;margin-bottom:10px}
-        #alumno-foto-preview{width:80px;height:80px;border-radius:50%;object-fit:cover;display:none}
+        .modal-actions{display:flex;gap:10px;margin-top:20px;padding-top:16px;border-top:1px solid #f1f5fb}
+        .foto-preview-wrap{text-align:center;margin-bottom:12px}
+        #alumno-foto-preview{width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid #e2e8f0;display:none}
+        .info-box{background:#fef9e7;border:1px solid #fde68a;border-radius:9px;padding:12px;font-size:11px;color:#92400e;margin-bottom:8px;line-height:1.6}
 
-        /* Nav boletas */
-        .btn-boletas{display:flex;align-items:center;gap:8px;padding:10px 16px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.2);border-radius:10px;color:#059669;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;transition:all .2s}
-        .btn-boletas:hover{background:rgba(16,185,129,.2)}
-
-        /* Responsive */
-        @media(max-width:768px){.sidebar{transform:translateX(-100%)}.main{margin-left:0;padding:20px}}
+        @media(max-width:768px){.sidebar{transform:translateX(-100%)}.main{margin-left:0}}
     </style>
 </head>
 <body>
 
     <!-- SIDEBAR -->
     <nav class="sidebar">
-        <div class="sidebar-brand">
-            <div class="brand-name">IDSJE</div>
-            <div class="brand-sub">Panel Administrador</div>
-        </div>
-        <div class="nav">
-            <button class="nav-btn active" data-vista="grados" onclick="mostrarVista('grados')">
-                <span class="icon">🏫</span> Grados y Secciones
-            </button>
-            <button class="nav-btn" data-vista="alumnos" onclick="mostrarVista('alumnos')">
-                <span class="icon">👨‍🎓</span> Alumnos
-            </button>
-            <button class="nav-btn" data-vista="docentes" onclick="mostrarVista('docentes')">
-                <span class="icon">👨‍🏫</span> Docentes
-            </button>
-            <button class="nav-btn" data-vista="materias" onclick="mostrarVista('materias')">
-                <span class="icon">📚</span> Materias
-            </button>
-        </div>
-        <div class="sidebar-footer">
-            <div class="user-info">
-                <div class="user-name" id="admin-nombre"></div>
-                <div class="user-role">Administrador</div>
+        <div class="sb-brand">
+            <div class="sb-logo-row">
+                <div class="sb-seal">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#d4af37" stroke-width="1.2"/><path d="M12 6v6l4 2" stroke="#d4af37" stroke-width="1.2" stroke-linecap="round"/></svg>
+                </div>
+                <div>
+                    <div class="sb-name">IDSJE</div>
+                    <div class="sb-tagline">Sistema Académico</div>
+                </div>
             </div>
-            <a href="./boleta.html" class="btn-boletas">🧾 Generar Boletas</a>
-            <br><br>
-            <button class="btn-logout" onclick="cerrarSesionAdmin()">↩ Cerrar sesión</button>
+        </div>
+        <div class="sb-nav">
+            <div class="nav-group-label">Gestión académica</div>
+            <div class="nav-item active" data-vista="grados" onclick="mostrarVista('grados')">
+                <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" fill="#d4af37"/><rect x="9" y="1" width="6" height="6" rx="1.5" fill="#d4af37" opacity=".4"/><rect x="1" y="9" width="6" height="6" rx="1.5" fill="#d4af37" opacity=".4"/><rect x="9" y="9" width="6" height="6" rx="1.5" fill="#d4af37" opacity=".4"/></svg>
+                <span class="nav-txt">Grados y Secciones</span>
+            </div>
+            <div class="nav-item" data-vista="alumnos" onclick="mostrarVista('alumnos')">
+                <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5.5" r="3" stroke="rgba(255,255,255,.6)" stroke-width="1.3" fill="none"/><path d="M2 14c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" stroke="rgba(255,255,255,.6)" stroke-width="1.3" stroke-linecap="round" fill="none"/></svg>
+                <span class="nav-txt">Alumnos</span>
+            </div>
+            <div class="nav-item" data-vista="docentes" onclick="mostrarVista('docentes')">
+                <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.3" fill="none"/><path d="M5 7h6M5 10h4" stroke="rgba(255,255,255,.6)" stroke-width="1.2"/></svg>
+                <span class="nav-txt">Docentes</span>
+            </div>
+            <div class="nav-item" data-vista="materias" onclick="mostrarVista('materias')">
+                <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M8 2L9.5 6.5H14L10.3 9l1.5 4.5L8 11 4.2 13.5l1.5-4.5L2 6.5h4.5L8 2z" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/></svg>
+                <span class="nav-txt">Materias</span>
+            </div>
+            <div class="nav-group-label" style="margin-top:14px">Reportes</div>
+            <div class="nav-item gold" onclick="window.location.href='./boleta.html'">
+                <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5" fill="#d4af37" opacity=".25"/><path d="M5 5h6M5 8h6M5 11h3" stroke="#d4af37" stroke-width="1.2"/></svg>
+                <span class="nav-txt">Generar Boletas</span>
+            </div>
+        </div>
+        <div class="sb-foot">
+            <div class="user-pill">
+                <div class="u-av" id="admin-iniciales">AC</div>
+                <div>
+                    <div class="u-name" id="admin-nombre">Cargando...</div>
+                    <div class="u-role">Administrador</div>
+                </div>
+            </div>
+            <button class="btn-exit" onclick="cerrarSesionAdmin()">↩ Cerrar sesión</button>
         </div>
     </nav>
 
     <!-- MAIN -->
-    <main class="main">
+    <div class="main">
+        <div class="gold-bar"></div>
 
-        <!-- VISTA: GRADOS -->
-        <div id="vista-grados" class="vista">
-            <div class="page-header">
-                <h1 class="page-title">Grados y Secciones</h1>
+        <!-- TOPBAR -->
+        <div class="topbar">
+            <div>
+                <div class="tb-title" id="topbar-titulo">Grados y Secciones</div>
+                <div class="tb-sub">Instituto Diocesano San Juan Evangelista · 2026</div>
+            </div>
+            <div class="topbar-actions" id="topbar-actions">
                 <button class="btn-primary" onclick="abrirModalGrado()">+ Nuevo Grado</button>
             </div>
-            <div class="tabla-wrap">
-                <table>
-                    <thead><tr>
-                        <th>Nombre</th><th>Sección</th><th>Modalidad</th><th>Año</th><th>Docente Guía</th><th>Acciones</th>
-                    </tr></thead>
-                    <tbody id="tbody-grados"></tbody>
-                </table>
+        </div>
+
+        <!-- STATS -->
+        <div style="padding:20px 24px 0">
+            <div class="stats">
+                <div class="sc"><div class="sc-label">Grados</div><div class="sc-val" id="stat-grados">—</div><div class="sc-note">Secciones activas</div></div>
+                <div class="sc"><div class="sc-label">Alumnos</div><div class="sc-val" id="stat-alumnos">—</div><div class="sc-note">Matriculados 2026</div></div>
+                <div class="sc"><div class="sc-label">Docentes</div><div class="sc-val" id="stat-docentes">—</div><div class="sc-note">Registrados</div></div>
+                <div class="sc"><div class="sc-label">Materias</div><div class="sc-val" id="stat-materias">—</div><div class="sc-note">Activas</div></div>
             </div>
         </div>
 
-        <!-- VISTA: ALUMNOS -->
-        <div id="vista-alumnos" class="vista hidden">
-            <div class="page-header">
-                <h1 class="page-title">Alumnos</h1>
-                <div style="display:flex;gap:10px">
-                    <input type="file" id="excel-alumnos" accept=".xlsx,.xls" class="hidden" onchange="importarAlumnosExcel(event)">
-                    <button class="btn-secondary" onclick="document.getElementById('excel-alumnos').click()">
-                        📊 Importar Excel
-                    </button>
-                    <button class="btn-primary" onclick="abrirModalAlumno()">+ Nuevo Alumno</button>
+        <!-- VISTAS -->
+        <div class="content">
+
+            <!-- GRADOS -->
+            <div id="vista-grados">
+                <div class="grados-section">
+                    <div class="gs-header">
+                        <div class="gs-title"><span class="gs-dot"></span>Secciones registradas</div>
+                    </div>
+                    <div class="gs-body" id="grados-bubbles-body">
+                        <div class="empty-bubbles">No hay grados todavía. Crea el primero con el botón de arriba.</div>
+                    </div>
                 </div>
             </div>
-            <div class="filtros">
-                <select id="filtro-grado" onchange="renderAlumnos()">
-                    <option value="">— Todos los grados —</option>
-                </select>
-                <button class="btn-danger" onclick="eliminarAlumnosMasivo()">🗑 Eliminar sección completa</button>
-            </div>
-            <div class="tabla-wrap">
-                <table>
-                    <thead><tr>
-                        <th>Foto</th><th>Apellidos</th><th>Nombres</th><th>NIE</th><th>Grado</th><th>Acciones</th>
-                    </tr></thead>
-                    <tbody id="tbody-alumnos"></tbody>
-                </table>
-            </div>
-        </div>
 
-        <!-- VISTA: DOCENTES -->
-        <div id="vista-docentes" class="vista hidden">
-            <div class="page-header">
-                <h1 class="page-title">Docentes</h1>
-                <button class="btn-primary" onclick="abrirModalDocente()">+ Nuevo Docente</button>
-            </div>
-            <div class="tabla-wrap">
-                <table>
-                    <thead><tr>
-                        <th>Nombre</th><th>Correo</th><th>Rol</th><th>Acciones</th>
-                    </tr></thead>
-                    <tbody id="tbody-docentes"></tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- VISTA: MATERIAS -->
-        <div id="vista-materias" class="vista hidden">
-            <div class="page-header">
-                <h1 class="page-title">Materias</h1>
-                <div style="display:flex;gap:10px">
-                    <button class="btn-secondary" onclick="cargarMateriasDefault()">Cargar materias IDSJE</button>
-                    <button class="btn-primary" onclick="abrirModalMateria()">+ Nueva Materia</button>
+            <!-- ALUMNOS -->
+            <div id="vista-alumnos" class="hidden">
+                <div class="filtros">
+                    <select id="filtro-grado" onchange="renderAlumnos()">
+                        <option value="">— Todos los grados —</option>
+                    </select>
+                    <button class="btn-danger" onclick="eliminarAlumnosMasivo()">🗑 Eliminar sección completa</button>
+                </div>
+                <div class="tabla-wrap">
+                    <table>
+                        <thead><tr><th>Foto</th><th>Apellidos</th><th>Nombres</th><th>NIE</th><th>Grado</th><th>Acciones</th></tr></thead>
+                        <tbody id="tbody-alumnos"></tbody>
+                    </table>
                 </div>
             </div>
-            <div class="tabla-wrap">
-                <table>
-                    <thead><tr><th>Nombre</th><th>Código</th><th>Acciones</th></tr></thead>
-                    <tbody id="tbody-materias"></tbody>
-                </table>
-            </div>
-        </div>
 
-    </main>
+            <!-- DOCENTES -->
+            <div id="vista-docentes" class="hidden">
+                <div class="tabla-wrap">
+                    <table>
+                        <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Acciones</th></tr></thead>
+                        <tbody id="tbody-docentes"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- MATERIAS -->
+            <div id="vista-materias" class="hidden">
+                <div class="tabla-wrap">
+                    <table>
+                        <thead><tr><th>Nombre</th><th>Código</th><th>Acciones</th></tr></thead>
+                        <tbody id="tbody-materias"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
 
     <!-- MODAL: GRADO -->
     <div class="modal-overlay" id="modal-grado">
         <div class="modal">
             <div class="modal-title" id="modal-grado-title">Nuevo Grado</div>
             <input type="hidden" id="grado-id">
-            <div class="field"><label>Nombre</label>
-                <input type="text" id="grado-nombre" placeholder="Ej: PRIMER AÑO DE BACHILLERATO"></div>
-            <div class="field"><label>Sección</label>
-                <input type="text" id="grado-seccion" placeholder="A"></div>
+            <div class="field"><label>Nombre del grado</label><input type="text" id="grado-nombre" placeholder="Ej: PRIMER AÑO DE BACHILLERATO"></div>
+            <div class="field"><label>Sección</label><input type="text" id="grado-seccion" placeholder="A"></div>
             <div class="field"><label>Modalidad</label>
-                <select id="grado-modalidad">
-                    <option>General</option><option>Técnico</option><option>Vocacional</option>
-                </select>
+                <select id="grado-modalidad"><option>General</option><option>Técnico</option><option>Vocacional</option></select>
             </div>
-            <div class="field"><label>Año</label>
-                <input type="number" id="grado-anio" value="2026"></div>
-            <div class="field"><label>Docente Guía</label>
-                <select id="grado-guia"></select></div>
+            <div class="field"><label>Año</label><input type="number" id="grado-anio" value="2026"></div>
+            <div class="field"><label>Docente Guía</label><select id="grado-guia"></select></div>
             <div class="modal-actions">
                 <button class="btn-primary" onclick="guardarGrado()">Guardar</button>
                 <button class="btn-secondary" onclick="cerrarModal('modal-grado')">Cancelar</button>
@@ -236,21 +296,13 @@
         <div class="modal" style="max-width:560px">
             <div class="modal-title" id="mgrado-titulo">Materias del Grado</div>
             <input type="hidden" id="mgrado-id">
-            <div style="display:flex;gap:10px;margin-bottom:16px;align-items:flex-end">
-                <div class="field" style="flex:1;margin:0">
-                    <label>Materia</label>
-                    <select id="mgrado-materia"></select>
-                </div>
-                <div class="field" style="flex:1;margin:0">
-                    <label>Docente</label>
-                    <select id="mgrado-docente"></select>
-                </div>
-                <button class="btn-primary" onclick="agregarMateriaGrado()" style="white-space:nowrap">+ Agregar</button>
+            <div style="display:flex;gap:10px;margin-bottom:16px;align-items:flex-end;flex-wrap:wrap">
+                <div class="field" style="flex:1;min-width:140px;margin:0"><label>Materia</label><select id="mgrado-materia"></select></div>
+                <div class="field" style="flex:1;min-width:140px;margin:0"><label>Docente</label><select id="mgrado-docente"></select></div>
+                <button class="btn-primary" onclick="agregarMateriaGrado()">+ Agregar</button>
             </div>
             <div id="lista-grado-materias"></div>
-            <div class="modal-actions" style="margin-top:16px">
-                <button class="btn-secondary" onclick="cerrarModal('modal-grado-materias')">Cerrar</button>
-            </div>
+            <div class="modal-actions"><button class="btn-secondary" onclick="cerrarModal('modal-grado-materias')">Cerrar</button></div>
         </div>
     </div>
 
@@ -259,21 +311,13 @@
         <div class="modal">
             <div class="modal-title" id="modal-docente-title">Nuevo Docente</div>
             <input type="hidden" id="docente-id">
-            <div class="field"><label>Nombre completo</label>
-                <input type="text" id="docente-nombre" placeholder="Ej: Juan Carlos Pérez"></div>
-            <div class="field"><label>Correo</label>
-                <input type="email" id="docente-correo" placeholder="docente@idsje.com"></div>
-            <div class="field"><label>Contraseña</label>
-                <input type="password" id="docente-pass" placeholder="Mínimo 6 caracteres"></div>
+            <div class="field"><label>Nombre completo</label><input type="text" id="docente-nombre" placeholder="Ej: Juan Carlos Pérez"></div>
+            <div class="field"><label>Correo</label><input type="email" id="docente-correo" placeholder="docente@idsje.com"></div>
+            <div class="field"><label>Contraseña</label><input type="password" id="docente-pass" placeholder="Mínimo 6 caracteres"></div>
             <div class="field"><label>Rol</label>
-                <select id="docente-rol">
-                    <option value="docente">Docente</option>
-                    <option value="admin">Administrador</option>
-                </select>
+                <select id="docente-rol"><option value="docente">Docente</option><option value="admin">Administrador</option></select>
             </div>
-            <div style="background:#fef9c3;border:1px solid #fde047;border-radius:10px;padding:12px;font-size:12px;color:#854d0e;margin-bottom:8px">
-                ⚠️ Después de crear el docente aquí, creá también su cuenta en <strong>Supabase → Authentication → Users → Add user</strong> con el mismo correo y contraseña, marcando <strong>Auto Confirm User</strong>.
-            </div>
+            <div class="info-box">⚠️ Después de guardar aquí, creá también la cuenta en <strong>Supabase → Authentication → Users → Add user</strong> con el mismo correo y contraseña, marcando <strong>Auto Confirm User</strong>.</div>
             <div class="modal-actions">
                 <button class="btn-primary" onclick="guardarDocente()">Guardar</button>
                 <button class="btn-secondary" onclick="cerrarModal('modal-docente')">Cancelar</button>
@@ -286,10 +330,8 @@
         <div class="modal">
             <div class="modal-title" id="modal-materia-title">Nueva Materia</div>
             <input type="hidden" id="materia-id">
-            <div class="field"><label>Nombre</label>
-                <input type="text" id="materia-nombre" placeholder="Ej: Lenguaje y Literatura"></div>
-            <div class="field"><label>Código (opcional)</label>
-                <input type="text" id="materia-codigo" placeholder="Ej: LEN"></div>
+            <div class="field"><label>Nombre</label><input type="text" id="materia-nombre" placeholder="Ej: Lenguaje y Literatura"></div>
+            <div class="field"><label>Código (opcional)</label><input type="text" id="materia-codigo" placeholder="Ej: LEN"></div>
             <div class="modal-actions">
                 <button class="btn-primary" onclick="guardarMateria()">Guardar</button>
                 <button class="btn-secondary" onclick="cerrarModal('modal-materia')">Cancelar</button>
@@ -302,21 +344,13 @@
         <div class="modal">
             <div class="modal-title" id="modal-alumno-title">Nuevo Alumno</div>
             <input type="hidden" id="alumno-id">
-            <div class="foto-preview-wrap">
-                <img id="alumno-foto-preview" alt="Foto del alumno">
-            </div>
-            <div class="field"><label>Foto del alumno</label>
-                <input type="file" id="alumno-foto" accept="image/*" onchange="previsualizarFoto(this)"></div>
-            <div class="field"><label>NIE</label>
-                <input type="text" id="alumno-nie" placeholder="Número de Identificación Estudiantil"></div>
-            <div class="field"><label>Apellidos</label>
-                <input type="text" id="alumno-apellidos" placeholder="APELLIDOS"></div>
-            <div class="field"><label>Nombres</label>
-                <input type="text" id="alumno-nombres" placeholder="NOMBRES"></div>
-            <div class="field"><label>Grado y Sección</label>
-                <select id="alumno-grado"></select></div>
-            <div class="field"><label>Año de ingreso</label>
-                <input type="number" id="alumno-anio" value="2026"></div>
+            <div class="foto-preview-wrap"><img id="alumno-foto-preview" alt="Foto"></div>
+            <div class="field"><label>Foto del alumno</label><input type="file" id="alumno-foto" accept="image/*" onchange="previsualizarFoto(this)"></div>
+            <div class="field"><label>NIE</label><input type="text" id="alumno-nie" placeholder="Número de Identificación Estudiantil"></div>
+            <div class="field"><label>Apellidos</label><input type="text" id="alumno-apellidos" placeholder="APELLIDOS"></div>
+            <div class="field"><label>Nombres</label><input type="text" id="alumno-nombres" placeholder="NOMBRES"></div>
+            <div class="field"><label>Grado y Sección</label><select id="alumno-grado"></select></div>
+            <div class="field"><label>Año de ingreso</label><input type="number" id="alumno-anio" value="2026"></div>
             <div class="modal-actions">
                 <button class="btn-primary" onclick="guardarAlumno()">Guardar</button>
                 <button class="btn-secondary" onclick="cerrarModal('modal-alumno')">Cancelar</button>

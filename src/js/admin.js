@@ -22,24 +22,60 @@ async function init() {
 }
 
 async function cargarTodo() {
-    const [{ data: grados }, { data: usuarios }, { data: materias }] = await Promise.all([
+    const [{ data: grados }, { data: usuarios }, { data: materias }, { count: cAlumnos }] = await Promise.all([
         supabase.from('grados').select('*').order('nombre'),
         supabase.from('usuarios').select('*').order('nombre_completo'),
         supabase.from('materias').select('*').order('nombre'),
+        supabase.from('alumnos').select('*', { count: 'exact', head: true }),
     ]);
     gradosCache   = grados   || [];
     usuariosCache = usuarios || [];
     materiasCache = materias || [];
+    const sg = document.getElementById('stat-grados');
+    const sa = document.getElementById('stat-alumnos');
+    const sd = document.getElementById('stat-docentes');
+    const sm = document.getElementById('stat-materias');
+    if (sg) sg.textContent = gradosCache.length;
+    if (sa) sa.textContent = cAlumnos || 0;
+    if (sd) sd.textContent = usuariosCache.length;
+    if (sm) sm.textContent = materiasCache.length;
+    const ini = document.getElementById('admin-inicial');
+    if (ini && usuarioActual?.nombre_completo) ini.textContent = usuarioActual.nombre_completo.charAt(0).toUpperCase();
 }
 
 // ── VISTAS ──────────────────────────────────
+const TITULOS = {
+    grados: 'Grados y Secciones',
+    alumnos: 'Alumnos',
+    docentes: 'Docentes',
+    materias: 'Materias'
+};
+
+const VISTA_CONFIG = {
+    grados:   { titulo: 'Grados y Secciones',  accion: `<button class="btn-primary" onclick="abrirModalGrado()">+ Nuevo Grado</button>` },
+    alumnos:  { titulo: 'Alumnos',              accion: `<input type="file" id="excel-alumnos" accept=".xlsx,.xls" class="hidden" onchange="importarAlumnosExcel(event)"><button class="btn-secondary" onclick="document.getElementById('excel-alumnos').click()">📊 Importar Excel</button><button class="btn-primary" onclick="abrirModalAlumno()">+ Nuevo Alumno</button>` },
+    docentes: { titulo: 'Docentes',             accion: `<button class="btn-primary" onclick="abrirModalDocente()">+ Nuevo Docente</button>` },
+    materias: { titulo: 'Materias',             accion: `<button class="btn-secondary" onclick="cargarMateriasDefault()">Cargar IDSJE</button><button class="btn-primary" onclick="abrirModalMateria()">+ Nueva Materia</button>` },
+};
+
 window.mostrarVista = async (vista) => {
     vistaActual = vista;
-    document.querySelectorAll('.vista').forEach(v => v.classList.add('hidden'));
+    document.querySelectorAll('[id^="vista-"]').forEach(v => v.classList.add('hidden'));
     const el = document.getElementById(`vista-${vista}`);
     if (el) el.classList.remove('hidden');
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
     document.querySelector(`[data-vista="${vista}"]`)?.classList.add('active');
+
+    // Actualizar topbar
+    const cfg = VISTA_CONFIG[vista];
+    if (cfg) {
+        const t = document.getElementById('topbar-titulo');
+        const a = document.getElementById('topbar-actions');
+        if (t) t.textContent = cfg.titulo;
+        if (a) a.innerHTML = cfg.accion;
+    }
+    const tt = document.getElementById('topbar-titulo');
+    if (tt) tt.textContent = TITULOS[vista] || vista;
 
     if (vista === 'grados')   renderGrados();
     if (vista === 'docentes') renderDocentes();
@@ -58,21 +94,69 @@ window.mostrarVista = async (vista) => {
 
 // ── GRADOS ──────────────────────────────────
 function renderGrados() {
-    const tbody = document.getElementById('tbody-grados');
-    tbody.innerHTML = gradosCache.map(g => `
-        <tr>
-            <td>${g.nombre}</td>
-            <td>${g.seccion}</td>
-            <td>${g.modalidad}</td>
-            <td>${g.anio}</td>
-            <td>${usuariosCache.find(u => u.id === g.docente_guia_id)?.nombre_completo || '—'}</td>
-            <td>
-                <button class="btn-sm btn-edit" onclick="editarGrado('${g.id}')">Editar</button>
-                <button class="btn-sm btn-del" onclick="eliminarGrado('${g.id}')">Eliminar</button>
-                <button class="btn-sm btn-info" onclick="gestionarMateriaGrado('${g.id}')">Materias</button>
-            </td>
-        </tr>
+    const body = document.getElementById('grados-bubbles-body');
+    if (!body) return;
+    if (!gradosCache.length) {
+        body.innerHTML = '<div class="empty-bubbles">No hay grados todavía. Creá el primero con el botón de arriba.</div>';
+        return;
+    }
+
+    // Agrupar por nombre de grado
+    const grupos = {};
+    gradosCache.forEach(g => {
+        const key = g.nombre;
+        if (!grupos[key]) grupos[key] = [];
+        grupos[key].push(g);
+    });
+
+    // Generar código corto: "PRIMER AÑO" + modalidad + sección → "1GA"
+    function codigoGrado(g) {
+        const nom = g.nombre.toUpperCase();
+        let num = '?';
+        if (nom.includes('PRIMER') || nom.includes('1')) num = '1';
+        else if (nom.includes('SEGUNDO') || nom.includes('2')) num = '2';
+        else if (nom.includes('TERCER') || nom.includes('3')) num = '3';
+        const mod = g.modalidad === 'Técnico' ? 'T' : g.modalidad === 'Vocacional' ? 'V' : 'G';
+        return `${num}${mod}${g.seccion}`;
+    }
+
+    function badgeMod(m) {
+        if (m === 'Técnico') return 'mod-tec';
+        if (m === 'Vocacional') return 'mod-voc';
+        return 'mod-gen';
+    }
+    function labelMod(m) {
+        if (m === 'Técnico') return 'TEC';
+        if (m === 'Vocacional') return 'VOC';
+        return 'GEN';
+    }
+
+    body.innerHTML = Object.entries(grupos).map(([nombre, grados]) => `
+        <div class="grados-group">
+            <div class="group-label">${nombre}</div>
+            <div class="bubbles">
+                ${grados.map(g => `
+                    <div class="grado-bubble">
+                        <div class="bubble-circle">
+                            <span class="badge-mod ${badgeMod(g.modalidad)}">${labelMod(g.modalidad)}</span>
+                            <span class="bubble-code">${codigoGrado(g)}</span>
+                            <span class="bubble-sub">Secc. ${g.seccion}</span>
+                        </div>
+                        <span class="bubble-label">${usuariosCache.find(u=>u.id===g.docente_guia_id)?.nombre_completo?.split(' ')[0] || 'Sin guía'}</span>
+                        <div class="bubble-actions">
+                            <button class="ba-btn ba-edit" onclick="editarGrado('${g.id}')">Editar</button>
+                            <button class="ba-btn ba-mat" onclick="gestionarMateriaGrado('${g.id}')">Materias</button>
+                            <button class="ba-btn ba-del" onclick="eliminarGrado('${g.id}')">Eliminar</button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
     `).join('');
+
+    // Actualizar stats
+    const sg = document.getElementById('stat-grados');
+    if (sg) sg.textContent = gradosCache.length;
 }
 
 window.abrirModalGrado = (id = null) => {

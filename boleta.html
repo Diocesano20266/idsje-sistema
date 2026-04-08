@@ -5,119 +5,155 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IDSJE — Boletas de Notas</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'DM Sans',sans-serif;background:#f0f4f8;color:#1e293b}
+        body{font-family:'Plus Jakarta Sans',sans-serif;background:#f0f3f9;color:#1e293b}
 
-        /* TOPBAR */
-        .topbar{background:#1B3A6B;color:#fff;padding:14px 28px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100}
-        .topbar-brand{font-family:'Syne',sans-serif;font-size:18px;font-weight:800}
-        .topbar-right{display:flex;gap:12px;align-items:center}
-        .btn-imprimir{background:#10b981;border:none;color:#fff;padding:9px 20px;border-radius:10px;font-family:'Syne',sans-serif;font-weight:700;font-size:12px;cursor:pointer;transition:background .2s}
-        .btn-imprimir:hover{background:#059669}
-        .btn-volver-link{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:#fff;padding:9px 16px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none}
-        .btn-logout{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.7);padding:7px 14px;border-radius:8px;font-size:11px;cursor:pointer}
+        /* ── TOPBAR ── */
+        .topbar{background:#0a1628;color:#fff;padding:14px 28px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100}
+        .gold-bar{height:2.5px;background:linear-gradient(90deg,#d4af37 0%,#f5d97a 40%,transparent 100%);position:sticky;top:52px;z-index:100}
+        .topbar-brand{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:#fff;display:flex;align-items:center;gap:8px}
+        .topbar-brand span{color:#d4af37}
+        .topbar-right{display:flex;gap:10px;align-items:center}
+        .btn-imprimir{background:#d4af37;border:none;color:#0a1628;padding:9px 20px;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:12px;cursor:pointer;transition:all .2s}
+        .btn-imprimir:hover{background:#f5d97a}
+        .btn-volver{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:#fff;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;transition:all .2s}
+        .btn-volver:hover{background:rgba(255,255,255,.2)}
+        .btn-salir{background:transparent;border:none;color:rgba(255,255,255,.5);font-size:11px;cursor:pointer}
 
-        /* CONTROLES */
-        .controles{max-width:900px;margin:28px auto;padding:0 24px}
-        .controles-card{background:#fff;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,.08);display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap}
-        .ctrl-field{flex:1;min-width:200px}
-        .ctrl-field label{display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:8px}
-        .ctrl-field select{width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;outline:none;background:#fff;transition:border-color .2s}
-        .ctrl-field select:focus{border-color:#1B3A6B}
-        .periodos{display:flex;background:#e2e8f0;border-radius:10px;padding:3px}
-        .periodo-btn-b{padding:8px 16px;border-radius:8px;border:none;background:transparent;font-family:'Syne',sans-serif;font-weight:700;font-size:11px;cursor:pointer;color:#64748b;transition:all .2s}
-        .periodo-btn-b.active{background:#1B3A6B;color:#fff}
-        .btn-generar{background:#1B3A6B;color:#fff;border:none;padding:11px 24px;border-radius:10px;font-family:'Syne',sans-serif;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;transition:background .2s}
-        .btn-generar:hover{background:#2E5FAC}
+        /* ── CONTROLES ── */
+        .controles{max-width:860px;margin:24px auto;padding:0 24px}
+        .ctrl-card{background:#fff;border-radius:14px;padding:20px 24px;box-shadow:0 1px 4px rgba(0,0,0,.08);border:1px solid #e2e8f0;display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap}
+        .ctrl-field{flex:1;min-width:180px}
+        .ctrl-field label{display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#64748b;margin-bottom:7px}
+        .ctrl-field select{width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:9px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;outline:none;background:#fff;transition:border-color .2s;color:#0a1628}
+        .ctrl-field select:focus{border-color:#0a1628}
+        .periodos{display:flex;background:#f1f5f9;border-radius:9px;padding:3px;gap:2px}
+        .periodo-btn-b{padding:7px 14px;border-radius:7px;border:none;background:transparent;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:11px;cursor:pointer;color:#64748b;transition:all .2s}
+        .periodo-btn-b.active{background:#0a1628;color:#d4af37;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+        .btn-generar{background:#0a1628;color:#d4af37;border:1px solid rgba(212,175,55,.3);padding:11px 24px;border-radius:9px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;transition:all .2s}
+        .btn-generar:hover{background:#d4af37;color:#0a1628}
 
-        /* LOADING */
-        #loading-boletas{text-align:center;padding:40px;color:#94a3b8;display:none}
-        #loading-boletas.show,#loading-boletas:not(.hidden){display:block}
+        /* ── LOADING ── */
+        .loading{text-align:center;padding:40px;color:#94a3b8;font-size:13px}
         .hidden{display:none!important}
 
-        /* ═══════════════════════════════════
-           BOLETA — Estilos de impresión
-        ═══════════════════════════════════ */
+        /* ════════════════════════════════════
+           BOLETA — Diseño vertical oficial
+        ════════════════════════════════════ */
+        #contenedor-boletas{max-width:860px;margin:0 auto;padding:0 24px 40px}
+
         .boleta-page{
             background:#fff;
-            max-width:760px;
-            margin:24px auto;
-            padding:24px 28px;
-            box-shadow:0 2px 12px rgba(0,0,0,.1);
-            border-radius:8px;
-            position:relative;
-            font-size:11px;
+            margin:24px 0;
+            border-radius:4px;
+            box-shadow:0 2px 16px rgba(0,0,0,.12);
+            overflow:hidden;
+            page-break-after:always;
         }
+        .boleta-page:last-child{page-break-after:avoid}
+
+        /* Franja superior dorada */
+        .boleta-top-stripe{height:5px;background:linear-gradient(90deg,#d4af37,#f5d97a,#d4af37)}
 
         /* Encabezado */
-        .boleta-header{display:flex;align-items:center;gap:16px;border-bottom:2px solid #1B3A6B;padding-bottom:12px;margin-bottom:8px}
-        .header-logos{flex-shrink:0}
-        .logo-placeholder{width:60px;height:60px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px;text-align:center}
-        .logo-idsje{background:#1B3A6B;color:#fff}
-        .logo-mined{background:#003087;color:#fff}
-        .header-info{flex:1;text-align:center}
-        .inst-nombre{font-family:'Syne',sans-serif;font-weight:800;font-size:13px;color:#1B3A6B}
-        .inst-dir{font-size:10px;color:#64748b;margin-top:2px}
+        .boleta-encabezado{
+            display:flex;
+            align-items:center;
+            gap:16px;
+            padding:16px 24px;
+            border-bottom:2px solid #0a1628;
+        }
+        .enc-logo{width:64px;height:64px;border-radius:50%;border:2px solid #0a1628;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;background:#f8fafc}
+        .enc-logo img{width:100%;height:100%;object-fit:cover}
+        .enc-logo-text{font-family:'Playfair Display',serif;font-size:10px;font-weight:700;color:#0a1628;text-align:center;line-height:1.2}
+        .enc-info{flex:1;text-align:center}
+        .enc-inst{font-family:'Playfair Display',serif;font-size:13px;font-weight:700;color:#0a1628;text-transform:uppercase;line-height:1.3}
+        .enc-lema{font-size:10px;color:#64748b;font-style:italic;margin:3px 0}
+        .enc-dir{font-size:10px;color:#475569}
+        .enc-mined{width:64px;height:64px;border-radius:50%;border:2px solid #0a1628;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#f8fafc}
+        .enc-mined-text{font-family:'Playfair Display',serif;font-size:9px;font-weight:700;color:#0a1628;text-align:center;line-height:1.3}
 
-        .boleta-titulo{text-align:center;font-family:'Syne',sans-serif;font-weight:800;font-size:13px;background:#f1f5f9;padding:8px;border-radius:6px;margin:10px 0 4px}
-        .boleta-subtitulo{text-align:center;font-size:11px;font-weight:600;color:#64748b;margin-bottom:12px}
+        /* Título boleta */
+        .boleta-titulo-wrap{background:#0a1628;padding:8px 24px;display:flex;justify-content:space-between;align-items:center}
+        .boleta-titulo{font-family:'Playfair Display',serif;font-size:12px;font-weight:700;color:#d4af37;letter-spacing:1px;text-transform:uppercase}
+        .boleta-periodo{font-size:10px;color:rgba(255,255,255,.7);font-weight:600}
 
-        /* Datos alumno */
-        .alumno-datos{position:relative;padding-right:90px;margin-bottom:12px}
-        .dato-row{display:flex;gap:6px;margin-bottom:4px;font-size:11px}
-        .dato-label{font-weight:700;white-space:nowrap}
-        .dato-valor{font-weight:600;color:#1B3A6B}
-        .foto-alumno{position:absolute;top:0;right:0;width:80px;height:96px;object-fit:cover;border:1px solid #e2e8f0;border-radius:4px}
-        .foto-vacia{position:absolute;top:0;right:0;width:80px;height:96px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px}
+        /* Datos del alumno */
+        .alumno-section{padding:14px 24px;border-bottom:1px solid #e2e8f0;display:flex;gap:16px;align-items:flex-start}
+        .alumno-datos{flex:1}
+        .dato-fila{display:flex;align-items:baseline;gap:6px;margin-bottom:6px}
+        .dato-etiqueta{font-size:9.5px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap;min-width:80px}
+        .dato-valor{font-size:12px;font-weight:600;color:#0a1628;border-bottom:1px solid #e2e8f0;flex:1;padding-bottom:2px}
+        .alumno-foto{width:88px;height:104px;border:2px solid #0a1628;border-radius:4px;object-fit:cover;flex-shrink:0}
+        .alumno-foto-vacia{width:88px;height:104px;border:2px dashed #cbd5e1;border-radius:4px;background:#f8fafc;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#94a3b8;font-size:10px;text-align:center;line-height:1.4}
 
-        /* Tabla notas */
-        .tabla-notas{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:10px}
-        .tabla-notas th{background:#1B3A6B;color:#fff;padding:6px 8px;text-align:center;font-weight:700;font-size:10px}
-        .tabla-notas .th-materia{text-align:left}
-        .tabla-notas td{padding:5px 8px;border:1px solid #e2e8f0;text-align:center}
-        .tabla-notas .td-num{width:24px;font-size:10px;color:#94a3b8}
-        .tabla-notas .td-materia{text-align:left;font-weight:500}
-        .tabla-notas .td-nf{font-weight:800;font-size:12px}
-        .tabla-notas .reprobado{color:#dc2626;background:#fef2f2}
-        .tabla-notas tfoot td{background:#f8fafc;font-weight:600;font-size:10px}
-        .td-reprobadas{text-align:right;padding-right:16px}
+        /* Tabla de notas */
+        .notas-section{padding:0 24px 14px}
+        .section-titulo{font-size:9.5px;font-weight:700;color:#0a1628;text-transform:uppercase;letter-spacing:1px;padding:10px 0 6px;border-bottom:2px solid #0a1628;margin-bottom:0}
+        .tabla-notas{width:100%;border-collapse:collapse;font-size:10px}
+        .tabla-notas thead tr{background:#0a1628}
+        .tabla-notas thead th{padding:7px 8px;color:#d4af37;font-weight:700;font-size:9px;text-align:center;letter-spacing:.5px;text-transform:uppercase}
+        .tabla-notas thead th:nth-child(2){text-align:left}
+        .tabla-notas tbody tr:nth-child(even){background:#f8fafc}
+        .tabla-notas tbody tr:hover{background:#f0f4f8}
+        .tabla-notas td{padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:center;color:#1e293b}
+        .tabla-notas td:nth-child(2){text-align:left;font-weight:500}
+        .tabla-notas .td-num{color:#94a3b8;font-size:9px;width:24px}
+        .td-nf{font-weight:800;font-size:12px}
+        .td-aprobado{color:#166534}
+        .td-reprobado{color:#991b1b;background:#fef2f2}
+        .tabla-notas tfoot tr{background:#f1f5f9}
+        .tabla-notas tfoot td{padding:6px 8px;font-size:10px;font-weight:700;color:#0a1628}
 
         /* Competencias */
-        .tabla-competencias{width:100%;border-collapse:collapse;margin-bottom:8px;font-size:10px}
-        .tabla-competencias th{background:#334155;color:#fff;padding:5px 10px;font-size:10px;font-weight:700}
-        .tabla-competencias .th-comp{text-align:left}
-        .tabla-competencias .th-concepto{width:80px;text-align:center}
-        .tabla-competencias td{padding:5px 10px;border:1px solid #e2e8f0}
-        .td-concepto{text-align:center;font-weight:700}
+        .comp-section{padding:0 24px 12px}
+        .tabla-comp{width:100%;border-collapse:collapse;font-size:10px}
+        .tabla-comp thead tr{background:#334155}
+        .tabla-comp thead th{padding:6px 10px;color:#fff;font-weight:700;font-size:9px;text-transform:uppercase;letter-spacing:.5px}
+        .tabla-comp thead th:first-child{text-align:left}
+        .tabla-comp thead th:last-child{text-align:center;width:80px}
+        .tabla-comp tbody tr:nth-child(even){background:#f8fafc}
+        .tabla-comp td{padding:6px 10px;border-bottom:1px solid #f1f5f9;font-size:10px;color:#1e293b}
+        .tabla-comp td:last-child{text-align:center;font-weight:700;font-size:12px;color:#0a1628}
+
+        /* Resumen */
+        .resumen-section{padding:8px 24px 12px;display:flex;gap:16px}
+        .resumen-item{flex:1;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;text-align:center}
+        .resumen-label{font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.8px}
+        .resumen-val{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#0a1628;margin-top:3px}
+        .resumen-val.aprobado{color:#166534}
+        .resumen-val.reprobado{color:#991b1b}
 
         /* Observación */
-        .tabla-obs{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:10px}
-        .tabla-obs td{padding:5px 10px;border:1px solid #e2e8f0}
-        .td-obs-label{font-weight:700;width:140px;background:#f8fafc}
-        .td-promedio{font-family:'Syne',sans-serif;font-weight:800;font-size:14px;color:#1B3A6B;text-align:right}
+        .obs-section{padding:0 24px 14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+        .obs-box{border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px}
+        .obs-label{font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px}
+        .obs-val{font-size:11px;color:#1e293b;min-height:20px}
 
         /* Firmas */
-        .firmas{display:flex;justify-content:space-around;margin-top:32px;margin-bottom:12px}
-        .firma-bloque{text-align:center;min-width:220px}
-        .firma-linea{border-top:1px solid #1e293b;margin-bottom:6px}
-        .firma-nombre{font-size:10px;font-weight:600}
-        .firma-cargo{font-size:10px;color:#64748b}
+        .firmas-section{padding:24px 24px 16px;display:flex;justify-content:space-around;border-top:1px solid #e2e8f0}
+        .firma-bloque{text-align:center;min-width:200px}
+        .firma-linea{border-top:1.5px solid #0a1628;margin-bottom:6px;margin-top:40px}
+        .firma-nombre{font-size:10px;font-weight:700;color:#0a1628}
+        .firma-cargo{font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
 
-        .boleta-footer{text-align:center;font-size:9px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:8px}
+        /* Footer boleta */
+        .boleta-footer-stripe{height:4px;background:linear-gradient(90deg,#0a1628,#2E5FAC,#0a1628)}
+        .boleta-footer{padding:6px 24px;display:flex;justify-content:space-between;align-items:center;background:#f8fafc;border-top:1px solid #e2e8f0}
+        .boleta-footer span{font-size:9px;color:#94a3b8}
 
-        /* ═══ IMPRESIÓN ═══ */
+        /* ══ IMPRESIÓN ══ */
         @media print {
-            .topbar,.controles,#loading-boletas{display:none!important}
+            .topbar,.gold-bar,.controles,#loading-boletas{display:none!important}
             body{background:white}
+            #contenedor-boletas{max-width:100%;padding:0;margin:0}
             .boleta-page{
-                box-shadow:none;
                 margin:0;
-                padding:16px 20px;
+                box-shadow:none;
                 border-radius:0;
                 page-break-after:always;
-                max-width:100%;
             }
             .boleta-page:last-child{page-break-after:avoid}
         }
@@ -126,21 +162,20 @@
 <body>
 
     <nav class="topbar">
-        <div class="topbar-brand">IDSJE · Boletas de Notas</div>
+        <div class="topbar-brand">IDSJE · <span>Boletas de Notas</span></div>
         <div class="topbar-right">
             <button class="btn-imprimir" onclick="imprimirBoletas()">🖨 Imprimir / PDF</button>
-            <a href="./admin.html" class="btn-volver-link">← Admin</a>
-            <button class="btn-logout" onclick="cerrarSesionBoleta()">Salir</button>
+            <a href="./admin.html" class="btn-volver">← Admin</a>
+            <button class="btn-salir" onclick="cerrarSesionBoleta()">Salir</button>
         </div>
     </nav>
+    <div class="gold-bar"></div>
 
     <div class="controles">
-        <div class="controles-card">
+        <div class="ctrl-card">
             <div class="ctrl-field">
                 <label>Grado y Sección</label>
-                <select id="sel-grado">
-                    <option value="">— Seleccionar —</option>
-                </select>
+                <select id="sel-grado"><option value="">— Seleccionar —</option></select>
             </div>
             <div class="ctrl-field">
                 <label>Periodo</label>
@@ -155,10 +190,7 @@
         </div>
     </div>
 
-    <div id="loading-boletas" class="hidden">
-        ⏳ Generando boletas, por favor espera...
-    </div>
-
+    <div id="loading-boletas" class="loading hidden">⏳ Generando boletas...</div>
     <div id="contenedor-boletas"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

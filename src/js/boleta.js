@@ -130,11 +130,11 @@ function generarBoleta(al, materias, notas, comp, docNombre, num, total) {
                     <div style="font-size:10px;color:#333">Teléfono: 7713-1964 | Correo electrónico: instituto_diocesanosje@idsje.info</div>
                 </td>
                 <td style="width:90px;vertical-align:middle;text-align:center">
-                    <img src="https://www.mineducyt.gob.sv/wp-content/uploads/2021/03/logo-mineducyt.png"
-                         onerror="this.style.display='none';this.nextElementSibling.style.display='block'"
-                         style="width:80px;object-fit:contain">
+                    <img src="https://raw.githubusercontent.com/Diocesano20266/idsje-sistema/main/logo-mineducyt.png"
+                         style="width:90px;object-fit:contain"
+                         onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
                     <div style="display:none;border:1.5px solid #333;border-radius:4px;padding:6px 8px;font-size:8px;font-weight:700;line-height:1.5;color:#333;text-align:center">
-                        MINISTERIO<br>DE EDUCACIÓN,<br>CIENCIA Y<br>TECNOLOGÍA
+                        MINISTERIO<br>DE EDUCACIÓN,<br>CIENCIA Y<br>TECNOLOGÍA<br><span style="font-size:9px;font-weight:800">MINEDUCYT</span>
                     </div>
                 </td>
             </tr>

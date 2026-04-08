@@ -147,7 +147,13 @@
         <div id="vista-alumnos" class="vista hidden">
             <div class="page-header">
                 <h1 class="page-title">Alumnos</h1>
-                <button class="btn-primary" onclick="abrirModalAlumno()">+ Nuevo Alumno</button>
+                <div style="display:flex;gap:10px">
+                    <input type="file" id="excel-alumnos" accept=".xlsx,.xls" class="hidden" onchange="importarAlumnosExcel(event)">
+                    <button class="btn-secondary" onclick="document.getElementById('excel-alumnos').click()">
+                        📊 Importar Excel
+                    </button>
+                    <button class="btn-primary" onclick="abrirModalAlumno()">+ Nuevo Alumno</button>
+                </div>
             </div>
             <div class="filtros">
                 <select id="filtro-grado" onchange="renderAlumnos()">
@@ -318,6 +324,7 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script type="module">
         import './src/js/admin.js';

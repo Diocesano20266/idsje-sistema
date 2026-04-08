@@ -33,17 +33,27 @@ async function cargarTodo() {
 }
 
 // ── VISTAS ──────────────────────────────────
-window.mostrarVista = (vista) => {
+window.mostrarVista = async (vista) => {
     vistaActual = vista;
     document.querySelectorAll('.vista').forEach(v => v.classList.add('hidden'));
-    document.getElementById(`vista-${vista}`).classList.remove('hidden');
+    const el = document.getElementById(`vista-${vista}`);
+    if (el) el.classList.remove('hidden');
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     document.querySelector(`[data-vista="${vista}"]`)?.classList.add('active');
 
     if (vista === 'grados')   renderGrados();
     if (vista === 'docentes') renderDocentes();
     if (vista === 'materias') renderMaterias();
-    if (vista === 'alumnos')  renderAlumnos();
+    if (vista === 'alumnos') {
+        // Poblar filtro grado
+        const { data } = await supabase.from('grados').select('*').order('nombre');
+        const sel = document.getElementById('filtro-grado');
+        if (sel) {
+            sel.innerHTML = '<option value="">— Todos los grados —</option>' +
+                (data || []).map(g => `<option value="${g.id}">${g.nombre} ${g.seccion}</option>`).join('');
+        }
+        renderAlumnos();
+    }
 };
 
 // ── GRADOS ──────────────────────────────────

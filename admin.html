@@ -319,28 +319,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script type="module">
-        import { init, mostrarVista as mv } from './src/js/admin.js';
-        window.mostrarVista = (v) => {
-            document.querySelectorAll('.vista').forEach(el => el.classList.add('hidden'));
-            document.getElementById('vista-' + v).classList.remove('hidden');
-            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            document.querySelector('[data-vista="' + v + '"]')?.classList.add('active');
-            mv(v);
-        };
-
-        // Poblar filtro grado en alumnos
-        const origMV = window.mostrarVista;
-        window.mostrarVista = async (v) => {
-            origMV(v);
-            if (v === 'alumnos') {
-                const { supabase } = await import('./src/js/auth.js');
-                const { data } = await supabase.from('grados').select('*').order('nombre');
-                const sel = document.getElementById('filtro-grado');
-                sel.innerHTML = '<option value="">— Todos los grados —</option>' +
-                    (data || []).map(g => `<option value="${g.id}">${g.nombre} ${g.seccion}</option>`).join('');
-            }
-        };
-    </script>
+    <script type="module" src="./src/js/admin.js"></script>
 </body>
 </html>

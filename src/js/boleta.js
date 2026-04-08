@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════
-//  IDSJE — Generador de Boletas
+//  IDSJE — Generador de Boletas v2
 // ═══════════════════════════════════════════
 import { supabase, verificarSesion } from './auth.js';
 import { INSTITUTO } from './config.js';
@@ -38,24 +38,20 @@ window.generarBoletas = async () => {
     if (!gradoId) return alert('Seleccioná un grado primero');
 
     gradoSel = gradosCache.find(g => g.id === gradoId);
-    document.getElementById('loading-boletas').classList.remove('hidden');
+    const loading = document.getElementById('loading-boletas');
+    loading.classList.remove('hidden');
     document.getElementById('contenedor-boletas').innerHTML = '';
 
-    // Cargar alumnos
     const { data: alumnos } = await supabase
-        .from('alumnos')
-        .select('*')
-        .eq('grado_id', gradoId)
-        .eq('activo', true)
-        .order('apellidos');
+        .from('alumnos').select('*')
+        .eq('grado_id', gradoId).eq('activo', true).order('apellidos');
 
     if (!alumnos?.length) {
-        document.getElementById('loading-boletas').classList.add('hidden');
+        loading.classList.add('hidden');
         alert('No hay alumnos en este grado.');
         return;
     }
 
-    // Cargar materias del grado con sus docentes
     const { data: gradoMaterias } = await supabase
         .from('grado_materia')
         .select('*, materias(id, nombre)')
@@ -63,208 +59,227 @@ window.generarBoletas = async () => {
 
     const materiaIds = (gradoMaterias || []).map(gm => gm.id);
 
-    // Cargar todas las notas del periodo
     const { data: todasNotas } = await supabase
-        .from('notas')
-        .select('*')
+        .from('notas').select('*')
         .in('grado_materia_id', materiaIds)
         .eq('periodo', periodoSel);
 
-    // Cargar competencias
     const alumnoIds = alumnos.map(a => a.id);
     const { data: competencias } = await supabase
-        .from('competencias')
-        .select('*')
+        .from('competencias').select('*')
         .in('alumno_id', alumnoIds)
         .eq('grado_id', gradoId)
         .eq('periodo', periodoSel);
 
-    // Generar boletas
     const contenedor = document.getElementById('contenedor-boletas');
     let html = '';
 
     alumnos.forEach((al, idx) => {
-        const notasAlumno = {};
-        (todasNotas || []).forEach(n => {
-            if (n.alumno_id === al.id) notasAlumno[n.grado_materia_id] = n;
-        });
-
-        const compAlumno = (competencias || []).find(c => c.alumno_id === al.id) || {};
-        const reprobadas = (gradoMaterias || []).filter(gm => {
-            const n = notasAlumno[gm.id];
-            if (!n) return false;
-            const nf = n.nota_final_rec ?? n.nota_final;
-            return nf < 6;
-        }).length;
-
-        const promedio = calcularPromedio(gradoMaterias, notasAlumno);
-        html += generarHTMLBoleta(al, gradoMaterias, notasAlumno, compAlumno, reprobadas, promedio, idx + 1, alumnos.length);
+        const notasAl = {};
+        (todasNotas || []).forEach(n => { if (n.alumno_id === al.id) notasAl[n.grado_materia_id] = n; });
+        const compAl = (competencias || []).find(c => c.alumno_id === al.id) || {};
+        html += generarBoleta(al, gradoMaterias || [], notasAl, compAl, idx + 1, alumnos.length);
     });
 
-    document.getElementById('loading-boletas').classList.add('hidden');
+    loading.classList.add('hidden');
     contenedor.innerHTML = html;
 };
 
-function calcularPromedio(materias, notas) {
-    const nfs = materias.map(gm => {
+function calcPromedio(materias, notas) {
+    const vals = materias.map(gm => {
         const n = notas[gm.id];
         if (!n) return null;
         return n.nota_final_rec ?? n.nota_final ?? 0;
-    }).filter(n => n !== null && n > 0);
-
-    if (!nfs.length) return '0.00';
-    return (nfs.reduce((a, b) => a + b, 0) / nfs.length).toFixed(2);
+    }).filter(v => v !== null && v > 0);
+    if (!vals.length) return '0.00';
+    return (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2);
 }
 
-function generarHTMLBoleta(al, materias, notas, comp, reprobadas, promedio, num, total) {
-    const nombreCompleto = `${al.nombres} ${al.apellidos}`;
-    const gradoNombre = `${gradoSel.nombre} ${gradoSel.modalidad} SECCION "${gradoSel.seccion}"`;
-    const docGuia = gradoSel.usuarios?.nombre_completo || 'Docente Guía';
+function reprobadas(materias, notas) {
+    return materias.filter(gm => {
+        const n = notas[gm.id];
+        if (!n) return false;
+        return (n.nota_final_rec ?? n.nota_final ?? 0) < 6;
+    }).length;
+}
+
+function generarBoleta(al, materias, notas, comp, num, total) {
+    const nombreCompleto = `${al.apellidos} ${al.nombres}`;
+    const gradoNombre = `${gradoSel.nombre} ${gradoSel.modalidad} — SECCIÓN "${gradoSel.seccion}"`;
+    const docGuia = gradoSel.usuarios?.nombre_completo || '________________________________';
+    const promedio = calcPromedio(materias, notas);
+    const nRep = reprobadas(materias, notas);
+    const promedioNum = parseFloat(promedio);
 
     const filasNotas = materias.map((gm, i) => {
         const n = notas[gm.id] || {};
-        const act = n.actividades?.toFixed(2) ?? '0.00';
-        const lab = n.laboratorio?.toFixed(2) ?? '0.00';
-        const exa = n.examen?.toFixed(2) ?? '0.00';
-        const nf  = n.nota_final?.toFixed(1) ?? '0.0';
-        const rec = n.recuperacion?.toFixed(2) ?? '';
-        const nfr = n.nota_final_rec?.toFixed(1) ?? '';
-        const reprobada = (n.nota_final_rec ?? n.nota_final ?? 0) < 6 && (n.nota_final ?? 0) > 0;
+        const act = parseFloat(n.actividades || 0).toFixed(2);
+        const lab = parseFloat(n.laboratorio || 0).toFixed(2);
+        const exa = parseFloat(n.examen || 0).toFixed(2);
+        const nf  = parseFloat(n.nota_final || 0).toFixed(1);
+        const rec = n.recuperacion ? parseFloat(n.recuperacion).toFixed(2) : '';
+        const nfr = n.nota_final_rec ? parseFloat(n.nota_final_rec).toFixed(1) : '';
+        const nfFinal = parseFloat(n.nota_final_rec ?? n.nota_final ?? 0);
+        const reprobada = nfFinal < 6 && nfFinal > 0;
 
         return `
         <tr>
-            <td class="td-num">${i + 1}</td>
-            <td class="td-materia">${gm.materias?.nombre || ''}</td>
-            <td class="td-nota">${act}</td>
-            <td class="td-nota">${lab}</td>
-            <td class="td-nota">${exa}</td>
-            <td class="td-nf ${reprobada ? 'reprobado' : ''}">${nf}</td>
-            <td class="td-nota">${rec}</td>
-            <td class="td-nota">${nfr}</td>
+            <td class="td-num">${i+1}</td>
+            <td>${gm.materias?.nombre || ''}</td>
+            <td>${act}</td>
+            <td>${lab}</td>
+            <td>${exa}</td>
+            <td class="td-nf ${reprobada ? 'td-reprobado' : nfFinal>=6?'td-aprobado':''}">${nf}</td>
+            <td>${rec}</td>
+            <td class="${nfr && parseFloat(nfr)<6 ? 'td-reprobado' : ''}">${nfr}</td>
         </tr>`;
     }).join('');
 
-    const COMPETENCIAS_LABELS = [
-        ['Evidencia actitudes favorables para la convivencia y cultura de paz', comp.convivencia || ''],
-        ['Toma decisiones de forma autónoma y responsable', comp.autonomia || ''],
-        ['Se expresa y participa con respeto', comp.expresion || ''],
-        ['Muestra sentido de pertenencia y respeto por nuestra cultura', comp.pertenencia || ''],
+    const COMP_LABELS = [
+        ['Evidencia actitudes favorables para la convivencia democrática y cultura de paz', comp.convivencia || ''],
+        ['Toma decisiones de forma autónoma y responsable frente a situaciones de su vida', comp.autonomia || ''],
+        ['Se expresa y participa con respeto, tolerancia y asertividad', comp.expresion || ''],
+        ['Muestra sentido de pertenencia, identidad cultural y respeto por la diversidad', comp.pertenencia || ''],
     ];
 
     return `
-    <div class="boleta-page" id="boleta-${al.id}">
+    <div class="boleta-page">
+        <div class="boleta-top-stripe"></div>
+
         <!-- ENCABEZADO -->
-        <div class="boleta-header">
-            <div class="header-logos">
-                <div class="logo-placeholder logo-idsje">IDSJE</div>
+        <div class="boleta-encabezado">
+            <div class="enc-logo">
+                <div class="enc-logo-text">IDSJE</div>
             </div>
-            <div class="header-info">
-                <div class="inst-nombre">${INSTITUTO.nombre}</div>
-                <div class="inst-dir">${INSTITUTO.direccion}</div>
-                <div class="inst-dir">Teléfono: ${INSTITUTO.telefono} | ${INSTITUTO.correo}</div>
+            <div class="enc-info">
+                <div class="enc-inst">${INSTITUTO.nombre.toUpperCase()}</div>
+                <div class="enc-lema">DIOS, CIENCIA Y EDUCACIÓN</div>
+                <div class="enc-dir">${INSTITUTO.direccion}</div>
+                <div class="enc-dir">Tel: ${INSTITUTO.telefono} | ${INSTITUTO.correo}</div>
             </div>
-            <div class="header-logos">
-                <div class="logo-placeholder logo-mined">MINED</div>
+            <div class="enc-mined">
+                <div class="enc-mined-text">MINEDUCYT<br>El Salvador</div>
             </div>
         </div>
 
-        <div class="boleta-titulo">
-            BOLETA DE CALIFICACIONES PERIODO ${periodoSel} AÑO ${INSTITUTO.anio}
+        <!-- TÍTULO -->
+        <div class="boleta-titulo-wrap">
+            <div class="boleta-titulo">Boleta de Calificaciones — Educación Media</div>
+            <div class="boleta-periodo">Periodo ${periodoSel} · Año ${INSTITUTO.anio}</div>
         </div>
-        <div class="boleta-subtitulo">EDUCACIÓN MEDIA</div>
 
-        <!-- DATOS DEL ALUMNO -->
-        <div class="alumno-datos">
-            <div class="dato-row">
-                <span class="dato-label">NOMBRE DEL ESTUDIANTE:</span>
-                <span class="dato-valor">${nombreCompleto}</span>
+        <!-- DATOS ALUMNO -->
+        <div class="alumno-section">
+            <div class="alumno-datos">
+                <div class="dato-fila">
+                    <span class="dato-etiqueta">Estudiante:</span>
+                    <span class="dato-valor">${nombreCompleto}</span>
+                </div>
+                <div class="dato-fila">
+                    <span class="dato-etiqueta">NIE:</span>
+                    <span class="dato-valor">${al.nie}</span>
+                </div>
+                <div class="dato-fila">
+                    <span class="dato-etiqueta">Grado:</span>
+                    <span class="dato-valor">${gradoNombre}</span>
+                </div>
+                <div class="dato-fila">
+                    <span class="dato-etiqueta">Docente Guía:</span>
+                    <span class="dato-valor">${docGuia}</span>
+                </div>
             </div>
-            <div class="dato-row">
-                <span class="dato-label">NIE:</span>
-                <span class="dato-valor">${al.nie}</span>
-            </div>
-            <div class="dato-row">
-                <span class="dato-label">GRADO:</span>
-                <span class="dato-valor">${gradoNombre}</span>
-            </div>
+            ${al.foto_url
+                ? `<img src="${al.foto_url}" class="alumno-foto" alt="${nombreCompleto}">`
+                : `<div class="alumno-foto-vacia">Sin<br>fotografía</div>`
+            }
         </div>
-        ${al.foto_url ? `<img src="${al.foto_url}" class="foto-alumno" alt="${nombreCompleto}">` : '<div class="foto-alumno foto-vacia"></div>'}
 
-        <!-- TABLA DE NOTAS -->
-        <table class="tabla-notas">
-            <thead>
-                <tr>
-                    <th>No</th>
-                    <th class="th-materia">ASIGNATURAS:</th>
-                    <th>ACTIVIDADES 35%</th>
-                    <th>LABORATORIO 35%</th>
-                    <th>EXAMEN 30%</th>
-                    <th>NF</th>
-                    <th>Rcup.</th>
-                    <th>NFR</th>
-                </tr>
-            </thead>
-            <tbody>${filasNotas}</tbody>
-            <tfoot>
-                <tr>
-                    <td colspan="6" class="td-reprobadas">
-                        ASIGNATURAS REPROBADAS: <strong>${reprobadas}</strong>
-                    </td>
-                    <td colspan="2"></td>
-                </tr>
-            </tfoot>
-        </table>
+        <!-- TABLA NOTAS -->
+        <div class="notas-section">
+            <div class="section-titulo">Registro de Calificaciones</div>
+            <table class="tabla-notas">
+                <thead>
+                    <tr>
+                        <th>N°</th>
+                        <th style="text-align:left">Asignatura</th>
+                        <th>Actividades<br><small style="font-weight:400;font-size:8px">35% / 3.5</small></th>
+                        <th>Laboratorio<br><small style="font-weight:400;font-size:8px">35% / 3.5</small></th>
+                        <th>Examen<br><small style="font-weight:400;font-size:8px">30% / 3.0</small></th>
+                        <th>N.F.</th>
+                        <th>Recuper.</th>
+                        <th>N.F.R.</th>
+                    </tr>
+                </thead>
+                <tbody>${filasNotas}</tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="5" style="text-align:right;font-size:9px;color:#64748b">Asignaturas reprobadas:</td>
+                        <td colspan="3" style="color:${nRep>0?'#991b1b':'#166534'};font-size:13px">${nRep}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
 
         <!-- COMPETENCIAS -->
-        <table class="tabla-competencias">
-            <thead>
-                <tr>
-                    <th class="th-comp">COMPETENCIAS CIUDADANAS:</th>
-                    <th class="th-concepto">CONCEPTO</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${COMPETENCIAS_LABELS.map(([label, val]) => `
-                <tr>
-                    <td class="td-comp">${label}</td>
-                    <td class="td-concepto">${val}</td>
-                </tr>`).join('')}
-            </tbody>
-        </table>
+        <div class="comp-section">
+            <div class="section-titulo" style="margin-bottom:0">Competencias Ciudadanas</div>
+            <table class="tabla-comp">
+                <thead>
+                    <tr>
+                        <th>Competencia</th>
+                        <th style="text-align:center;width:80px">Concepto<br><small style="font-weight:400;font-size:8px">E·MB·B·R·D</small></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${COMP_LABELS.map(([label, val]) => `
+                    <tr>
+                        <td>${label}</td>
+                        <td style="text-align:center;font-weight:800;font-size:13px;color:#0a1628">${val}</td>
+                    </tr>`).join('')}
+                </tbody>
+            </table>
+        </div>
 
-        <!-- OBSERVACIÓN E INASISTENCIAS -->
-        <table class="tabla-obs">
-            <tr>
-                <td class="td-obs-label">OBSERVACIÓN:</td>
-                <td class="td-obs-val">${comp.observacion || ''}</td>
-            </tr>
-            <tr>
-                <td class="td-obs-label">INASISTENCIA</td>
-                <td class="td-obs-val">${comp.inasistencias || ''}</td>
-            </tr>
-            <tr>
-                <td class="td-obs-label">PROMEDIO GENERAL</td>
-                <td class="td-obs-val td-promedio">${promedio}</td>
-            </tr>
-        </table>
+        <!-- RESUMEN -->
+        <div class="resumen-section">
+            <div class="resumen-item">
+                <div class="resumen-label">Promedio General</div>
+                <div class="resumen-val ${promedioNum>=6?'aprobado':'reprobado'}">${promedio}</div>
+            </div>
+            <div class="resumen-item">
+                <div class="resumen-label">Inasistencias</div>
+                <div class="resumen-val">${comp.inasistencias || 0}</div>
+            </div>
+            <div class="resumen-item" style="flex:2;text-align:left">
+                <div class="resumen-label">Observación</div>
+                <div style="font-size:12px;color:#1e293b;margin-top:4px;min-height:28px">${comp.observacion || ''}</div>
+            </div>
+        </div>
 
         <!-- FIRMAS -->
-        <div class="firmas">
+        <div class="firmas-section">
             <div class="firma-bloque">
                 <div class="firma-linea"></div>
                 <div class="firma-nombre">Licda. María Mirna Miranda de Solorzano</div>
-                <div class="firma-cargo">DIRECTORA</div>
+                <div class="firma-cargo">Directora</div>
             </div>
             <div class="firma-bloque">
                 <div class="firma-linea"></div>
                 <div class="firma-nombre">${docGuia}</div>
-                <div class="firma-cargo">DOCENTE GUIA</div>
+                <div class="firma-cargo">Docente Guía</div>
+            </div>
+            <div class="firma-bloque">
+                <div class="firma-linea"></div>
+                <div class="firma-nombre">Padre / Madre / Encargado</div>
+                <div class="firma-cargo">Firma y Sello</div>
             </div>
         </div>
 
         <div class="boleta-footer">
-            Fecha: ${new Date().toLocaleDateString('es-SV')} &nbsp;&nbsp; Página ${num}/${total}
+            <span>Generado el ${new Date().toLocaleDateString('es-SV', {day:'numeric',month:'long',year:'numeric'})}</span>
+            <span>Página ${num} de ${total}</span>
         </div>
+        <div class="boleta-footer-stripe"></div>
     </div>`;
 }
 

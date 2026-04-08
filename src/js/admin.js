@@ -23,7 +23,7 @@ async function init() {
 
 async function cargarTodo() {
     const [{ data: grados }, { data: usuarios }, { data: materias }] = await Promise.all([
-        supabase.from('grados').select('*, usuarios!grados_docente_guia_id_fkey(nombre_completo)').order('nombre'),
+        supabase.from('grados').select('*').order('nombre'),
         supabase.from('usuarios').select('*').order('nombre_completo'),
         supabase.from('materias').select('*').order('nombre'),
     ]);
@@ -65,7 +65,7 @@ function renderGrados() {
             <td>${g.seccion}</td>
             <td>${g.modalidad}</td>
             <td>${g.anio}</td>
-            <td>${g.usuarios?.nombre_completo || '—'}</td>
+            <td>${usuariosCache.find(u => u.id === g.docente_guia_id)?.nombre_completo || '—'}</td>
             <td>
                 <button class="btn-sm btn-edit" onclick="editarGrado('${g.id}')">Editar</button>
                 <button class="btn-sm btn-del" onclick="eliminarGrado('${g.id}')">Eliminar</button>

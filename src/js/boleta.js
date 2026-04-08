@@ -117,7 +117,10 @@ function generarBoleta(al, materias, notas, comp, docNombre, num, total) {
         <table style="width:100%;border-collapse:collapse;margin-bottom:8px">
             <tr>
                 <td style="width:80px;vertical-align:middle;text-align:center">
-                    <div style="width:72px;height:72px;border-radius:50%;border:2px solid #333;display:flex;align-items:center;justify-content:center;margin:0 auto;overflow:hidden">
+                    <img src="https://raw.githubusercontent.com/Diocesano20266/idsje-sistema/main/logo-idsje.png"
+                         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+                         style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid #333">
+                    <div style="display:none;width:72px;height:72px;border-radius:50%;border:2px solid #333;align-items:center;justify-content:center;margin:0 auto">
                         <div style="text-align:center;font-size:8px;font-weight:800;color:#0a1628;line-height:1.3">INSTITUTO<br>DIOCESANO<br><span style="font-size:11px">IDSJE</span></div>
                     </div>
                 </td>
@@ -127,8 +130,10 @@ function generarBoleta(al, materias, notas, comp, docNombre, num, total) {
                     <div style="font-size:10px;color:#333">Teléfono: 7713-1964 | Correo electrónico: instituto_diocesanosje@idsje.info</div>
                 </td>
                 <td style="width:90px;vertical-align:middle;text-align:center">
-                    <div style="border:1.5px solid #333;border-radius:4px;padding:6px 8px;font-size:8px;font-weight:700;line-height:1.5;color:#333;text-align:center">
-                        <div style="font-size:9px;font-weight:800;margin-bottom:2px">🇸🇻</div>
+                    <img src="https://www.mineducyt.gob.sv/wp-content/uploads/2021/03/logo-mineducyt.png"
+                         onerror="this.style.display='none';this.nextElementSibling.style.display='block'"
+                         style="width:80px;object-fit:contain">
+                    <div style="display:none;border:1.5px solid #333;border-radius:4px;padding:6px 8px;font-size:8px;font-weight:700;line-height:1.5;color:#333;text-align:center">
                         MINISTERIO<br>DE EDUCACIÓN,<br>CIENCIA Y<br>TECNOLOGÍA
                     </div>
                 </td>

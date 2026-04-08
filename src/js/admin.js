@@ -305,7 +305,7 @@ window.cargarMateriasDefault = async () => {
 };
 
 // ── ALUMNOS ─────────────────────────────────
-async function renderAlumnos() {
+window.renderAlumnos = async function renderAlumnos() {
     const gradoFiltro = document.getElementById('filtro-grado')?.value || '';
     let query = supabase.from('alumnos').select('*, grados(nombre, seccion)').order('apellidos');
     if (gradoFiltro) query = query.eq('grado_id', gradoFiltro);

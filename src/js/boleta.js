@@ -113,14 +113,13 @@ function generarBoleta(al, materias, notas, comp, docNombre, num, total) {
 
     return `
     <div class="boleta-page">
-        <!-- ENCABEZADO -->
+        <!-- ENCABEZADO: Logo IDSJE | Info Instituto | Logo MINED -->
         <table style="width:100%;border-collapse:collapse;margin-bottom:8px">
             <tr>
                 <td style="width:80px;vertical-align:middle;text-align:center">
-                    ${al.foto_url
-                        ? `<img src="${al.foto_url}" style="width:72px;height:86px;object-fit:cover;border:1.5px solid #333">`
-                        : `<div style="width:72px;height:86px;border:1.5px dashed #aaa;display:flex;align-items:center;justify-content:center;font-size:9px;color:#aaa;text-align:center">Sin foto</div>`
-                    }
+                    <div style="width:72px;height:72px;border-radius:50%;border:2px solid #333;display:flex;align-items:center;justify-content:center;margin:0 auto;overflow:hidden">
+                        <div style="text-align:center;font-size:8px;font-weight:800;color:#0a1628;line-height:1.3">INSTITUTO<br>DIOCESANO<br><span style="font-size:11px">IDSJE</span></div>
+                    </div>
                 </td>
                 <td style="text-align:center;vertical-align:middle;padding:0 12px">
                     <div style="font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:.5px">INSTITUTO DIOCESANO "SAN JUAN EVANGELISTA"</div>
@@ -128,7 +127,10 @@ function generarBoleta(al, materias, notas, comp, docNombre, num, total) {
                     <div style="font-size:10px;color:#333">Teléfono: 7713-1964 | Correo electrónico: instituto_diocesanosje@idsje.info</div>
                 </td>
                 <td style="width:90px;vertical-align:middle;text-align:center">
-                    <div style="border:1.5px solid #333;padding:6px;font-size:8px;font-weight:700;line-height:1.4;color:#333;text-align:center">MINISTERIO<br>DE EDUCACIÓN,<br>CIENCIA Y<br>TECNOLOGÍA</div>
+                    <div style="border:1.5px solid #333;border-radius:4px;padding:6px 8px;font-size:8px;font-weight:700;line-height:1.5;color:#333;text-align:center">
+                        <div style="font-size:9px;font-weight:800;margin-bottom:2px">🇸🇻</div>
+                        MINISTERIO<br>DE EDUCACIÓN,<br>CIENCIA Y<br>TECNOLOGÍA
+                    </div>
                 </td>
             </tr>
         </table>
@@ -136,17 +138,27 @@ function generarBoleta(al, materias, notas, comp, docNombre, num, total) {
         <hr style="border:none;border-top:2px solid #333;margin-bottom:8px">
 
         <!-- TÍTULO -->
-        <div style="text-align:center;margin-bottom:6px">
+        <div style="text-align:center;margin-bottom:8px">
             <div style="font-size:13px;font-weight:800;letter-spacing:.5px">BOLETA DE CALIFICACIONES PERIODO ${periodoSel} AÑO ${INSTITUTO.anio}</div>
             <div style="font-size:11px;font-weight:600;margin-top:2px">EDUCACIÓN MEDIA</div>
         </div>
 
-        <!-- DATOS ALUMNO -->
-        <div style="margin-bottom:8px;font-size:11px">
-            <div style="margin-bottom:3px"><strong>NOMBRE DEL ESTUDIANTE:</strong> ${al.apellidos} ${al.nombres}</div>
-            <div style="margin-bottom:3px"><strong>NIE:</strong> ${al.nie}</div>
-            <div><strong>GRADO:</strong> ${gNombre}</div>
-        </div>
+        <!-- DATOS ALUMNO + FOTO -->
+        <table style="width:100%;border-collapse:collapse;margin-bottom:10px">
+            <tr>
+                <td style="vertical-align:top;font-size:11px;padding-right:12px">
+                    <div style="margin-bottom:5px"><strong>NOMBRE DEL ESTUDIANTE:</strong> ${al.apellidos} ${al.nombres}</div>
+                    <div style="margin-bottom:5px"><strong>NIE:</strong> ${al.nie}</div>
+                    <div><strong>GRADO:</strong> ${gNombre}</div>
+                </td>
+                <td style="width:80px;vertical-align:top;text-align:center">
+                    ${al.foto_url
+                        ? `<img src="${al.foto_url}" style="width:72px;height:88px;object-fit:cover;border:1.5px solid #333">`
+                        : `<div style="width:72px;height:88px;border:1.5px dashed #aaa;display:flex;align-items:center;justify-content:center;font-size:9px;color:#aaa;text-align:center;line-height:1.4">Sin<br>foto</div>`
+                    }
+                </td>
+            </tr>
+        </table>
 
         <!-- TABLA NOTAS -->
         <table style="width:100%;border-collapse:collapse;border:1.5px solid #333;margin-bottom:8px;font-size:10.5px">

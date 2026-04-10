@@ -144,8 +144,11 @@
 </head>
 <body>
 
+    <!-- OVERLAY MÓVIL -->
+    <div id="sidebar-overlay" onclick="toggleSidebar()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99;backdrop-filter:blur(2px)"></div>
+
     <!-- SIDEBAR -->
-    <nav class="sidebar">
+    <nav class="sidebar" id="sidebar">
         <div class="sb-brand" style="padding:24px 16px 20px;text-align:center;border-bottom:1px solid rgba(212,175,55,.12)">
             <img src="https://raw.githubusercontent.com/Diocesano20266/idsje-sistema/main/logo-idsje.png"
                  style="width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid rgba(212,175,55,.7);box-shadow:0 0 0 6px rgba(212,175,55,.08);display:block;margin:0 auto 12px;"
@@ -198,6 +201,9 @@
 
         <!-- TOPBAR -->
         <div class="topbar">
+            <button class="hamburger" onclick="toggleSidebar()" id="hamburger-btn">
+                <span></span><span></span><span></span>
+            </button>
             <div>
                 <div class="tb-title" id="topbar-titulo">Grados y Secciones</div>
                 <div class="tb-sub">Instituto Diocesano San Juan Evangelista · 2026</div>
@@ -357,6 +363,28 @@
         </div>
     </div>
 
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            const btn = document.getElementById('hamburger-btn');
+            sidebar.classList.toggle('open');
+            btn.classList.toggle('open');
+            overlay.style.display = sidebar.classList.contains('open') ? 'block' : 'none';
+        }
+        // Close sidebar when nav item clicked on mobile
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    if (window.innerWidth <= 768) {
+                        document.getElementById('sidebar').classList.remove('open');
+                        document.getElementById('hamburger-btn').classList.remove('open');
+                        document.getElementById('sidebar-overlay').style.display = 'none';
+                    }
+                });
+            });
+        });
+    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script type="module">

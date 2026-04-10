@@ -5,130 +5,149 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IDSJE — Panel Docente</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'DM Sans',sans-serif;background:#f0f4f8;color:#1e293b;min-height:100vh}
+        body{font-family:'Plus Jakarta Sans',sans-serif;background:#f0f3f9;color:#1e293b;min-height:100vh}
 
-        /* TOPBAR */
-        .topbar{background:#1B3A6B;color:#fff;padding:14px 28px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.15)}
-        .topbar-brand{font-family:'Syne',sans-serif;font-size:18px;font-weight:800}
-        .topbar-right{display:flex;align-items:center;gap:16px}
-        .topbar-user{font-size:12px;color:rgba(255,255,255,.7)}
-        .btn-logout{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:#fff;padding:7px 14px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;transition:background .2s}
-        .btn-logout:hover{background:rgba(255,255,255,.2)}
+        .topbar{background:#0a1628;color:#fff;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+        .gold-bar{height:2.5px;background:linear-gradient(90deg,#d4af37 0%,#f5d97a 40%,transparent 100%);position:sticky;top:56px;z-index:99}
+        .topbar-left{display:flex;align-items:center;gap:12px}
+        .topbar-logo{width:32px;height:32px;border-radius:50%;border:1.5px solid rgba(212,175,55,.6);display:flex;align-items:center;justify-content:center}
+        .topbar-brand{font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:#fff}
+        .topbar-brand span{color:#d4af37}
+        .topbar-right{display:flex;align-items:center;gap:12px}
+        .topbar-user{font-size:11px;color:rgba(255,255,255,.6)}
+        .topbar-user strong{color:#d4af37;font-weight:600}
+        .btn-salir{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:rgba(255,120,120,.9);padding:7px 14px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s}
+        .btn-salir:hover{background:rgba(239,68,68,.18)}
 
-        /* CONTENIDO */
-        .contenido{max-width:1100px;margin:0 auto;padding:32px 24px}
+        .contenido{max-width:1100px;margin:0 auto;padding:28px 24px}
         .hidden{display:none!important}
 
-        /* VISTA GRADOS */
-        .vista-titulo{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:#1B3A6B;margin-bottom:24px}
-        .grados-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px}
-        .grado-card-doc{background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);overflow:hidden}
-        .grado-card-header{padding:20px 20px 12px;border-bottom:1px solid #f1f5f9}
-        .grado-nombre{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:#1B3A6B;text-transform:uppercase}
-        .grado-sub{font-size:11px;color:#94a3b8;margin-top:3px}
-        .materias-list{padding:12px}
-        .materia-btn{display:flex;justify-content:space-between;align-items:center;width:100%;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:6px;cursor:pointer;transition:all .2s;font-family:'DM Sans',sans-serif}
-        .materia-btn:hover{background:#e0f2fe;border-color:#7dd3fc}
-        .materia-nombre{font-size:13px;font-weight:500;color:#1e293b}
-        .materia-arrow{color:#94a3b8;font-size:14px}
-        .empty-state{text-align:center;padding:60px 20px;color:#94a3b8;font-size:14px;line-height:1.8}
+        .vista-header{margin-bottom:24px}
+        .vista-titulo{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:#0a1628}
+        .vista-sub{font-size:12px;color:#94a3b8;margin-top:4px}
+        .grados-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
 
-        /* VISTA NOTAS */
-        .notas-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;gap:12px}
-        .notas-titulo{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:#1B3A6B}
-        .notas-subtitulo{font-size:12px;color:#94a3b8;margin-top:3px}
-        .btn-volver{background:#e2e8f0;color:#475569;border:none;padding:9px 16px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s}
-        .btn-volver:hover{background:#cbd5e1}
+        .grado-card{background:#fff;border-radius:14px;border:1px solid #e2e8f0;overflow:hidden;transition:box-shadow .2s}
+        .grado-card:hover{box-shadow:0 4px 20px rgba(10,22,40,.1)}
+        .grado-card-top{background:#0a1628;padding:16px 18px;display:flex;justify-content:space-between;align-items:center}
+        .gc-nombre{font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:#fff}
+        .gc-badge{padding:3px 8px;border-radius:100px;font-size:9px;font-weight:700;background:rgba(212,175,55,.15);color:#d4af37;border:1px solid rgba(212,175,55,.3)}
+        .grado-card-body{padding:14px 18px}
+        .gc-sub{font-size:11px;color:#64748b;margin-bottom:12px}
+        .materias-list{display:flex;flex-direction:column;gap:6px}
+        .materia-btn{display:flex;justify-content:space-between;align-items:center;width:100%;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;cursor:pointer;transition:all .2s;font-family:'Plus Jakarta Sans',sans-serif}
+        .materia-btn:hover{background:#0a1628;border-color:#0a1628}
+        .materia-btn:hover .mb-nombre{color:#fff}
+        .materia-btn:hover .mb-arrow{color:#d4af37}
+        .mb-nombre{font-size:12px;font-weight:500;color:#1e293b;transition:color .2s}
+        .mb-arrow{color:#94a3b8;font-size:13px;transition:color .2s}
+        .btn-comp{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:9px 14px;background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.25);border-radius:9px;cursor:pointer;transition:all .2s;font-family:'Plus Jakarta Sans',sans-serif;color:#b8960c;font-size:11px;font-weight:600;margin-top:8px}
+        .btn-comp:hover{background:rgba(212,175,55,.15)}
+        .empty-state{text-align:center;padding:60px 20px;color:#94a3b8;font-size:13px;line-height:1.8;background:#fff;border-radius:14px;border:1px dashed #e2e8f0}
 
-        /* Periodos */
-        .periodos{display:flex;background:#e2e8f0;border-radius:10px;padding:3px;margin-bottom:20px;width:fit-content}
-        .periodo-btn{padding:7px 18px;border-radius:8px;border:none;background:transparent;font-family:'Syne',sans-serif;font-weight:700;font-size:11px;cursor:pointer;color:#64748b;transition:all .2s}
-        .periodo-btn.active{background:#1B3A6B;color:#fff;box-shadow:0 2px 4px rgba(0,0,0,.15)}
+        .vista-notas-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+        .btn-volver{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #e2e8f0;color:#475569;padding:8px 16px;border-radius:9px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}
+        .btn-volver:hover{background:#f1f5f9}
 
-        /* Tabla notas */
-        .tabla-wrap{background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);overflow:hidden;overflow-x:auto}
-        table{width:100%;border-collapse:collapse;min-width:700px}
-        thead{background:#1B3A6B;color:#fff}
-        th{padding:13px 14px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;white-space:nowrap}
-        td{padding:11px 14px;font-size:13px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+        .periodos-wrap{display:flex;background:#e8ecf5;border-radius:10px;padding:3px;width:fit-content;margin-bottom:18px}
+        .periodo-btn,.comp-periodo-btn{padding:7px 18px;border-radius:8px;border:none;background:transparent;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:11px;cursor:pointer;color:#64748b;transition:all .2s}
+        .periodo-btn.active,.comp-periodo-btn.active{background:#0a1628;color:#d4af37;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+
+        .rangos{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+        .rango-tag{padding:5px 12px;border-radius:100px;font-size:10px;font-weight:600;background:#e8f4fd;color:#1a5f9a;border:1px solid #c3ddf5}
+
+        .tabla-wrap{background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;overflow-x:auto}
+        table{width:100%;border-collapse:collapse;min-width:680px}
+        thead{background:#0a1628}
+        th{padding:12px 14px;text-align:left;font-size:10px;font-weight:700;color:#d4af37;letter-spacing:.5px;text-transform:uppercase;white-space:nowrap}
+        .th-center{text-align:center}
+        td{padding:11px 14px;font-size:12px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
         tr:last-child td{border-bottom:none}
-        tr:hover td{background:#f8fafc}
-        .td-num{width:40px;text-align:center;color:#94a3b8;font-size:11px}
-        .td-nombre{font-weight:500;min-width:200px}
-        .nota-input{width:72px;padding:7px 8px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;text-align:center;outline:none;transition:border-color .2s}
-        .nota-input:focus{border-color:#1B3A6B}
-        .nota-input:disabled{background:#f8fafc;color:#94a3b8;cursor:not-allowed}
-        .nota-rec{border-style:dashed;background:#fff9f0}
-        .td-nf{font-family:'Syne',sans-serif;font-weight:800;font-size:15px;text-align:center}
-        .nf-aprobado{color:#059669}
-        .nf-reprobado{color:#dc2626}
-        .th-nf{background:#2E5FAC!important;text-align:center}
+        tr:hover td{background:#fafbfd}
+        .td-num{width:36px;text-align:center;color:#94a3b8;font-size:11px}
+        .td-nombre{font-weight:500;min-width:180px}
+        .nota-input{width:74px;padding:7px 8px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;text-align:center;outline:none;transition:border-color .2s;color:#0a1628}
+        .nota-input:focus{border-color:#0a1628;background:#f8fafc}
+        .nota-input:disabled{background:#f8fafc;color:#94a3b8;cursor:not-allowed;border-style:dashed}
+        .nota-rec{border-style:dashed;background:#fffbeb}
+        .td-nf{font-family:'Playfair Display',serif;font-weight:700;font-size:16px;text-align:center}
+        .nf-aprobado{color:#166534}
+        .nf-reprobado{color:#991b1b}
 
-        /* Info de rango */
-        .info-rangos{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}
-        .rango-tag{padding:5px 12px;border-radius:100px;font-size:11px;font-weight:600;background:#e0f2fe;color:#0369a1}
+        .comp-select{padding:6px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;font-weight:600;outline:none;background:#fff;cursor:pointer;transition:border-color .2s;color:#0a1628}
+        .comp-select:focus{border-color:#0a1628}
+        .inasis-input{width:64px;padding:6px 8px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;text-align:center;outline:none}
+        .obs-input{width:180px;padding:6px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;outline:none}
+        .th-comp{font-size:9px;white-space:normal;line-height:1.3;text-align:center}
+
+        @media(max-width:768px){.contenido{padding:16px}.grados-grid{grid-template-columns:1fr}}
     </style>
 </head>
 <body>
 
-    <!-- TOPBAR -->
     <nav class="topbar">
-        <div class="topbar-brand">IDSJE · Panel Docente</div>
+        <div class="topbar-left">
+            <div class="topbar-logo">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#d4af37" stroke-width="1.5"/><path d="M12 6v6l4 2" stroke="#d4af37" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </div>
+            <div class="topbar-brand">IDSJE · <span>Panel Docente</span></div>
+        </div>
         <div class="topbar-right">
-            <span class="topbar-user" id="docente-nombre"></span>
-            <button class="btn-logout" onclick="cerrarSesionDocente()">↩ Salir</button>
+            <span class="topbar-user">Bienvenido, <strong id="docente-nombre">...</strong></span>
+            <button class="btn-salir" onclick="cerrarSesionDocente()">↩ Salir</button>
         </div>
     </nav>
+    <div class="gold-bar"></div>
 
     <div class="contenido">
 
         <!-- VISTA: MIS GRADOS -->
         <div id="vista-grados-doc">
-            <h1 class="vista-titulo">Mis Materias</h1>
+            <div class="vista-header">
+                <div class="vista-titulo">Mis Materias</div>
+                <div class="vista-sub">Seleccioná una materia para registrar notas o competencias ciudadanas</div>
+            </div>
             <div class="grados-grid" id="mis-grados"></div>
         </div>
 
         <!-- VISTA: NOTAS -->
         <div id="vista-notas" class="hidden">
-            <div class="notas-header">
+            <div class="vista-notas-header">
                 <div>
-                    <div class="notas-titulo" id="titulo-materia">Materia</div>
-                    <div class="notas-subtitulo" id="subtitulo-materia"></div>
+                    <div class="vista-titulo" id="titulo-materia">Materia</div>
+                    <div class="vista-sub" id="subtitulo-materia"></div>
                 </div>
                 <button class="btn-volver" onclick="volverAGrados()">← Mis Materias</button>
             </div>
 
-            <!-- Selector de periodo -->
-            <div class="periodos">
+            <div class="periodos-wrap">
                 <button class="periodo-btn active" onclick="setPeriodo(1)">Periodo 1</button>
                 <button class="periodo-btn" onclick="setPeriodo(2)">Periodo 2</button>
                 <button class="periodo-btn" onclick="setPeriodo(3)">Periodo 3</button>
                 <button class="periodo-btn" onclick="setPeriodo(4)">Periodo 4</button>
             </div>
 
-            <!-- Rangos de notas -->
-            <div class="info-rangos">
+            <div class="rangos">
                 <span class="rango-tag">Actividades: máx 3.5</span>
                 <span class="rango-tag">Laboratorio: máx 3.5</span>
                 <span class="rango-tag">Examen: máx 3.0</span>
-                <span class="rango-tag">Nota Final: suma de los tres</span>
+                <span class="rango-tag">Nota Final = suma de los tres</span>
             </div>
 
-            <!-- Tabla -->
             <div class="tabla-wrap">
                 <table>
                     <thead>
                         <tr>
                             <th>Nº</th>
                             <th>Apellidos y Nombres</th>
-                            <th>Actividades<br><small>35%</small></th>
-                            <th>Laboratorio<br><small>35%</small></th>
-                            <th>Examen<br><small>30%</small></th>
-                            <th class="th-nf">NF</th>
-                            <th>Recuperación</th>
+                            <th class="th-center">Actividades<br><small style="font-weight:400;color:rgba(212,175,55,.6);font-size:9px">35% / 3.5</small></th>
+                            <th class="th-center">Laboratorio<br><small style="font-weight:400;color:rgba(212,175,55,.6);font-size:9px">35% / 3.5</small></th>
+                            <th class="th-center">Examen<br><small style="font-weight:400;color:rgba(212,175,55,.6);font-size:9px">30% / 3.0</small></th>
+                            <th class="th-center" style="background:#1a2d4a">N.F.</th>
+                            <th class="th-center">Recuperación</th>
                         </tr>
                     </thead>
                     <tbody id="tbody-notas"></tbody>
@@ -136,17 +155,17 @@
             </div>
         </div>
 
-        <!-- VISTA: COMPETENCIAS CIUDADANAS -->
+        <!-- VISTA: COMPETENCIAS -->
         <div id="vista-competencias" class="hidden">
-            <div class="notas-header">
+            <div class="vista-notas-header">
                 <div>
-                    <div class="notas-titulo" id="comp-titulo">Competencias</div>
-                    <div class="notas-subtitulo">Competencias Ciudadanas e Inasistencias</div>
+                    <div class="vista-titulo" id="comp-titulo">Competencias</div>
+                    <div class="vista-sub">Competencias Ciudadanas e Inasistencias por periodo</div>
                 </div>
                 <button class="btn-volver" onclick="volverDeCompetencias()">← Mis Materias</button>
             </div>
 
-            <div class="periodos">
+            <div class="periodos-wrap">
                 <button class="comp-periodo-btn active" onclick="setCompPeriodo(1)">Periodo 1</button>
                 <button class="comp-periodo-btn" onclick="setCompPeriodo(2)">Periodo 2</button>
                 <button class="comp-periodo-btn" onclick="setCompPeriodo(3)">Periodo 3</button>
@@ -159,11 +178,11 @@
                         <tr>
                             <th>Nº</th>
                             <th>Apellidos y Nombres</th>
-                            <th class="th-comp-label">Convivencia y paz</th>
-                            <th class="th-comp-label">Autonomía</th>
-                            <th class="th-comp-label">Expresión</th>
-                            <th class="th-comp-label">Pertenencia</th>
-                            <th>Inasistencias</th>
+                            <th class="th-comp">Convivencia y paz</th>
+                            <th class="th-comp">Autonomía</th>
+                            <th class="th-comp">Expresión</th>
+                            <th class="th-comp">Pertenencia</th>
+                            <th class="th-center">Inasistencias</th>
                             <th>Observación</th>
                         </tr>
                     </thead>

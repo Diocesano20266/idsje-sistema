@@ -46,23 +46,24 @@ function renderMisGrados() {
     });
 
     contenedor.innerHTML = Object.values(porGrado).map(({ grado, materias }) => `
-        <div class="grado-card-doc">
-            <div class="grado-card-header">
-                <div>
-                    <div class="grado-nombre">${grado.nombre}</div>
-                    <div class="grado-sub">Sección ${grado.seccion} · ${grado.modalidad} · ${grado.anio}</div>
-                </div>
+        <div class="grado-card">
+            <div class="grado-card-top">
+                <div class="gc-nombre">${grado.nombre}</div>
+                <span class="gc-badge">${grado.modalidad}</span>
             </div>
-            <div class="materias-list">
-                ${materias.map(gm => `
-                    <button class="materia-btn" onclick="abrirMateria('${gm.grado_id}', '${gm.materia_id}', '${gm.id}')">
-                        <span class="materia-nombre">${gm.materias.nombre}</span>
-                        <span class="materia-arrow">→</span>
+            <div class="grado-card-body">
+                <div class="gc-sub">Sección ${grado.seccion} · ${grado.anio}</div>
+                <div class="materias-list">
+                    ${materias.map(gm => `
+                        <button class="materia-btn" onclick="abrirMateria('${gm.grado_id}', '${gm.materia_id}', '${gm.id}')">
+                            <span class="mb-nombre">${gm.materias.nombre}</span>
+                            <span class="mb-arrow">→</span>
+                        </button>
+                    `).join('')}
+                    <button class="btn-comp" onclick="abrirCompetencias('${grado.id}', '${grado.nombre}', '${grado.seccion}')">
+                        📋 Competencias Ciudadanas e Inasistencias
                     </button>
-                `).join('')}
-                <button class="btn-comp" onclick="abrirCompetencias('${grado.id}', '${grado.nombre}', '${grado.seccion}')">
-                    📋 Competencias Ciudadanas e Inasistencias
-                </button>
+                </div>
             </div>
         </div>
     `).join('');

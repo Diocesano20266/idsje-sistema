@@ -2,7 +2,7 @@
 //  IDSJE — Panel Administrador
 // ═══════════════════════════════════════════
 import { supabase, verificarSesion, cerrarSesion, subirFoto } from './auth.js';
-import { CLOUDINARY_CLOUD, CLOUDINARY_PRESET, MATERIAS_DEFAULT } from './config.js';
+import { CLOUDINARY_CLOUD, CLOUDINARY_PRESET, MATERIAS_DEFAULT, SUPABASE_URL, SUPABASE_SERVICE_KEY } from './config.js';
 
 let usuarioActual = null;
 let gradosCache   = [];
@@ -297,22 +297,52 @@ window.guardarDocente = async () => {
     if (!nombre || !correo) return alert('Nombre y correo son obligatorios');
 
     if (!id) {
-        // Crear usuario en Auth
+        // Crear usuario nuevo
         if (!pass || pass.length < 6) return alert('La contraseña debe tener al menos 6 caracteres');
-        const { data: authData, error: authErr } = await supabase.auth.admin
-            ? await fetch(`${supabase.supabaseUrl}/auth/v1/admin/users`, {
-                method: 'POST',
-                headers: { 'apikey': supabase.supabaseKey, 'Authorization': `Bearer ${supabase.supabaseKey}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: correo, password: pass, email_confirm: true })
-            }).then(r => r.json())
-            : { error: { message: 'Crea el usuario desde Supabase Auth' } };
 
-        // Insertar en tabla usuarios
+        // 1. Crear en Supabase Auth usando service role key
+        const authRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+            method: 'POST',
+            headers: {
+                'apikey': SUPABASE_SERVICE_KEY,
+                'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                email: correo,
+                password: pass,
+                email_confirm: true
+            })
+        });
+
+        const authData = await authRes.json();
+        if (!authRes.ok) return alert('Error creando cuenta: ' + (authData.message || authData.msg || JSON.stringify(authData)));
+
+        // 2. Insertar en tabla usuarios
         const { error } = await supabase.from('usuarios').insert([{ correo, nombre_completo: nombre, rol }]);
-        if (error) return alert('Error: ' + error.message);
+        if (error) return alert('Error guardando usuario: ' + error.message);
+
+        alert(`✅ Docente "${nombre}" creado correctamente.`);
     } else {
+        // Actualizar datos existentes
         const { error } = await supabase.from('usuarios').update({ nombre_completo: nombre, rol }).eq('id', id);
         if (error) return alert('Error: ' + error.message);
+
+        // Cambiar contraseña si se ingresó una nueva
+        if (pass && pass.length >= 6) {
+            const { data: authUser } = await supabase.auth.admin?.getUserByEmail?.(correo) || {};
+            if (authUser?.id) {
+                await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${authUser.id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'apikey': SUPABASE_SERVICE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ password: pass })
+                });
+            }
+        }
     }
 
     cerrarModal('modal-docente');

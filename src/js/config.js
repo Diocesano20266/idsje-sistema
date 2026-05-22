@@ -4,6 +4,7 @@
 
 export const SUPABASE_URL  = 'https://xhprlhvtdyhghhhjdztd.supabase.co';
 export const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhocHJsaHZ0ZHloZ2hoaGpkenRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1OTY4NTMsImV4cCI6MjA5MTE3Mjg1M30.zPtlHNMMoOFnvy8DZk3GWF3cjTvkqvAJQ23Jj7BH9cE';
+export const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhocHJsaHZ0ZHloZ2hoaGpkenRkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTU5Njg1MywiZXhwIjoyMDkxMTcyODUzfQ.bR0mVSBVpJpuLQ0TVxEqVNgSAPOenybuPbkURmjsuWI';
 
 export const CLOUDINARY_CLOUD  = 'dpfwjnq1f';
 export const CLOUDINARY_PRESET = 'idsje_fotos'; // Upload preset sin firmar (crear en Cloudinary)

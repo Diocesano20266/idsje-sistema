@@ -144,6 +144,19 @@
         .hamburger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
         .hamburger.open span:nth-child(2){opacity:0}
         .hamburger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+        .panel-grado-btn{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:24px;cursor:pointer;transition:all .2s;text-align:center}
+        .panel-grado-btn:hover{background:#0a1628;border-color:#0a1628;transform:translateY(-3px);box-shadow:0 8px 20px rgba(10,22,40,.15)}
+        .panel-grado-btn:hover .pgb-label{color:#d4af37}
+        .panel-grado-btn:hover .pgb-sub{color:rgba(255,255,255,.5)}
+        .pgb-icon{font-size:32px;margin-bottom:10px}
+        .pgb-label{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:#0a1628;transition:color .2s}
+        .pgb-sub{font-size:11px;color:#94a3b8;margin-top:4px;transition:color .2s}
+        .pgb-danger{border-color:#fecaca}
+        .pgb-danger:hover{background:#b52828;border-color:#b52828}
+        .grado-bubble{cursor:pointer}
+        .grado-bubble:hover .bubble-circle{background:#0a1628;border-color:#d4af37;transform:translateY(-4px);box-shadow:0 8px 20px rgba(10,22,40,.2)}
+        .grado-bubble:hover .bubble-code{color:#d4af37}
+        .grado-bubble:hover .bubble-sub{color:rgba(255,255,255,.5)}
         @media(max-width:768px){
             .hamburger{display:flex!important}
             .sidebar{transform:translateX(-100%);transition:transform .3s ease}
@@ -274,6 +287,11 @@
                         <tbody id="tbody-docentes"></tbody>
                     </table>
                 </div>
+            </div>
+
+            <!-- PANEL GRADO -->
+            <div id="vista-panel-grado" class="hidden">
+                <div id="panel-grado-body"></div>
             </div>
 
             <!-- MATERIAS DEL GRADO (pantalla completa) -->

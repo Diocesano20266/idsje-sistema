@@ -543,9 +543,7 @@ window.previsualizarFoto = (input) => {
 // ── MODALES ─────────────────────────────────
 window.abrirModal  = (id) => document.getElementById(id).classList.add('open');
 window.cerrarModal = (id) => document.getElementById(id).classList.remove('open');
-document.addEventListener('click', e => {
-    if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('open');
-});
+// Modal solo se cierra con botones Guardar/Cancelar, no al hacer click afuera
 
 // Evitar que doble click dentro del modal lo cierre
 document.querySelectorAll && document.addEventListener('DOMContentLoaded', () => {

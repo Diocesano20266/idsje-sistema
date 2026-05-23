@@ -53,7 +53,7 @@ const TITULOS = {
 
 const VISTA_CONFIG = {
     grados:          { titulo: 'Grados y Secciones',  accion: `<button class="btn-primary" onclick="abrirModalGrado()">+ Nuevo Grado</button>` },
-    alumnos:         { titulo: 'Alumnos',              accion: `<input type="file" id="excel-alumnos" accept=".xlsx,.xls" class="hidden" onchange="importarAlumnosExcel(event)"><button class="btn-secondary" onclick="document.getElementById('excel-alumnos').click()">📊 Importar Excel</button><button class="btn-primary" onclick="abrirModalAlumno()">+ Nuevo Alumno</button>` },
+    alumnos:         { titulo: 'Alumnos',              accion: `<button class="btn-secondary" onclick="mostrarVista('grados')">← Volver</button><input type="file" id="excel-alumnos" accept=".xlsx,.xls" class="hidden" onchange="importarAlumnosExcel(event)"><button class="btn-secondary" onclick="document.getElementById('excel-alumnos').click()">📊 Importar Excel</button><button class="btn-primary" onclick="abrirModalAlumno()">+ Nuevo Alumno</button>` },
     docentes:        { titulo: 'Docentes',             accion: `<button class="btn-primary" onclick="abrirModalDocente()">+ Nuevo Docente</button>` },
     materias:        { titulo: 'Materias',             accion: `<button class="btn-secondary" onclick="cargarMateriasDefault()">Cargar IDSJE</button><button class="btn-primary" onclick="abrirModalMateria()">+ Nueva Materia</button>` },
     'grado-materias':{ titulo: 'Materias del Grado',   accion: `<button class="btn-secondary" onclick="mostrarVista('grados')">← Volver a Grados</button>` },
@@ -265,6 +265,7 @@ window.abrirGradoMateriasFull = async (gradoId, nombre, seccion) => {
 
     document.getElementById('grado-mat-titulo').textContent = `${nombre} — Sección ${seccion}`;
     document.getElementById('topbar-titulo').textContent = `${nombre} ${seccion} — Materias`;
+    document.getElementById('topbar-actions').innerHTML = `<button class="btn-secondary" onclick="abrirPanelGrado('${gradoId}')">← Volver al Grado</button>`;
 
     // Poblar selects
     const selM = document.getElementById('gm-materia-sel');

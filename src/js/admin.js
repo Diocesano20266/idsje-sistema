@@ -137,18 +137,13 @@ function renderGrados() {
             <div class="group-label">${nombre}</div>
             <div class="bubbles">
                 ${grados.map(g => `
-                    <div class="grado-bubble">
+                    <div class="grado-bubble" onclick="abrirPanelGrado('${g.id}')">
                         <div class="bubble-circle">
                             <span class="badge-mod ${badgeMod(g.modalidad)}">${labelMod(g.modalidad)}</span>
                             <span class="bubble-code">${codigoGrado(g)}</span>
                             <span class="bubble-sub">Secc. ${g.seccion}</span>
                         </div>
                         <span class="bubble-label">${usuariosCache.find(u=>u.id===g.docente_guia_id)?.nombre_completo?.split(' ')[0] || 'Sin guía'}</span>
-                        <div class="bubble-actions">
-                            <button class="ba-btn ba-edit" onclick="editarGrado('${g.id}')">Editar</button>
-                            <button class="ba-btn ba-mat" onclick="abrirGradoMateriasFull('${g.id}', '${g.nombre}', '${g.seccion}')">Materias</button>
-                            <button class="ba-btn ba-del" onclick="eliminarGrado('${g.id}')">Eliminar</button>
-                        </div>
                     </div>
                 `).join('')}
             </div>
@@ -206,6 +201,60 @@ window.eliminarGrado = async (id) => {
     if (error) return alert('Error: ' + error.message);
     await cargarTodo();
     renderGrados();
+};
+
+// ── PANEL DE GRADO ──────────────────────────────────
+window.abrirPanelGrado = (gradoId) => {
+    const g = gradosCache.find(x => x.id === gradoId);
+    if (!g) return;
+
+    // Ocultar todas las vistas
+    document.querySelectorAll('[id^="vista-"]').forEach(v => v.classList.add('hidden'));
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+
+    // Mostrar vista panel grado
+    document.getElementById('vista-panel-grado').classList.remove('hidden');
+    document.getElementById('topbar-titulo').textContent = `${g.nombre} — Sección ${g.seccion}`;
+    document.getElementById('topbar-actions').innerHTML = `<button class="btn-secondary" onclick="mostrarVista('grados')">← Volver a Grados</button>`;
+
+    const docGuia = usuariosCache.find(u => u.id === g.docente_guia_id)?.nombre_completo || 'Sin asignar';
+
+    document.getElementById('panel-grado-body').innerHTML = `
+        <div style="margin-bottom:20px">
+            <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#0a1628">${g.nombre}</div>
+            <div style="font-size:13px;color:#64748b;margin-top:4px">Sección ${g.seccion} · ${g.modalidad} · ${g.anio} · Guía: ${docGuia}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px">
+            <div class="panel-grado-btn" onclick="abrirGradoMateriasFull('${g.id}','${g.nombre}','${g.seccion}')">
+                <div class="pgb-icon">📚</div>
+                <div class="pgb-label">Materias</div>
+                <div class="pgb-sub">Asignar materias y docentes</div>
+            </div>
+            <div class="panel-grado-btn" onclick="irAlumnosGrado('${g.id}')">
+                <div class="pgb-icon">👨‍🎓</div>
+                <div class="pgb-label">Alumnos</div>
+                <div class="pgb-sub">Ver y gestionar estudiantes</div>
+            </div>
+            <div class="panel-grado-btn" onclick="editarGrado('${g.id}')">
+                <div class="pgb-icon">✏️</div>
+                <div class="pgb-label">Editar Grado</div>
+                <div class="pgb-sub">Modificar datos del grado</div>
+            </div>
+            <div class="panel-grado-btn pgb-danger" onclick="eliminarGrado('${g.id}')">
+                <div class="pgb-icon">🗑</div>
+                <div class="pgb-label">Eliminar Grado</div>
+                <div class="pgb-sub">Eliminar grado y sus datos</div>
+            </div>
+        </div>
+    `;
+};
+
+window.irAlumnosGrado = (gradoId) => {
+    mostrarVista('alumnos');
+    setTimeout(() => {
+        const sel = document.getElementById('filtro-grado');
+        if (sel) { sel.value = gradoId; renderAlumnos(); }
+    }, 100);
 };
 
 // ── GESTIÓN MATERIAS POR GRADO (PANTALLA COMPLETA) ─────────────

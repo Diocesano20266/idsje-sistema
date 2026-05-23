@@ -291,7 +291,7 @@
 
     <!-- MODAL: GRADO -->
     <div class="modal-overlay" id="modal-grado">
-        <div class="modal">
+        <div class="modal" onclick="event.stopPropagation()" ondblclick="event.stopPropagation()">
             <div class="modal-title" id="modal-grado-title">Nuevo Grado</div>
             <input type="hidden" id="grado-id">
             <div class="field"><label>Nombre del grado</label><input type="text" id="grado-nombre" placeholder="Ej: PRIMER AÑO DE BACHILLERATO"></div>
@@ -310,7 +310,7 @@
 
     <!-- MODAL: MATERIAS DEL GRADO -->
     <div class="modal-overlay" id="modal-grado-materias">
-        <div class="modal" style="max-width:560px">
+        <div class="modal" style="max-width:560px" onclick="event.stopPropagation()" ondblclick="event.stopPropagation()">
             <div class="modal-title" id="mgrado-titulo">Materias del Grado</div>
             <input type="hidden" id="mgrado-id">
             <div style="display:flex;gap:10px;margin-bottom:16px;align-items:flex-end;flex-wrap:wrap">
@@ -325,7 +325,7 @@
 
     <!-- MODAL: DOCENTE -->
     <div class="modal-overlay" id="modal-docente">
-        <div class="modal">
+        <div class="modal" onclick="event.stopPropagation()" ondblclick="event.stopPropagation()">
             <div class="modal-title" id="modal-docente-title">Nuevo Docente</div>
             <input type="hidden" id="docente-id">
             <div class="field"><label>Nombre completo</label><input type="text" id="docente-nombre" placeholder="Ej: Juan Carlos Pérez"></div>
@@ -344,7 +344,7 @@
 
     <!-- MODAL: MATERIA -->
     <div class="modal-overlay" id="modal-materia">
-        <div class="modal">
+        <div class="modal" onclick="event.stopPropagation()" ondblclick="event.stopPropagation()">
             <div class="modal-title" id="modal-materia-title">Nueva Materia</div>
             <input type="hidden" id="materia-id">
             <div class="field"><label>Nombre</label><input type="text" id="materia-nombre" placeholder="Ej: Lenguaje y Literatura"></div>
@@ -358,7 +358,7 @@
 
     <!-- MODAL: ALUMNO -->
     <div class="modal-overlay" id="modal-alumno">
-        <div class="modal">
+        <div class="modal" onclick="event.stopPropagation()" ondblclick="event.stopPropagation()">
             <div class="modal-title" id="modal-alumno-title">Nuevo Alumno</div>
             <input type="hidden" id="alumno-id">
             <div class="foto-preview-wrap"><img id="alumno-foto-preview" alt="Foto"></div>

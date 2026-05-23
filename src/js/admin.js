@@ -547,6 +547,14 @@ document.addEventListener('click', e => {
     if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('open');
 });
 
+// Evitar que doble click dentro del modal lo cierre
+document.querySelectorAll && document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.modal').forEach(m => {
+        m.addEventListener('click', e => e.stopPropagation());
+        m.addEventListener('dblclick', e => e.stopPropagation());
+    });
+});
+
 window.cerrarSesionAdmin = cerrarSesion;
 
 init();

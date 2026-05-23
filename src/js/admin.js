@@ -446,13 +446,20 @@ window.renderAlumnos = async function renderAlumnos() {
 }
 
 window.abrirModalAlumno = async (id = null) => {
-    const a = id ? alumnosCache.find(x => x.id === id) : null;
+    // Si hay id, cargar datos frescos de la BD
+    let a = null;
+    if (id) {
+        const { data } = await supabase.from('alumnos').select('*').eq('id', id).single();
+        a = data;
+    }
+
     document.getElementById('modal-alumno-title').textContent = a ? 'Editar Alumno' : 'Nuevo Alumno';
     document.getElementById('alumno-id').value        = a?.id || '';
     document.getElementById('alumno-nie').value       = a?.nie || '';
     document.getElementById('alumno-nombres').value   = a?.nombres || '';
     document.getElementById('alumno-apellidos').value = a?.apellidos || '';
     document.getElementById('alumno-anio').value      = a?.anio_ingreso || 2026;
+    document.getElementById('alumno-foto').value      = ''; // limpiar input foto
     document.getElementById('alumno-foto-preview').src = a?.foto_url || '';
     document.getElementById('alumno-foto-preview').style.display = a?.foto_url ? 'block' : 'none';
 
@@ -476,7 +483,13 @@ window.guardarAlumno = async () => {
 
     if (!nie || !nombres || !apellidos || !gradoId) return alert('Todos los campos son obligatorios');
 
-    let foto_url = alumnosCache.find(a => a.id === id)?.foto_url || null;
+    // FIX: obtener foto actual directo de la base de datos para no mezclar con otros alumnos
+    let foto_url = null;
+    if (id) {
+        const { data: alumnoActual } = await supabase
+            .from('alumnos').select('foto_url').eq('id', id).single();
+        foto_url = alumnoActual?.foto_url || null;
+    }
 
     if (fotoFile) {
         try {
@@ -485,6 +498,9 @@ window.guardarAlumno = async () => {
             alert('Error subiendo foto: ' + e.message);
         }
     }
+
+    // Limpiar el input de foto para evitar reusos
+    document.getElementById('alumno-foto').value = '';
 
     const payload = { nie, nombres, apellidos, grado_id: gradoId, anio_ingreso: anio, foto_url };
     const { error } = id

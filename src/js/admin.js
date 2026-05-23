@@ -52,10 +52,11 @@ const TITULOS = {
 };
 
 const VISTA_CONFIG = {
-    grados:   { titulo: 'Grados y Secciones',  accion: `<button class="btn-primary" onclick="abrirModalGrado()">+ Nuevo Grado</button>` },
-    alumnos:  { titulo: 'Alumnos',              accion: `<input type="file" id="excel-alumnos" accept=".xlsx,.xls" class="hidden" onchange="importarAlumnosExcel(event)"><button class="btn-secondary" onclick="document.getElementById('excel-alumnos').click()">📊 Importar Excel</button><button class="btn-primary" onclick="abrirModalAlumno()">+ Nuevo Alumno</button>` },
-    docentes: { titulo: 'Docentes',             accion: `<button class="btn-primary" onclick="abrirModalDocente()">+ Nuevo Docente</button>` },
-    materias: { titulo: 'Materias',             accion: `<button class="btn-secondary" onclick="cargarMateriasDefault()">Cargar IDSJE</button><button class="btn-primary" onclick="abrirModalMateria()">+ Nueva Materia</button>` },
+    grados:          { titulo: 'Grados y Secciones',  accion: `<button class="btn-primary" onclick="abrirModalGrado()">+ Nuevo Grado</button>` },
+    alumnos:         { titulo: 'Alumnos',              accion: `<input type="file" id="excel-alumnos" accept=".xlsx,.xls" class="hidden" onchange="importarAlumnosExcel(event)"><button class="btn-secondary" onclick="document.getElementById('excel-alumnos').click()">📊 Importar Excel</button><button class="btn-primary" onclick="abrirModalAlumno()">+ Nuevo Alumno</button>` },
+    docentes:        { titulo: 'Docentes',             accion: `<button class="btn-primary" onclick="abrirModalDocente()">+ Nuevo Docente</button>` },
+    materias:        { titulo: 'Materias',             accion: `<button class="btn-secondary" onclick="cargarMateriasDefault()">Cargar IDSJE</button><button class="btn-primary" onclick="abrirModalMateria()">+ Nueva Materia</button>` },
+    'grado-materias':{ titulo: 'Materias del Grado',   accion: `<button class="btn-secondary" onclick="mostrarVista('grados')">← Volver a Grados</button>` },
 };
 
 window.mostrarVista = async (vista) => {
@@ -145,7 +146,7 @@ function renderGrados() {
                         <span class="bubble-label">${usuariosCache.find(u=>u.id===g.docente_guia_id)?.nombre_completo?.split(' ')[0] || 'Sin guía'}</span>
                         <div class="bubble-actions">
                             <button class="ba-btn ba-edit" onclick="editarGrado('${g.id}')">Editar</button>
-                            <button class="ba-btn ba-mat" onclick="gestionarMateriaGrado('${g.id}')">Materias</button>
+                            <button class="ba-btn ba-mat" onclick="abrirGradoMateriasFull('${g.id}', '${g.nombre}', '${g.seccion}')">Materias</button>
                             <button class="ba-btn ba-del" onclick="eliminarGrado('${g.id}')">Eliminar</button>
                         </div>
                     </div>
@@ -207,7 +208,87 @@ window.eliminarGrado = async (id) => {
     renderGrados();
 };
 
-// ── GESTIÓN MATERIAS POR GRADO ───────────────
+// ── GESTIÓN MATERIAS POR GRADO (PANTALLA COMPLETA) ─────────────
+let gradoMatFullId = null;
+
+window.abrirGradoMateriasFull = async (gradoId, nombre, seccion) => {
+    gradoMatFullId = gradoId;
+
+    document.getElementById('grado-mat-titulo').textContent = `${nombre} — Sección ${seccion}`;
+    document.getElementById('topbar-titulo').textContent = `${nombre} ${seccion} — Materias`;
+
+    // Poblar selects
+    const selM = document.getElementById('gm-materia-sel');
+    const selD = document.getElementById('gm-docente-sel');
+    selM.innerHTML = materiasCache.map(m => `<option value="${m.id}">${m.nombre}</option>`).join('');
+    selD.innerHTML = '<option value="">— Sin asignar —</option>' +
+        usuariosCache.map(u => `<option value="${u.id}">${u.nombre_completo}</option>`).join('');
+
+    // Ocultar todas las vistas y mostrar esta
+    document.querySelectorAll('[id^="vista-"]').forEach(v => v.classList.add('hidden'));
+    document.getElementById('vista-grado-materias').classList.remove('hidden');
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+
+    await renderMateriasGradoFull();
+};
+
+async function renderMateriasGradoFull() {
+    const { data: asignadas } = await supabase
+        .from('grado_materia')
+        .select('*, materias(nombre), usuarios(nombre_completo)')
+        .eq('grado_id', gradoMatFullId);
+
+    const lista = document.getElementById('lista-materias-full');
+
+    if (!asignadas?.length) {
+        lista.innerHTML = `<div style="padding:32px;text-align:center;color:#94a3b8;font-size:13px">Sin materias asignadas. Agregá una arriba.</div>`;
+        return;
+    }
+
+    lista.innerHTML = asignadas.map((a, i) => `
+        <div style="display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid #f1f5f9;${i%2===0?'background:#fafbfd':''}">
+            <div style="width:28px;height:28px;border-radius:50%;background:#0a1628;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#d4af37;flex-shrink:0">${i+1}</div>
+            <div style="flex:1">
+                <div style="font-size:14px;font-weight:600;color:#0a1628">${a.materias?.nombre}</div>
+                <div style="font-size:12px;color:#94a3b8;margin-top:2px">${a.usuarios?.nombre_completo || 'Sin docente asignado'}</div>
+            </div>
+            <select onchange="cambiarDocenteMateria('${a.id}', this.value)" 
+                style="padding:7px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;background:#fff;min-width:180px">
+                <option value="">— Sin asignar —</option>
+                ${usuariosCache.map(u => `<option value="${u.id}" ${u.id === a.docente_id ? 'selected' : ''}>${u.nombre_completo}</option>`).join('')}
+            </select>
+            <button onclick="quitarMateriaGradoFull('${a.id}')" 
+                style="padding:7px 12px;border-radius:8px;border:none;background:#fde8e8;color:#b52828;font-size:12px;font-weight:600;cursor:pointer">
+                Quitar
+            </button>
+        </div>
+    `).join('');
+}
+
+window.agregarMateriaGradoFull = async () => {
+    const materiaId = document.getElementById('gm-materia-sel').value;
+    const docenteId = document.getElementById('gm-docente-sel').value || null;
+    if (!materiaId) return alert('Seleccioná una materia');
+
+    const { error } = await supabase.from('grado_materia').upsert([{
+        grado_id: gradoMatFullId, materia_id: materiaId, docente_id: docenteId
+    }], { onConflict: 'grado_id,materia_id' });
+
+    if (error) return alert('Error: ' + error.message);
+    await renderMateriasGradoFull();
+};
+
+window.cambiarDocenteMateria = async (gradoMateriaId, docenteId) => {
+    await supabase.from('grado_materia').update({ docente_id: docenteId || null }).eq('id', gradoMateriaId);
+};
+
+window.quitarMateriaGradoFull = async (id) => {
+    if (!confirm('¿Quitar esta materia del grado?')) return;
+    await supabase.from('grado_materia').delete().eq('id', id);
+    await renderMateriasGradoFull();
+};
+
+// ── GESTIÓN MATERIAS POR GRADO (MODAL LEGACY) ─────────────
 window.gestionarMateriaGrado = async (gradoId) => {
     const grado = gradosCache.find(g => g.id === gradoId);
     document.getElementById('mgrado-titulo').textContent = `${grado.nombre} ${grado.seccion} — Materias`;

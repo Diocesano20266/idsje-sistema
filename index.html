@@ -5,302 +5,273 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IDSJE — Sistema Académico</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'Plus Jakarta Sans',sans-serif;min-height:100vh;display:flex;background:#f0f3f9}
+        *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
 
-        /* ── PANEL IZQUIERDO ── */
-        .panel-left{
-            width:48%;
-            background:#0a1628;
-            display:flex;
-            flex-direction:column;
-            justify-content:center;
-            align-items:center;
-            padding:60px 48px;
-            position:relative;
-            overflow:hidden;
-        }
-        .panel-left::before{
-            content:'';position:absolute;
-            width:500px;height:500px;border-radius:50%;
-            border:1px solid rgba(212,175,55,.06);
-            top:-120px;left:-120px;
-        }
-        .panel-left::after{
-            content:'';position:absolute;
-            width:350px;height:350px;border-radius:50%;
-            border:1px solid rgba(212,175,55,.04);
-            bottom:-80px;right:-80px;
-        }
-        .panel-deco{
-            position:absolute;top:0;left:0;right:0;height:3px;
-            background:linear-gradient(90deg,#d4af37,#f5d97a,#d4af37);
+        :root {
+            --gold:  #d4af37;
+            --navy:  #07101f;
+            --text:  #e8e4d9;
+            --muted: #8a94a8;
         }
 
-        .logo-wrap{text-align:center;z-index:1;margin-bottom:40px}
-        .logo-circle{
-            width:140px;height:140px;
-            border-radius:50%;
-            border:3px solid rgba(212,175,55,.7);
-            box-shadow:0 0 0 8px rgba(212,175,55,.08), 0 0 0 16px rgba(212,175,55,.04);
-            margin:0 auto 24px;
-            overflow:hidden;
-            background:#0d2040;
-        }
-        .logo-circle img{width:100%;height:100%;object-fit:cover}
-        .logo-circle-fallback{
-            width:100%;height:100%;
-            display:flex;align-items:center;justify-content:center;
-            font-family:'Playfair Display',serif;
-            font-size:32px;font-weight:800;color:#d4af37;
-        }
-        .logo-nombre{
-            font-family:'Playfair Display',serif;
-            font-size:32px;font-weight:800;
-            color:#fff;letter-spacing:2px;
-        }
-        .logo-nombre span{color:#d4af37}
-        .logo-sub{
-            font-size:11px;color:rgba(212,175,55,.6);
-            letter-spacing:3px;text-transform:uppercase;margin-top:6px;
+        html, body {
+            height: 100%;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            color: var(--text);
+            overflow: hidden;
         }
 
-        .panel-tagline{z-index:1;text-align:center;max-width:340px}
-        .panel-tagline h2{
-            font-family:'Playfair Display',serif;
-            font-size:20px;font-weight:700;
-            color:#fff;line-height:1.4;margin-bottom:12px;
-        }
-        .panel-tagline p{
-            font-size:13px;color:rgba(255,255,255,.45);
-            line-height:1.8;
-        }
-
-        .panel-features{
-            z-index:1;margin-top:36px;
-            display:flex;flex-direction:column;gap:12px;width:100%;max-width:300px;
-        }
-        .feat{
-            display:flex;align-items:center;gap:10px;
-            padding:10px 14px;
-            background:rgba(255,255,255,.04);
-            border:1px solid rgba(212,175,55,.1);
-            border-radius:10px;
-        }
-        .feat-icon{
-            width:28px;height:28px;border-radius:7px;
-            background:rgba(212,175,55,.1);
-            display:flex;align-items:center;justify-content:center;
-            font-size:14px;flex-shrink:0;
-        }
-        .feat-text{font-size:12px;color:rgba(255,255,255,.6);font-weight:500}
-
-        /* ── PANEL DERECHO ── */
-        .panel-right{
-            flex:1;display:flex;align-items:center;
-            justify-content:center;padding:40px;
-            background:#f0f3f9;
-        }
-        .login-box{width:100%;max-width:420px}
-
-        .login-header{margin-bottom:32px}
-        .login-inst{
-            font-size:11px;font-weight:700;color:#94a3b8;
-            text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;
-        }
-        .login-title{
-            font-family:'Playfair Display',serif;
-            font-size:28px;font-weight:800;color:#0a1628;
-            line-height:1.2;
-        }
-        .login-sub{font-size:14px;color:#94a3b8;margin-top:8px}
-
-        .field{margin-bottom:18px}
-        .field label{
-            display:block;font-size:11px;font-weight:700;
-            text-transform:uppercase;letter-spacing:1.2px;
-            color:#64748b;margin-bottom:8px;
-        }
-        .field input{
-            width:100%;padding:14px 16px;
-            border:1.5px solid #e2e8f0;border-radius:10px;
-            font-family:'Plus Jakarta Sans',sans-serif;
-            font-size:15px;color:#0a1628;background:#fff;
-            outline:none;transition:all .2s;
-        }
-        .field input:focus{border-color:#0a1628;box-shadow:0 0 0 3px rgba(10,22,40,.06)}
-
-        .btn-login{
-            width:100%;padding:15px;
-            background:#0a1628;color:#d4af37;
-            border:1px solid rgba(212,175,55,.3);
-            border-radius:10px;
-            font-family:'Playfair Display',serif;
-            font-weight:700;font-size:15px;
-            letter-spacing:1px;cursor:pointer;
-            transition:all .2s;margin-top:8px;
-        }
-        .btn-login:hover{background:#d4af37;color:#0a1628;border-color:#d4af37}
-        .btn-login:disabled{background:#94a3b8;border-color:#94a3b8;color:#fff;cursor:not-allowed}
-
-        .error-msg{
-            background:#fef2f2;border:1px solid #fecaca;
-            color:#dc2626;font-size:13px;
-            padding:12px 16px;border-radius:10px;
-            margin-top:14px;display:none;
+        /* Fondo: logo a pantalla completa */
+        .bg {
+            position: fixed;
+            inset: 0;
+            background-image: url('assets/logo-idsje.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            z-index: 0;
         }
 
-        .login-footer{
-            margin-top:36px;padding-top:24px;
-            border-top:1px solid #e2e8f0;
-            text-align:center;
+        /* Capa oscura encima del logo */
+        .bg::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(7, 16, 31, 0.82);
         }
-        .login-footer p{font-size:12px;color:#94a3b8;line-height:1.8}
-        .login-footer strong{color:#0a1628}
 
-        @media(max-width:768px){
-            body{flex-direction:column}
-            .panel-left{width:100%;padding:40px 24px;min-height:280px}
-            .logo-circle{width:100px;height:100px}
-            .logo-nombre{font-size:24px}
-            .panel-features{display:none}
-            .panel-right{padding:24px}
+        /* Línea dorada superior */
+        .topline {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+            z-index: 10;
+        }
+
+        /* Contenedor centrado */
+        .wrapper {
+            position: relative;
+            z-index: 1;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        /* Marca arriba */
+        .brand {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.8rem;
+            font-weight: 600;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--text);
+            margin-bottom: 0.3rem;
+            animation: fadeUp 0.5s ease both;
+        }
+
+        .brand span { color: var(--gold); }
+
+        .divider {
+            width: 36px;
+            height: 1px;
+            background: var(--gold);
+            opacity: 0.5;
+            margin: 0.6rem auto 1.8rem;
+            animation: fadeUp 0.5s 0.05s ease both;
+        }
+
+        /* Formulario */
+        .form {
+            width: 100%;
+            max-width: 360px;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            animation: fadeUp 0.5s 0.1s ease both;
+        }
+
+        .field label {
+            display: block;
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: var(--muted);
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            margin-bottom: 0.45rem;
+        }
+
+        .field input {
+            width: 100%;
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 2px;
+            padding: 0.85rem 1rem;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 0.9rem;
+            color: var(--text);
+            outline: none;
+            transition: border-color 0.2s, background 0.2s;
+            backdrop-filter: blur(4px);
+        }
+
+        .field input::placeholder { color: rgba(138,148,168,0.45); }
+
+        .field input:focus {
+            border-color: rgba(212,175,55,0.45);
+            background: rgba(212,175,55,0.05);
+        }
+
+        .btn-login {
+            width: 100%;
+            margin-top: 0.5rem;
+            padding: 0.9rem;
+            background: var(--gold);
+            color: var(--navy);
+            border: none;
+            border-radius: 2px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        .btn-login:hover   { background: #e0bd45; }
+        .btn-login:active  { transform: scale(0.99); }
+        .btn-login:disabled { background: #5a4e1a; color: #9a8a40; cursor: not-allowed; }
+
+        .error-msg {
+            display: none;
+            padding: 0.65rem 0.9rem;
+            background: rgba(220,53,69,0.1);
+            border: 1px solid rgba(220,53,69,0.22);
+            border-radius: 2px;
+            font-size: 0.75rem;
+            color: #f08080;
+            text-align: center;
+        }
+
+        /* Footer */
+        .footer {
+            position: fixed;
+            bottom: 1.5rem;
+            left: 0; right: 0;
+            text-align: center;
+            font-size: 0.6rem;
+            color: rgba(138,148,168,0.3);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            z-index: 2;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
 <body>
 
-    <!-- PANEL IZQUIERDO -->
-    <div class="panel-left">
-        <div class="panel-deco"></div>
+<div class="bg"></div>
+<div class="topline"></div>
 
-        <div class="logo-wrap">
-            <div class="logo-circle">
-                <img src="https://raw.githubusercontent.com/Diocesano20266/idsje-sistema/main/logo-idsje.png"
-                     alt="Logo IDSJE"
-                     onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-                <div class="logo-circle-fallback" style="display:none">IDSJE</div>
-            </div>
-            <div class="logo-nombre">IDS<span>JE</span></div>
-            <div class="logo-sub">Sistema Académico · 2026</div>
+<div class="wrapper">
+    <div class="brand">IDS<span>JE</span></div>
+    <div class="divider"></div>
+
+    <div class="form">
+        <div class="field">
+            <label for="correo">Usuario</label>
+            <input type="email" id="correo" placeholder="tu@correo.com"
+                   onkeydown="if(event.key==='Enter') iniciarSesion()" autocomplete="username"/>
         </div>
 
-        <div class="panel-tagline">
-            <h2>Instituto Diocesano<br>"San Juan Evangelista"</h2>
-            <p>Gestión académica moderna para docentes y administradores del instituto.</p>
+        <div class="field">
+            <label for="password">Contraseña</label>
+            <input type="password" id="password" placeholder="••••••••"
+                   onkeydown="if(event.key==='Enter') iniciarSesion()" autocomplete="current-password"/>
         </div>
 
-        <div class="panel-features">
-            <div class="feat">
-                <div class="feat-icon">📋</div>
-                <span class="feat-text">Registro de notas por periodo</span>
-            </div>
-            <div class="feat">
-                <div class="feat-icon">🧾</div>
-                <span class="feat-text">Generación automática de boletas</span>
-            </div>
-            <div class="feat">
-                <div class="feat-icon">👨‍🎓</div>
-                <span class="feat-text">Gestión completa de alumnos</span>
-            </div>
-        </div>
+        <button class="btn-login" onclick="iniciarSesion()" id="btn-entrar">
+            Iniciar Sesión
+        </button>
+
+        <div class="error-msg" id="error-msg"></div>
     </div>
+</div>
 
-    <!-- PANEL DERECHO -->
-    <div class="panel-right">
-        <div class="login-box">
-            <div class="login-header">
-                <div class="login-inst">San Juan Opico, El Salvador</div>
-                <div class="login-title">Bienvenido al<br>Sistema Académico</div>
-                <div class="login-sub">Ingresá con tus credenciales institucionales</div>
-            </div>
+<div class="footer">Instituto Diocesano &ldquo;San Juan Evangelista&rdquo; &mdash; San Juan Opico, El Salvador</div>
 
-            <div class="field">
-                <label>Correo institucional</label>
-                <input type="email" id="correo" placeholder="tu@correo.com"
-                    onkeydown="if(event.key==='Enter') iniciarSesion()">
-            </div>
-            <div class="field">
-                <label>Contraseña</label>
-                <input type="password" id="password" placeholder="••••••••"
-                    onkeydown="if(event.key==='Enter') iniciarSesion()">
-            </div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+    import { supabase, verificarSesion } from './src/js/auth.js';
 
-            <button class="btn-login" onclick="iniciarSesion()" id="btn-entrar">
-                Iniciar Sesión
-            </button>
-
-            <div class="error-msg" id="error-msg"></div>
-
-            <div class="login-footer">
-                <p>
-                    <strong>Instituto Diocesano "San Juan Evangelista"</strong><br>
-                    2a Calle Ote. y 2a Av. Norte · San Juan Opico<br>
-                    Tel: 7713-1964
-                </p>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script type="module">
-        import { supabase } from './src/js/auth.js';
-
-        (async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                const { data: usuario } = await supabase
-                    .from('usuarios').select('rol')
-                    .eq('correo', session.user.email).single();
-                if (usuario) {
-                    window.location.href = usuario.rol === 'admin' ? './admin.html' : './docente.html';
-                }
-            }
-        })();
-
-        window.iniciarSesion = async () => {
-            const correo   = document.getElementById('correo').value.trim();
-            const password = document.getElementById('password').value;
-            const errEl    = document.getElementById('error-msg');
-            const btn      = document.getElementById('btn-entrar');
-            errEl.style.display = 'none';
-
-            if (!correo || !password) {
-                errEl.textContent = 'Completá todos los campos.';
-                errEl.style.display = 'block';
-                return;
-            }
-
-            btn.disabled = true;
-            btn.textContent = 'Ingresando...';
-
-            const { error } = await supabase.auth.signInWithPassword({ email: correo, password });
-
-            if (error) {
-                errEl.textContent = 'Correo o contraseña incorrectos.';
-                errEl.style.display = 'block';
-                btn.disabled = false;
-                btn.textContent = 'Iniciar Sesión';
-                return;
-            }
-
+    (async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
             const { data: usuario } = await supabase
-                .from('usuarios').select('rol')
-                .eq('correo', correo).single();
-
-            if (!usuario) {
-                errEl.textContent = 'Usuario no registrado. Contactá al administrador.';
-                errEl.style.display = 'block';
-                await supabase.auth.signOut();
-                btn.disabled = false;
-                btn.textContent = 'Iniciar Sesión';
-                return;
+                .from('usuarios')
+                .select('rol')
+                .eq('correo', session.user.email)
+                .single();
+            if (usuario) {
+                window.location.href = usuario.rol === 'admin' ? './admin.html' : './docente.html';
             }
+        }
+    })();
 
-            window.location.href = usuario.rol === 'admin' ? './admin.html' : './docente.html';
-        };
-    </script>
+    window.iniciarSesion = async () => {
+        const correo   = document.getElementById('correo').value.trim();
+        const password = document.getElementById('password').value;
+        const errEl    = document.getElementById('error-msg');
+        const btn      = document.getElementById('btn-entrar');
+        errEl.style.display = 'none';
+
+        if (!correo || !password) {
+            errEl.textContent = 'Completá todos los campos.';
+            errEl.style.display = 'block';
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Ingresando...';
+
+        const { error } = await supabase.auth.signInWithPassword({ email: correo, password });
+
+        if (error) {
+            errEl.textContent = 'Correo o contraseña incorrectos.';
+            errEl.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = 'Iniciar Sesión';
+            return;
+        }
+
+        const { data: usuario } = await supabase
+            .from('usuarios')
+            .select('rol')
+            .eq('correo', correo)
+            .single();
+
+        if (!usuario) {
+            errEl.textContent = 'Usuario no registrado en el sistema. Contactá al administrador.';
+            errEl.style.display = 'block';
+            await supabase.auth.signOut();
+            btn.disabled = false;
+            btn.textContent = 'Iniciar Sesión';
+            return;
+        }
+
+        window.location.href = usuario.rol === 'admin' ? './admin.html' : './docente.html';
+    };
+</script>
+
 </body>
 </html>

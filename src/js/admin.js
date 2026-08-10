@@ -231,72 +231,77 @@ window.gestionarMateriaGrado = async (gradoId) => {
 
     const { data: asignadas } = await supabase
         .from('grado_materia')
-        .select('*, materias(nombre), usuarios(nombre_completo)')
+        .select('*')
         .eq('grado_id', gradoId);
 
-    // Select materias
-    const selM = document.getElementById('mgrado-materia');
-    selM.innerHTML = materiasCache.map(m => `<option value="${m.id}">${m.nombre}</option>`).join('');
+    const asignadasPorMateria = {};
+    (asignadas || []).forEach(a => { asignadasPorMateria[a.materia_id] = a; });
 
-    // Select docentes
-    const selD = document.getElementById('mgrado-docente');
-    selD.innerHTML = '<option value="">— Sin asignar —</option>' +
+    const opcionesDocentes = '<option value="">— Sin asignar —</option>' +
         usuariosCache.map(u => `<option value="${u.id}">${u.nombre_completo}</option>`).join('');
 
-    // Lista de asignadas
-    document.getElementById('lista-grado-materias').innerHTML = (asignadas || []).map(a => `
-        <div class="materia-asignada">
-            <span>${a.materias?.nombre}</span>
-            <span class="text-muted">${a.usuarios?.nombre_completo || 'Sin docente'}</span>
-            <button class="btn-sm btn-del" onclick="quitarMateriaGrado('${a.id}', '${gradoId}')">✕</button>
-        </div>
-    `).join('') || '<p class="text-muted">Sin materias asignadas</p>';
+    document.getElementById('lista-grado-materias').innerHTML = materiasCache.map(m => {
+        const asignada = asignadasPorMateria[m.id];
+        const marcada  = !!asignada;
+        return `
+        <div class="mgm-row">
+            <label class="mgm-check">
+                <input type="checkbox" class="mgm-checkbox" data-materia-id="${m.id}" ${marcada ? 'checked' : ''} onchange="toggleMgmRow('${m.id}')">
+                <span>${m.nombre}</span>
+            </label>
+            <select id="mgm-docente-${m.id}" ${marcada ? '' : 'disabled'}>${opcionesDocentes}</select>
+        </div>`;
+    }).join('') || '<p class="text-muted">No hay materias registradas</p>';
+
+    // Autocompletar docente sugerido: el de la asignación existente, o si no, el docente_id de la materia
+    materiasCache.forEach(m => {
+        const asignada  = asignadasPorMateria[m.id];
+        const docenteId = asignada ? (asignada.docente_id || '') : (m.docente_id || '');
+        const sel = document.getElementById(`mgm-docente-${m.id}`);
+        if (sel) sel.value = docenteId;
+    });
 
     abrirModal('modal-grado-materias');
 };
 
-window.sugerirDocenteMateria = async () => {
-    const materiaId = document.getElementById('mgrado-materia').value;
-    if (!materiaId) return;
+window.toggleMgmRow = (materiaId) => {
+    const chk = document.querySelector(`.mgm-checkbox[data-materia-id="${materiaId}"]`);
+    const sel = document.getElementById(`mgm-docente-${materiaId}`);
+    if (sel) sel.disabled = !chk.checked;
+};
 
-    const { data } = await supabase
-        .from('grado_materia')
-        .select('docente_id')
-        .eq('materia_id', materiaId)
-        .not('docente_id', 'is', null);
+window.guardarMateriasGrado = async () => {
+    const gradoId = document.getElementById('mgrado-id').value;
+    const checks  = document.querySelectorAll('.mgm-checkbox');
 
-    if (!data || !data.length) return;
+    const paraGuardar = [];
+    const paraQuitar  = [];
 
-    const conteo = {};
-    let sugerido = null, maxConteo = 0;
-    for (const { docente_id } of data) {
-        conteo[docente_id] = (conteo[docente_id] || 0) + 1;
-        if (conteo[docente_id] > maxConteo) {
-            maxConteo = conteo[docente_id];
-            sugerido = docente_id;
+    checks.forEach(chk => {
+        const materiaId = chk.dataset.materiaId;
+        const docenteId = document.getElementById(`mgm-docente-${materiaId}`).value || null;
+        if (chk.checked) {
+            paraGuardar.push({ grado_id: gradoId, materia_id: materiaId, docente_id: docenteId });
+        } else {
+            paraQuitar.push(materiaId);
         }
+    });
+
+    if (paraGuardar.length) {
+        const { error } = await supabase.from('grado_materia')
+            .upsert(paraGuardar, { onConflict: 'grado_id,materia_id' });
+        if (error) return alert('Error: ' + error.message);
     }
 
-    if (sugerido) document.getElementById('mgrado-docente').value = sugerido;
-};
+    if (paraQuitar.length) {
+        const { error } = await supabase.from('grado_materia')
+            .delete()
+            .eq('grado_id', gradoId)
+            .in('materia_id', paraQuitar);
+        if (error) return alert('Error: ' + error.message);
+    }
 
-window.agregarMateriaGrado = async () => {
-    const gradoId   = document.getElementById('mgrado-id').value;
-    const materiaId = document.getElementById('mgrado-materia').value;
-    const docenteId = document.getElementById('mgrado-docente').value || null;
-
-    const { error } = await supabase.from('grado_materia').upsert([{
-        grado_id: gradoId, materia_id: materiaId, docente_id: docenteId
-    }], { onConflict: 'grado_id,materia_id' });
-
-    if (error) return alert('Error: ' + error.message);
-    window.gestionarMateriaGrado(gradoId);
-};
-
-window.quitarMateriaGrado = async (id, gradoId) => {
-    if (!confirm('¿Quitar esta materia del grado?')) return;
-    await supabase.from('grado_materia').delete().eq('id', id);
-    window.gestionarMateriaGrado(gradoId);
+    cerrarModal('modal-grado-materias');
 };
 
 // ── DOCENTES ────────────────────────────────
@@ -400,20 +405,27 @@ window.abrirModalMateria = (id = null) => {
     document.getElementById('materia-id').value     = m?.id || '';
     document.getElementById('materia-nombre').value = m?.nombre || '';
     document.getElementById('materia-codigo').value = m?.codigo || '';
+
+    const selDoc = document.getElementById('materia-docente');
+    selDoc.innerHTML = '<option value="">— Sin asignar —</option>' +
+        usuariosCache.map(u => `<option value="${u.id}">${u.nombre_completo}</option>`).join('');
+    selDoc.value = m?.docente_id || '';
+
     abrirModal('modal-materia');
 };
 
 window.editarMateria = (id) => window.abrirModalMateria(id);
 
 window.guardarMateria = async () => {
-    const id     = document.getElementById('materia-id').value;
-    const nombre = document.getElementById('materia-nombre').value.trim();
-    const codigo = document.getElementById('materia-codigo').value.trim();
+    const id        = document.getElementById('materia-id').value;
+    const nombre    = document.getElementById('materia-nombre').value.trim();
+    const codigo    = document.getElementById('materia-codigo').value.trim();
+    const docenteId = document.getElementById('materia-docente').value || null;
     if (!nombre) return alert('El nombre es obligatorio');
 
     const { error } = id
-        ? await supabase.from('materias').update({ nombre, codigo }).eq('id', id)
-        : await supabase.from('materias').insert([{ nombre, codigo }]);
+        ? await supabase.from('materias').update({ nombre, codigo, docente_id: docenteId }).eq('id', id)
+        : await supabase.from('materias').insert([{ nombre, codigo, docente_id: docenteId }]);
     if (error) return alert('Error: ' + error.message);
 
     cerrarModal('modal-materia');

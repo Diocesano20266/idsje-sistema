@@ -255,6 +255,31 @@ window.gestionarMateriaGrado = async (gradoId) => {
     abrirModal('modal-grado-materias');
 };
 
+window.sugerirDocenteMateria = async () => {
+    const materiaId = document.getElementById('mgrado-materia').value;
+    if (!materiaId) return;
+
+    const { data } = await supabase
+        .from('grado_materia')
+        .select('docente_id')
+        .eq('materia_id', materiaId)
+        .not('docente_id', 'is', null);
+
+    if (!data || !data.length) return;
+
+    const conteo = {};
+    let sugerido = null, maxConteo = 0;
+    for (const { docente_id } of data) {
+        conteo[docente_id] = (conteo[docente_id] || 0) + 1;
+        if (conteo[docente_id] > maxConteo) {
+            maxConteo = conteo[docente_id];
+            sugerido = docente_id;
+        }
+    }
+
+    if (sugerido) document.getElementById('mgrado-docente').value = sugerido;
+};
+
 window.agregarMateriaGrado = async () => {
     const gradoId   = document.getElementById('mgrado-id').value;
     const materiaId = document.getElementById('mgrado-materia').value;

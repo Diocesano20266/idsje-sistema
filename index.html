@@ -5,212 +5,159 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IDSJE — Sistema Académico</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+        * { margin:0; padding:0; box-sizing:border-box; }
 
-        html, body {
-            height: 100%;
-            background: #0b0f1a;
+        body {
             font-family: 'Plus Jakarta Sans', sans-serif;
-            color: #dde2ec;
-            overflow: hidden;
-        }
-
-        /* Línea dorada superior */
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0; left: 0; right: 0;
-            height: 3px;
-            background: #d4af37;
-            z-index: 10;
-        }
-
-        .wrapper {
-            height: 100vh;
+            min-height: 100vh;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 2rem;
-            gap: 0;
+            padding: 24px;
+            position: relative;
+            background:
+                linear-gradient(160deg, rgba(11,26,58,.93) 0%, rgba(5,12,28,.96) 100%),
+                url('https://raw.githubusercontent.com/Diocesano20266/idsje-sistema/main/logo-idsje.png') center/cover no-repeat fixed;
         }
 
-        /* Logo */
-        .logo-wrap {
-            width: 160px;
-            height: 160px;
-            border-radius: 50%;
-            overflow: hidden;
-            border: 2px solid rgba(212,175,55,0.35);
-            margin-bottom: 1.2rem;
-            animation: fadeUp 0.4s ease both;
-        }
-
-        .logo-wrap img {
+        /* Tarjeta glassmorphism */
+        .login-card {
             width: 100%;
-            height: 100%;
-            object-fit: cover;
+            max-width: 420px;
+            background: rgba(255,255,255,0.07);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,.15);
+            border-radius: 12px;
+            padding: 48px 40px;
+            box-shadow: 0 25px 70px rgba(0,0,0,.45);
         }
 
-        /* Nombre institución */
-        .inst-name {
+        .login-logo {
+            width: 140px;
+            height: 140px;
+            object-fit: contain;
+            display: block;
+            margin: 0 auto 22px;
+            filter: drop-shadow(0 4px 14px rgba(0,0,0,.35));
+        }
+
+        .login-nombre {
             font-family: 'Playfair Display', serif;
-            font-size: 0.72rem;
-            font-weight: 400;
-            letter-spacing: 0.3em;
-            text-transform: uppercase;
-            color: #8a94a8;
-            margin-bottom: 0.3rem;
+            font-size: 21px;
+            font-weight: 700;
+            color: #fff;
             text-align: center;
-            animation: fadeUp 0.4s 0.05s ease both;
-            opacity: 0;
-            animation-fill-mode: forwards;
+            line-height: 1.35;
+            letter-spacing: .2px;
         }
 
-        .inst-full {
-            font-family: 'Playfair Display', serif;
-            font-size: 1rem;
-            font-weight: 600;
-            color: #dde2ec;
-            letter-spacing: 0.05em;
+        .login-sub {
+            font-size: 12px;
+            color: rgba(255,255,255,.55);
             text-align: center;
-            margin-bottom: 2rem;
-            animation: fadeUp 0.4s 0.08s ease both;
-            opacity: 0;
-            animation-fill-mode: forwards;
+            margin-top: 10px;
+            margin-bottom: 34px;
+            line-height: 1.6;
         }
 
-        /* Línea separadora */
-        .sep {
-            width: 100%;
-            max-width: 360px;
-            height: 1px;
-            background: rgba(212,175,55,0.2);
-            margin-bottom: 2rem;
-            animation: fadeUp 0.4s 0.1s ease both;
-            opacity: 0;
-            animation-fill-mode: forwards;
-        }
-
-        /* Formulario */
-        .form {
-            width: 100%;
-            max-width: 360px;
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            animation: fadeUp 0.4s 0.12s ease both;
-            opacity: 0;
-            animation-fill-mode: forwards;
-        }
-
+        .field { margin-bottom: 18px; }
         .field label {
             display: block;
-            font-size: 0.62rem;
+            font-size: 10px;
             font-weight: 600;
-            color: #6b7590;
-            letter-spacing: 0.2em;
             text-transform: uppercase;
-            margin-bottom: 0.4rem;
+            letter-spacing: 1.5px;
+            color: rgba(255,255,255,.5);
+            margin-bottom: 8px;
         }
-
         .field input {
             width: 100%;
-            background: rgba(255,255,255,0.04);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-top: none;
-            border-left: none;
-            border-right: none;
-            border-bottom: 1px solid rgba(255,255,255,0.15);
-            padding: 0.75rem 0.2rem;
+            padding: 13px 16px;
+            border: 1px solid rgba(255,255,255,.15);
+            border-radius: 8px;
             font-family: 'Plus Jakarta Sans', sans-serif;
-            font-size: 0.9rem;
-            color: #dde2ec;
+            font-size: 14px;
+            color: #fff;
+            background: rgba(0,0,0,.25);
             outline: none;
-            background: transparent;
-            transition: border-color 0.2s;
+            transition: border-color .2s, background .2s;
         }
-
-        .field input::placeholder { color: rgba(107,117,144,0.4); }
-        .field input:focus { border-bottom-color: #d4af37; }
+        .field input::placeholder { color: rgba(255,255,255,.3); }
+        .field input:focus { border-color: #d4af37; background: rgba(0,0,0,.35); }
 
         .btn-login {
             width: 100%;
-            margin-top: 0.8rem;
-            padding: 0.85rem;
-            background: transparent;
-            color: #d4af37;
-            border: 1px solid rgba(212,175,55,0.5);
+            padding: 14px;
+            background: #d4af37;
+            color: #0a1628;
+            border: none;
+            border-radius: 8px;
             font-family: 'Plus Jakarta Sans', sans-serif;
-            font-size: 0.68rem;
             font-weight: 700;
-            letter-spacing: 0.28em;
+            font-size: 13px;
+            letter-spacing: 1px;
             text-transform: uppercase;
             cursor: pointer;
-            transition: background 0.2s, color 0.2s;
+            transition: all .25s ease;
+            margin-top: 8px;
+            box-shadow: 0 4px 16px rgba(212,175,55,.25);
         }
-
         .btn-login:hover {
-            background: #d4af37;
-            color: #0b0f1a;
+            background: #e3c25a;
+            box-shadow: 0 8px 26px rgba(212,175,55,.5);
+            transform: translateY(-1px);
         }
-
         .btn-login:disabled {
-            opacity: 0.4;
+            background: rgba(255,255,255,.15);
+            color: rgba(255,255,255,.4);
             cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
         }
 
         .error-msg {
+            background: rgba(220,38,38,.15);
+            border: 1px solid rgba(220,38,38,.4);
+            color: #fca5a5;
+            font-size: 13px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-top: 14px;
             display: none;
-            padding: 0.6rem 0;
-            font-size: 0.72rem;
-            color: #f08080;
-            text-align: center;
-            border-top: 1px solid rgba(220,53,69,0.2);
         }
 
-        /* Footer */
-        .footer {
-            position: fixed;
-            bottom: 1.2rem;
-            left: 0; right: 0;
+        .footer-login {
+            margin-top: 32px;
+            font-size: 11px;
+            color: rgba(255,255,255,.35);
             text-align: center;
-            font-size: 0.58rem;
-            color: rgba(107,117,144,0.3);
-            letter-spacing: 0.15em;
-            text-transform: uppercase;
+            line-height: 1.8;
         }
 
-        @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(10px); }
-            to   { opacity: 1; transform: translateY(0); }
+        @media (max-width: 480px) {
+            .login-card { padding: 36px 26px; }
         }
     </style>
 </head>
 <body>
 
-<div class="wrapper">
-    <div class="logo-wrap">
-        <img src="https://raw.githubusercontent.com/Diocesano20266/idsje-sistema/main/logo-idsje.png" alt="IDSJE"/>
-    </div>
+    <div class="login-card">
+        <img class="login-logo" src="https://raw.githubusercontent.com/Diocesano20266/idsje-sistema/main/logo-idsje.png" alt="IDSJE">
+        <div class="login-nombre">Instituto Diocesano<br>"San Juan Evangelista"</div>
+        <p class="login-sub">Ingresá con tus credenciales institucionales</p>
 
-    <div class="inst-full">Instituto Diocesano "San Juan Evangelista"</div>
-
-    <div class="sep"></div>
-
-    <div class="form">
         <div class="field">
-            <label for="correo">Usuario</label>
+            <label>Correo institucional</label>
             <input type="email" id="correo" placeholder="tu@correo.com"
-                   onkeydown="if(event.key==='Enter') iniciarSesion()" autocomplete="username"/>
+                onkeydown="if(event.key==='Enter') iniciarSesion()">
         </div>
-
         <div class="field">
-            <label for="password">Contraseña</label>
+            <label>Contraseña</label>
             <input type="password" id="password" placeholder="••••••••"
-                   onkeydown="if(event.key==='Enter') iniciarSesion()" autocomplete="current-password"/>
+                onkeydown="if(event.key==='Enter') iniciarSesion()">
         </div>
 
         <button class="btn-login" onclick="iniciarSesion()" id="btn-entrar">
@@ -218,73 +165,76 @@
         </button>
 
         <div class="error-msg" id="error-msg"></div>
+
+        <div class="footer-login">
+            Instituto Diocesano "San Juan Evangelista"<br>
+            San Juan Opico, El Salvador · 2026
+        </div>
     </div>
-</div>
 
-<div class="footer">San Juan Opico, La Libertad &mdash; El Salvador</div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module">
+        import { supabase, verificarSesion } from './src/js/auth.js';
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module">
-    import { supabase, verificarSesion } from './src/js/auth.js';
+        // Si ya hay sesión activa, redirigir
+        (async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                const { data: usuario } = await supabase
+                    .from('usuarios')
+                    .select('rol')
+                    .eq('correo', session.user.email)
+                    .single();
+                if (usuario) {
+                    window.location.href = usuario.rol === 'admin' ? './admin.html' : './docente.html';
+                }
+            }
+        })();
 
-    (async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
+        window.iniciarSesion = async () => {
+            const correo   = document.getElementById('correo').value.trim();
+            const password = document.getElementById('password').value;
+            const errEl    = document.getElementById('error-msg');
+            const btn      = document.getElementById('btn-entrar');
+            errEl.style.display = 'none';
+
+            if (!correo || !password) {
+                errEl.textContent = 'Completá todos los campos.';
+                errEl.style.display = 'block';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Ingresando...';
+
+            const { error } = await supabase.auth.signInWithPassword({ email: correo, password });
+
+            if (error) {
+                errEl.textContent = 'Correo o contraseña incorrectos.';
+                errEl.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Iniciar Sesión';
+                return;
+            }
+
+            // Obtener rol
             const { data: usuario } = await supabase
                 .from('usuarios')
                 .select('rol')
-                .eq('correo', session.user.email)
+                .eq('correo', correo)
                 .single();
-            if (usuario) {
-                window.location.href = usuario.rol === 'admin' ? './admin.html' : './docente.html';
+
+            if (!usuario) {
+                errEl.textContent = 'Usuario no registrado en el sistema. Contactá al administrador.';
+                errEl.style.display = 'block';
+                await supabase.auth.signOut();
+                btn.disabled = false;
+                btn.textContent = 'Iniciar Sesión';
+                return;
             }
-        }
-    })();
 
-    window.iniciarSesion = async () => {
-        const correo   = document.getElementById('correo').value.trim();
-        const password = document.getElementById('password').value;
-        const errEl    = document.getElementById('error-msg');
-        const btn      = document.getElementById('btn-entrar');
-        errEl.style.display = 'none';
-
-        if (!correo || !password) {
-            errEl.textContent = 'Completá todos los campos.';
-            errEl.style.display = 'block';
-            return;
-        }
-
-        btn.disabled = true;
-        btn.textContent = 'Verificando...';
-
-        const { error } = await supabase.auth.signInWithPassword({ email: correo, password });
-
-        if (error) {
-            errEl.textContent = 'Credenciales incorrectas.';
-            errEl.style.display = 'block';
-            btn.disabled = false;
-            btn.textContent = 'Iniciar Sesión';
-            return;
-        }
-
-        const { data: usuario } = await supabase
-            .from('usuarios')
-            .select('rol')
-            .eq('correo', correo)
-            .single();
-
-        if (!usuario) {
-            errEl.textContent = 'Usuario no registrado. Contactá al administrador.';
-            errEl.style.display = 'block';
-            await supabase.auth.signOut();
-            btn.disabled = false;
-            btn.textContent = 'Iniciar Sesión';
-            return;
-        }
-
-        window.location.href = usuario.rol === 'admin' ? './admin.html' : './docente.html';
-    };
-</script>
-
+            window.location.href = usuario.rol === 'admin' ? './admin.html' : './docente.html';
+        };
+    </script>
 </body>
 </html>

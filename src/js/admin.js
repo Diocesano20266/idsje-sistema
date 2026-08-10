@@ -2,7 +2,7 @@
 //  IDSJE — Panel Administrador
 // ═══════════════════════════════════════════
 import { supabase, verificarSesion, cerrarSesion, subirFoto } from './auth.js';
-import { CLOUDINARY_CLOUD, CLOUDINARY_PRESET, MATERIAS_DEFAULT, SUPABASE_URL, SUPABASE_SERVICE_KEY } from './config.js';
+import { CLOUDINARY_CLOUD, CLOUDINARY_PRESET, MATERIAS_DEFAULT } from './config.js';
 
 let usuarioActual = null;
 let gradosCache   = [];
@@ -10,6 +10,22 @@ let alumnosCache  = [];
 let usuariosCache = [];
 let materiasCache = [];
 let vistaActual   = 'grados';
+
+// Llama al endpoint serverless que gestiona usuarios con la service key
+async function llamarApiAdmin(action, datos) {
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch('/api/admin-usuarios', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token || ''}`
+        },
+        body: JSON.stringify({ action, ...datos })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error en la solicitud');
+    return data;
+}
 
 // ── INICIO ──────────────────────────────────
 async function init() {
@@ -52,11 +68,10 @@ const TITULOS = {
 };
 
 const VISTA_CONFIG = {
-    grados:          { titulo: 'Grados y Secciones',  accion: `<button class="btn-primary" onclick="abrirModalGrado()">+ Nuevo Grado</button>` },
-    alumnos:         { titulo: 'Alumnos',              accion: `<button class="btn-secondary" onclick="mostrarVista('grados')">← Volver</button><input type="file" id="excel-alumnos" accept=".xlsx,.xls" class="hidden" onchange="importarAlumnosExcel(event)"><button class="btn-secondary" onclick="document.getElementById('excel-alumnos').click()">📊 Importar Excel</button><button class="btn-primary" onclick="abrirModalAlumno()">+ Nuevo Alumno</button>` },
-    docentes:        { titulo: 'Docentes',             accion: `<button class="btn-primary" onclick="abrirModalDocente()">+ Nuevo Docente</button>` },
-    materias:        { titulo: 'Materias',             accion: `<button class="btn-secondary" onclick="cargarMateriasDefault()">Cargar IDSJE</button><button class="btn-primary" onclick="abrirModalMateria()">+ Nueva Materia</button>` },
-    'grado-materias':{ titulo: 'Materias del Grado',   accion: `<button class="btn-secondary" onclick="mostrarVista('grados')">← Volver a Grados</button>` },
+    grados:   { titulo: 'Grados y Secciones',  accion: `<button class="btn-primary" onclick="abrirModalGrado()">+ Nuevo Grado</button>` },
+    alumnos:  { titulo: 'Alumnos',              accion: `<input type="file" id="excel-alumnos" accept=".xlsx,.xls" class="hidden" onchange="importarAlumnosExcel(event)"><button class="btn-secondary" onclick="document.getElementById('excel-alumnos').click()">📊 Importar Excel</button><button class="btn-primary" onclick="abrirModalAlumno()">+ Nuevo Alumno</button>` },
+    docentes: { titulo: 'Docentes',             accion: `<button class="btn-primary" onclick="abrirModalDocente()">+ Nuevo Docente</button>` },
+    materias: { titulo: 'Materias',             accion: `<button class="btn-secondary" onclick="cargarMateriasDefault()">Cargar IDSJE</button><button class="btn-primary" onclick="abrirModalMateria()">+ Nueva Materia</button>` },
 };
 
 window.mostrarVista = async (vista) => {
@@ -137,13 +152,18 @@ function renderGrados() {
             <div class="group-label">${nombre}</div>
             <div class="bubbles">
                 ${grados.map(g => `
-                    <div class="grado-bubble" onclick="abrirPanelGrado('${g.id}')">
+                    <div class="grado-bubble">
                         <div class="bubble-circle">
                             <span class="badge-mod ${badgeMod(g.modalidad)}">${labelMod(g.modalidad)}</span>
                             <span class="bubble-code">${codigoGrado(g)}</span>
                             <span class="bubble-sub">Secc. ${g.seccion}</span>
                         </div>
                         <span class="bubble-label">${usuariosCache.find(u=>u.id===g.docente_guia_id)?.nombre_completo?.split(' ')[0] || 'Sin guía'}</span>
+                        <div class="bubble-actions">
+                            <button class="ba-btn ba-edit" onclick="editarGrado('${g.id}')">Editar</button>
+                            <button class="ba-btn ba-mat" onclick="gestionarMateriaGrado('${g.id}')">Materias</button>
+                            <button class="ba-btn ba-del" onclick="eliminarGrado('${g.id}')">Eliminar</button>
+                        </div>
                     </div>
                 `).join('')}
             </div>
@@ -203,142 +223,7 @@ window.eliminarGrado = async (id) => {
     renderGrados();
 };
 
-// ── PANEL DE GRADO ──────────────────────────────────
-window.abrirPanelGrado = (gradoId) => {
-    const g = gradosCache.find(x => x.id === gradoId);
-    if (!g) return;
-
-    // Ocultar todas las vistas
-    document.querySelectorAll('[id^="vista-"]').forEach(v => v.classList.add('hidden'));
-    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-
-    // Mostrar vista panel grado
-    document.getElementById('vista-panel-grado').classList.remove('hidden');
-    document.getElementById('topbar-titulo').textContent = `${g.nombre} — Sección ${g.seccion}`;
-    document.getElementById('topbar-actions').innerHTML = `<button class="btn-secondary" onclick="mostrarVista('grados')">← Volver a Grados</button>`;
-
-    const docGuia = usuariosCache.find(u => u.id === g.docente_guia_id)?.nombre_completo || 'Sin asignar';
-
-    document.getElementById('panel-grado-body').innerHTML = `
-        <div style="margin-bottom:20px">
-            <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#0a1628">${g.nombre}</div>
-            <div style="font-size:13px;color:#64748b;margin-top:4px">Sección ${g.seccion} · ${g.modalidad} · ${g.anio} · Guía: ${docGuia}</div>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px">
-            <div class="panel-grado-btn" onclick="abrirGradoMateriasFull('${g.id}','${g.nombre}','${g.seccion}')">
-                <div class="pgb-icon">📚</div>
-                <div class="pgb-label">Materias</div>
-                <div class="pgb-sub">Asignar materias y docentes</div>
-            </div>
-            <div class="panel-grado-btn" onclick="irAlumnosGrado('${g.id}')">
-                <div class="pgb-icon">👨‍🎓</div>
-                <div class="pgb-label">Alumnos</div>
-                <div class="pgb-sub">Ver y gestionar estudiantes</div>
-            </div>
-            <div class="panel-grado-btn" onclick="editarGrado('${g.id}')">
-                <div class="pgb-icon">✏️</div>
-                <div class="pgb-label">Editar Grado</div>
-                <div class="pgb-sub">Modificar datos del grado</div>
-            </div>
-            <div class="panel-grado-btn pgb-danger" onclick="eliminarGrado('${g.id}')">
-                <div class="pgb-icon">🗑</div>
-                <div class="pgb-label">Eliminar Grado</div>
-                <div class="pgb-sub">Eliminar grado y sus datos</div>
-            </div>
-        </div>
-    `;
-};
-
-window.irAlumnosGrado = (gradoId) => {
-    mostrarVista('alumnos');
-    setTimeout(() => {
-        const sel = document.getElementById('filtro-grado');
-        if (sel) { sel.value = gradoId; renderAlumnos(); }
-    }, 100);
-};
-
-// ── GESTIÓN MATERIAS POR GRADO (PANTALLA COMPLETA) ─────────────
-let gradoMatFullId = null;
-
-window.abrirGradoMateriasFull = async (gradoId, nombre, seccion) => {
-    gradoMatFullId = gradoId;
-
-    document.getElementById('grado-mat-titulo').textContent = `${nombre} — Sección ${seccion}`;
-    document.getElementById('topbar-titulo').textContent = `${nombre} ${seccion} — Materias`;
-    document.getElementById('topbar-actions').innerHTML = `<button class="btn-secondary" onclick="abrirPanelGrado('${gradoId}')">← Volver al Grado</button>`;
-
-    // Poblar selects
-    const selM = document.getElementById('gm-materia-sel');
-    const selD = document.getElementById('gm-docente-sel');
-    selM.innerHTML = materiasCache.map(m => `<option value="${m.id}">${m.nombre}</option>`).join('');
-    selD.innerHTML = '<option value="">— Sin asignar —</option>' +
-        usuariosCache.map(u => `<option value="${u.id}">${u.nombre_completo}</option>`).join('');
-
-    // Ocultar todas las vistas y mostrar esta
-    document.querySelectorAll('[id^="vista-"]').forEach(v => v.classList.add('hidden'));
-    document.getElementById('vista-grado-materias').classList.remove('hidden');
-    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-
-    await renderMateriasGradoFull();
-};
-
-async function renderMateriasGradoFull() {
-    const { data: asignadas } = await supabase
-        .from('grado_materia')
-        .select('*, materias(nombre), usuarios(nombre_completo)')
-        .eq('grado_id', gradoMatFullId);
-
-    const lista = document.getElementById('lista-materias-full');
-
-    if (!asignadas?.length) {
-        lista.innerHTML = `<div style="padding:32px;text-align:center;color:#94a3b8;font-size:13px">Sin materias asignadas. Agregá una arriba.</div>`;
-        return;
-    }
-
-    lista.innerHTML = asignadas.map((a, i) => `
-        <div style="display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid #f1f5f9;${i%2===0?'background:#fafbfd':''}">
-            <div style="width:28px;height:28px;border-radius:50%;background:#0a1628;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#d4af37;flex-shrink:0">${i+1}</div>
-            <div style="flex:1">
-                <div style="font-size:14px;font-weight:600;color:#0a1628">${a.materias?.nombre}</div>
-                <div style="font-size:12px;color:#94a3b8;margin-top:2px">${a.usuarios?.nombre_completo || 'Sin docente asignado'}</div>
-            </div>
-            <select onchange="cambiarDocenteMateria('${a.id}', this.value)" 
-                style="padding:7px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;background:#fff;min-width:180px">
-                <option value="">— Sin asignar —</option>
-                ${usuariosCache.map(u => `<option value="${u.id}" ${u.id === a.docente_id ? 'selected' : ''}>${u.nombre_completo}</option>`).join('')}
-            </select>
-            <button onclick="quitarMateriaGradoFull('${a.id}')" 
-                style="padding:7px 12px;border-radius:8px;border:none;background:#fde8e8;color:#b52828;font-size:12px;font-weight:600;cursor:pointer">
-                Quitar
-            </button>
-        </div>
-    `).join('');
-}
-
-window.agregarMateriaGradoFull = async () => {
-    const materiaId = document.getElementById('gm-materia-sel').value;
-    const docenteId = document.getElementById('gm-docente-sel').value || null;
-    if (!materiaId) return alert('Seleccioná una materia');
-
-    const { error } = await supabase.from('grado_materia').upsert([{
-        grado_id: gradoMatFullId, materia_id: materiaId, docente_id: docenteId
-    }], { onConflict: 'grado_id,materia_id' });
-
-    if (error) return alert('Error: ' + error.message);
-    await renderMateriasGradoFull();
-};
-
-window.cambiarDocenteMateria = async (gradoMateriaId, docenteId) => {
-    await supabase.from('grado_materia').update({ docente_id: docenteId || null }).eq('id', gradoMateriaId);
-};
-
-window.quitarMateriaGradoFull = async (id) => {
-    if (!confirm('¿Quitar esta materia del grado?')) return;
-    await supabase.from('grado_materia').delete().eq('id', id);
-    await renderMateriasGradoFull();
-};
-
-// ── GESTIÓN MATERIAS POR GRADO (MODAL LEGACY) ─────────────
+// ── GESTIÓN MATERIAS POR GRADO ───────────────
 window.gestionarMateriaGrado = async (gradoId) => {
     const grado = gradosCache.find(g => g.id === gradoId);
     document.getElementById('mgrado-titulo').textContent = `${grado.nombre} ${grado.seccion} — Materias`;
@@ -431,23 +316,12 @@ window.guardarDocente = async () => {
         // Crear usuario nuevo
         if (!pass || pass.length < 6) return alert('La contraseña debe tener al menos 6 caracteres');
 
-        // 1. Crear en Supabase Auth usando service role key
-        const authRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
-            method: 'POST',
-            headers: {
-                'apikey': SUPABASE_SERVICE_KEY,
-                'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                email: correo,
-                password: pass,
-                email_confirm: true
-            })
-        });
-
-        const authData = await authRes.json();
-        if (!authRes.ok) return alert('Error creando cuenta: ' + (authData.message || authData.msg || JSON.stringify(authData)));
+        // 1. Crear en Supabase Auth vía endpoint serverless (usa la service key en el servidor)
+        try {
+            await llamarApiAdmin('crear', { correo, password: pass });
+        } catch (err) {
+            return alert('Error creando cuenta: ' + err.message);
+        }
 
         // 2. Insertar en tabla usuarios
         const { error } = await supabase.from('usuarios').insert([{ correo, nombre_completo: nombre, rol }]);
@@ -461,17 +335,10 @@ window.guardarDocente = async () => {
 
         // Cambiar contraseña si se ingresó una nueva
         if (pass && pass.length >= 6) {
-            const { data: authUser } = await supabase.auth.admin?.getUserByEmail?.(correo) || {};
-            if (authUser?.id) {
-                await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${authUser.id}`, {
-                    method: 'PUT',
-                    headers: {
-                        'apikey': SUPABASE_SERVICE_KEY,
-                        'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ password: pass })
-                });
+            try {
+                await llamarApiAdmin('cambiar-password', { correo, password: pass });
+            } catch (err) {
+                return alert('Error cambiando contraseña: ' + err.message);
             }
         }
     }
@@ -577,20 +444,13 @@ window.renderAlumnos = async function renderAlumnos() {
 }
 
 window.abrirModalAlumno = async (id = null) => {
-    // Si hay id, cargar datos frescos de la BD
-    let a = null;
-    if (id) {
-        const { data } = await supabase.from('alumnos').select('*').eq('id', id).single();
-        a = data;
-    }
-
+    const a = id ? alumnosCache.find(x => x.id === id) : null;
     document.getElementById('modal-alumno-title').textContent = a ? 'Editar Alumno' : 'Nuevo Alumno';
     document.getElementById('alumno-id').value        = a?.id || '';
     document.getElementById('alumno-nie').value       = a?.nie || '';
     document.getElementById('alumno-nombres').value   = a?.nombres || '';
     document.getElementById('alumno-apellidos').value = a?.apellidos || '';
     document.getElementById('alumno-anio').value      = a?.anio_ingreso || 2026;
-    document.getElementById('alumno-foto').value      = ''; // limpiar input foto
     document.getElementById('alumno-foto-preview').src = a?.foto_url || '';
     document.getElementById('alumno-foto-preview').style.display = a?.foto_url ? 'block' : 'none';
 
@@ -614,13 +474,7 @@ window.guardarAlumno = async () => {
 
     if (!nie || !nombres || !apellidos || !gradoId) return alert('Todos los campos son obligatorios');
 
-    // FIX: obtener foto actual directo de la base de datos para no mezclar con otros alumnos
-    let foto_url = null;
-    if (id) {
-        const { data: alumnoActual } = await supabase
-            .from('alumnos').select('foto_url').eq('id', id).single();
-        foto_url = alumnoActual?.foto_url || null;
-    }
+    let foto_url = alumnosCache.find(a => a.id === id)?.foto_url || null;
 
     if (fotoFile) {
         try {
@@ -629,9 +483,6 @@ window.guardarAlumno = async () => {
             alert('Error subiendo foto: ' + e.message);
         }
     }
-
-    // Limpiar el input de foto para evitar reusos
-    document.getElementById('alumno-foto').value = '';
 
     const payload = { nie, nombres, apellidos, grado_id: gradoId, anio_ingreso: anio, foto_url };
     const { error } = id
@@ -674,14 +525,8 @@ window.previsualizarFoto = (input) => {
 // ── MODALES ─────────────────────────────────
 window.abrirModal  = (id) => document.getElementById(id).classList.add('open');
 window.cerrarModal = (id) => document.getElementById(id).classList.remove('open');
-// Modal solo se cierra con botones Guardar/Cancelar, no al hacer click afuera
-
-// Evitar que doble click dentro del modal lo cierre
-document.querySelectorAll && document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.modal').forEach(m => {
-        m.addEventListener('click', e => e.stopPropagation());
-        m.addEventListener('dblclick', e => e.stopPropagation());
-    });
+document.addEventListener('click', e => {
+    if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('open');
 });
 
 window.cerrarSesionAdmin = cerrarSesion;

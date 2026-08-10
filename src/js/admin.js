@@ -2,14 +2,15 @@
 //  IDSJE — Panel Administrador
 // ═══════════════════════════════════════════
 import { supabase, verificarSesion, cerrarSesion, subirFoto } from './auth.js';
-import { CLOUDINARY_CLOUD, CLOUDINARY_PRESET, MATERIAS_DEFAULT } from './config.js';
+import { CLOUDINARY_CLOUD, CLOUDINARY_PRESET, MATERIAS_DEFAULT, INSTITUTO } from './config.js';
 
 let usuarioActual = null;
 let gradosCache   = [];
 let alumnosCache  = [];
 let usuariosCache = [];
 let materiasCache = [];
-let vistaActual   = 'grados';
+let vistaActual   = 'inicio';
+let dashChart     = null;
 
 // Llama al endpoint serverless que gestiona usuarios con la service key
 async function llamarApiAdmin(action, datos) {
@@ -34,7 +35,7 @@ async function init() {
     usuarioActual = res.usuario;
     document.getElementById('admin-nombre').textContent = usuarioActual.nombre_completo;
     await cargarTodo();
-    mostrarVista('grados');
+    mostrarVista('inicio');
 }
 
 async function cargarTodo() {
@@ -61,6 +62,7 @@ async function cargarTodo() {
 
 // ── VISTAS ──────────────────────────────────
 const TITULOS = {
+    inicio: 'Inicio',
     grados: 'Grados y Secciones',
     alumnos: 'Alumnos',
     docentes: 'Docentes',
@@ -68,6 +70,7 @@ const TITULOS = {
 };
 
 const VISTA_CONFIG = {
+    inicio:   { titulo: 'Inicio',               accion: `<button class="btn-primary" onclick="mostrarVista('grados')">Ver Grados</button>` },
     grados:   { titulo: 'Grados y Secciones',  accion: `<button class="btn-primary" onclick="abrirModalGrado()">+ Nuevo Grado</button>` },
     alumnos:  { titulo: 'Alumnos',              accion: `<input type="file" id="excel-alumnos" accept=".xlsx,.xls" class="hidden" onchange="importarAlumnosExcel(event)"><button class="btn-secondary" onclick="document.getElementById('excel-alumnos').click()">📊 Importar Excel</button><button class="btn-primary" onclick="abrirModalAlumno()">+ Nuevo Alumno</button>` },
     docentes: { titulo: 'Docentes',             accion: `<button class="btn-primary" onclick="abrirModalDocente()">+ Nuevo Docente</button>` },
@@ -93,6 +96,7 @@ window.mostrarVista = async (vista) => {
     const tt = document.getElementById('topbar-titulo');
     if (tt) tt.textContent = TITULOS[vista] || vista;
 
+    if (vista === 'inicio')   renderDashboard();
     if (vista === 'grados')   renderGrados();
     if (vista === 'docentes') renderDocentes();
     if (vista === 'materias') renderMaterias();
@@ -107,6 +111,145 @@ window.mostrarVista = async (vista) => {
         renderAlumnos();
     }
 };
+
+// Genera código corto: "PRIMER AÑO" + modalidad + sección → "1GA"
+function codigoGrado(g) {
+    const nom = g.nombre.toUpperCase();
+    let num = '?';
+    if (nom.includes('PRIMER') || nom.includes('1')) num = '1';
+    else if (nom.includes('SEGUNDO') || nom.includes('2')) num = '2';
+    else if (nom.includes('TERCER') || nom.includes('3')) num = '3';
+    const mod = g.modalidad === 'Técnico' ? 'T' : g.modalidad === 'Vocacional' ? 'V' : 'G';
+    return `${num}${mod}${g.seccion}`;
+}
+
+// ── DASHBOARD (INICIO) ───────────────────────
+async function cargarAlumnosDashboard() {
+    const { data, error } = await supabase
+        .from('alumnos')
+        .select('*, grados(nombre, seccion)')
+        .order('created_at', { ascending: false });
+
+    if (!error) return data || [];
+
+    // La tabla podría no tener columna created_at: reintentar sin ese orden
+    const fallback = await supabase.from('alumnos').select('*, grados(nombre, seccion)');
+    const alumnos = fallback.data || [];
+    alumnos.sort((a, b) => (b.anio_ingreso || 0) - (a.anio_ingreso || 0));
+    return alumnos;
+}
+
+// Variación de un conteo respecto al año anterior. Null si no hay dato del año anterior.
+function calcularVariacion(items, campoAnio) {
+    const anioActual = INSTITUTO.anio;
+    const actual    = items.filter(x => x[campoAnio] === anioActual).length;
+    const anterior  = items.filter(x => x[campoAnio] === anioActual - 1).length;
+    if (!anterior) return null;
+    return Math.round(((actual - anterior) / anterior) * 100);
+}
+
+function formatFechaAlumno(a) {
+    if (a.created_at) {
+        return new Date(a.created_at).toLocaleDateString('es-SV', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+    return a.anio_ingreso ? `Año ${a.anio_ingreso}` : '—';
+}
+
+async function renderDashboard() {
+    // Notas de variación (grados y alumnos tienen campo de año; docentes/materias no)
+    const varGrados = calcularVariacion(gradosCache, 'anio');
+    const notaGrados = document.getElementById('stat-grados-note');
+    if (notaGrados) {
+        notaGrados.textContent = varGrados === null
+            ? 'Secciones activas'
+            : `${varGrados >= 0 ? '▲' : '▼'} ${Math.abs(varGrados)}% vs. ${INSTITUTO.anio - 1}`;
+        notaGrados.className = 'sc-note' + (varGrados === null ? '' : varGrados >= 0 ? ' up' : ' down');
+    }
+
+    const alumnosDash = await cargarAlumnosDashboard();
+
+    const varAlumnos = calcularVariacion(alumnosDash, 'anio_ingreso');
+    const notaAlumnos = document.getElementById('stat-alumnos-note');
+    if (notaAlumnos) {
+        notaAlumnos.textContent = varAlumnos === null
+            ? `Matriculados ${INSTITUTO.anio}`
+            : `${varAlumnos >= 0 ? '▲' : '▼'} ${Math.abs(varAlumnos)}% vs. ${INSTITUTO.anio - 1}`;
+        notaAlumnos.className = 'sc-note' + (varAlumnos === null ? '' : varAlumnos >= 0 ? ' up' : ' down');
+    }
+
+    // Conteo de alumnos por grado
+    const conteoPorGrado = {};
+    alumnosDash.forEach(a => {
+        if (!a.grado_id) return;
+        conteoPorGrado[a.grado_id] = (conteoPorGrado[a.grado_id] || 0) + 1;
+    });
+
+    // Gráfica de barras
+    const canvas = document.getElementById('chart-alumnos-grado');
+    if (canvas && window.Chart) {
+        const labels = gradosCache.map(g => `${codigoGrado(g)}`);
+        const valores = gradosCache.map(g => conteoPorGrado[g.id] || 0);
+
+        if (dashChart) dashChart.destroy();
+        dashChart = new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Alumnos',
+                    data: valores,
+                    backgroundColor: '#1B3A6B',
+                    borderRadius: 5,
+                    maxBarThickness: 40
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f1f5fb' } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    // Últimos alumnos registrados
+    const cont = document.getElementById('dash-recientes');
+    if (cont) {
+        const recientes = alumnosDash.slice(0, 5);
+        cont.innerHTML = recientes.map(a => `
+            <div class="dash-recientes-item">
+                <div>
+                    <div class="dr-nombre">${a.nombres} ${a.apellidos}</div>
+                    <div class="dr-grado">${a.grados ? `${a.grados.nombre} ${a.grados.seccion}` : 'Sin grado'}</div>
+                </div>
+                <div class="dr-fecha">${formatFechaAlumno(a)}</div>
+            </div>
+        `).join('') || '<div class="empty-bubbles">Sin alumnos todavía</div>';
+    }
+
+    // Tarjetas de grados
+    const gc = document.getElementById('dash-grado-cards');
+    if (gc) {
+        gc.innerHTML = gradosCache.map(g => {
+            const guia = usuariosCache.find(u => u.id === g.docente_guia_id);
+            return `
+            <div class="grado-card">
+                <div class="gc-top">
+                    <div>
+                        <div class="gc-nombre">${g.nombre}</div>
+                        <div class="gc-seccion">Sección ${g.seccion}</div>
+                    </div>
+                    <div class="gc-count">${conteoPorGrado[g.id] || 0}</div>
+                </div>
+                <div class="gc-guia">👤 ${guia?.nombre_completo || 'Sin docente guía'}</div>
+            </div>
+        `;
+        }).join('') || '<div class="empty-bubbles">No hay grados todavía.</div>';
+    }
+}
 
 // ── GRADOS ──────────────────────────────────
 function renderGrados() {
@@ -124,17 +267,6 @@ function renderGrados() {
         if (!grupos[key]) grupos[key] = [];
         grupos[key].push(g);
     });
-
-    // Generar código corto: "PRIMER AÑO" + modalidad + sección → "1GA"
-    function codigoGrado(g) {
-        const nom = g.nombre.toUpperCase();
-        let num = '?';
-        if (nom.includes('PRIMER') || nom.includes('1')) num = '1';
-        else if (nom.includes('SEGUNDO') || nom.includes('2')) num = '2';
-        else if (nom.includes('TERCER') || nom.includes('3')) num = '3';
-        const mod = g.modalidad === 'Técnico' ? 'T' : g.modalidad === 'Vocacional' ? 'V' : 'G';
-        return `${num}${mod}${g.seccion}`;
-    }
 
     function badgeMod(m) {
         if (m === 'Técnico') return 'mod-tec';

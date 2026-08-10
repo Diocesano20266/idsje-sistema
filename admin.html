@@ -57,10 +57,41 @@
         /* ── STATS ── */
         .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px}
         .sc{background:#fff;border-radius:10px;padding:16px;border:1px solid rgba(27,58,107,.12);position:relative;overflow:hidden}
-        .sc::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#1B3A6B,#2E5FAC)}
+        .sc::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent-grad,linear-gradient(90deg,#1B3A6B,#2E5FAC))}
+        .sc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
         .sc-label{font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1.2px}
-        .sc-val{font-family:'Playfair Display',serif;font-size:26px;font-weight:700;color:#0a1628;margin:6px 0 3px}
+        .sc-icon{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:var(--accent-bg,#eef2fb);flex-shrink:0}
+        .sc-icon svg{width:17px;height:17px}
+        .sc-val{font-family:'Playfair Display',serif;font-size:26px;font-weight:700;color:#0a1628;margin:0 0 3px}
         .sc-note{font-size:12px;color:#64748b}
+        .sc-note.up{color:#1a7a40;font-weight:600}
+        .sc-note.down{color:#b52828;font-weight:600}
+        .sc-grados{--accent-bg:rgba(27,58,107,.1);--accent-grad:linear-gradient(90deg,#1B3A6B,#2E5FAC)}
+        .sc-alumnos{--accent-bg:rgba(212,175,55,.15);--accent-grad:linear-gradient(90deg,#d4af37,#f5d97a)}
+        .sc-docentes{--accent-bg:rgba(26,122,64,.1);--accent-grad:linear-gradient(90deg,#1a7a40,#4ade80)}
+        .sc-materias{--accent-bg:rgba(26,95,154,.1);--accent-grad:linear-gradient(90deg,#1a5f9a,#7dd3fc)}
+
+        /* ── DASHBOARD (INICIO) ── */
+        .dash-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-bottom:16px;align-items:start}
+        .dash-card{background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden}
+        .dash-card-header{padding:14px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f1f5fb}
+        .dash-card-title{font-size:13px;font-weight:700;color:#0a1628;display:flex;align-items:center;gap:8px}
+        .dash-card-body{padding:20px}
+        .chart-wrap{position:relative;height:260px}
+        .dash-recientes-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f7f9fc}
+        .dash-recientes-item:last-child{border-bottom:none}
+        .dr-nombre{font-size:13px;font-weight:600;color:#0a1628}
+        .dr-grado{font-size:11px;color:#94a3b8;margin-top:1px}
+        .dr-fecha{margin-left:auto;font-size:11px;color:#64748b;white-space:nowrap}
+        .grado-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+        .grado-card{background:#fff;border-radius:10px;border:1px solid #e2e8f0;padding:14px;transition:all .2s}
+        .grado-card:hover{border-color:#d4af37;box-shadow:0 6px 16px rgba(10,22,40,.08);transform:translateY(-2px)}
+        .gc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+        .gc-nombre{font-size:13px;font-weight:700;color:#0a1628;line-height:1.3}
+        .gc-seccion{font-size:10px;color:#94a3b8;margin-top:2px}
+        .gc-count{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#d4af37}
+        .gc-guia{font-size:11px;color:#64748b;padding-top:8px;border-top:1px solid #f1f5fb;display:flex;align-items:center;gap:6px}
+        @media(max-width:900px){.dash-grid{grid-template-columns:1fr}}
 
         /* ── GRADOS BURBUJAS ── */
         .grados-section{background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden}
@@ -181,7 +212,11 @@
         </div>
         <div class="sb-nav">
             <div class="nav-group-label">Gestión académica</div>
-            <div class="nav-item active" data-vista="grados" onclick="mostrarVista('grados')">
+            <div class="nav-item active" data-vista="inicio" onclick="mostrarVista('inicio')">
+                <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M2 7.5L8 2l6 5.5" stroke="rgba(255,255,255,.6)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.5 6.5V14h9V6.5" stroke="rgba(255,255,255,.6)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="nav-txt">Inicio</span>
+            </div>
+            <div class="nav-item" data-vista="grados" onclick="mostrarVista('grados')">
                 <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" fill="#d4af37"/><rect x="9" y="1" width="6" height="6" rx="1.5" fill="#d4af37" opacity=".4"/><rect x="1" y="9" width="6" height="6" rx="1.5" fill="#d4af37" opacity=".4"/><rect x="9" y="9" width="6" height="6" rx="1.5" fill="#d4af37" opacity=".4"/></svg>
                 <span class="nav-txt">Grados y Secciones</span>
             </div>
@@ -233,21 +268,79 @@
             </div>
         </div>
 
-        <!-- STATS -->
-        <div style="padding:20px 24px 0">
-            <div class="stats">
-                <div class="sc"><div class="sc-label">Grados</div><div class="sc-val" id="stat-grados">—</div><div class="sc-note">Secciones activas</div></div>
-                <div class="sc"><div class="sc-label">Alumnos</div><div class="sc-val" id="stat-alumnos">—</div><div class="sc-note">Matriculados 2026</div></div>
-                <div class="sc"><div class="sc-label">Docentes</div><div class="sc-val" id="stat-docentes">—</div><div class="sc-note">Registrados</div></div>
-                <div class="sc"><div class="sc-label">Materias</div><div class="sc-val" id="stat-materias">—</div><div class="sc-note">Activas</div></div>
-            </div>
-        </div>
-
         <!-- VISTAS -->
         <div class="content">
 
+            <!-- INICIO / DASHBOARD -->
+            <div id="vista-inicio">
+                <div class="stats">
+                    <div class="sc sc-grados">
+                        <div class="sc-top">
+                            <div class="sc-label">Grados</div>
+                            <div class="sc-icon"><svg viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" fill="#1B3A6B"/><rect x="9" y="1" width="6" height="6" rx="1.5" fill="#1B3A6B" opacity=".4"/><rect x="1" y="9" width="6" height="6" rx="1.5" fill="#1B3A6B" opacity=".4"/><rect x="9" y="9" width="6" height="6" rx="1.5" fill="#1B3A6B" opacity=".4"/></svg></div>
+                        </div>
+                        <div class="sc-val" id="stat-grados">—</div>
+                        <div class="sc-note" id="stat-grados-note">Secciones activas</div>
+                    </div>
+                    <div class="sc sc-alumnos">
+                        <div class="sc-top">
+                            <div class="sc-label">Alumnos</div>
+                            <div class="sc-icon"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5.5" r="3" stroke="#a8841f" stroke-width="1.3" fill="none"/><path d="M2 14c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" stroke="#a8841f" stroke-width="1.3" stroke-linecap="round" fill="none"/></svg></div>
+                        </div>
+                        <div class="sc-val" id="stat-alumnos">—</div>
+                        <div class="sc-note" id="stat-alumnos-note">Matriculados</div>
+                    </div>
+                    <div class="sc sc-docentes">
+                        <div class="sc-top">
+                            <div class="sc-label">Docentes</div>
+                            <div class="sc-icon"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="#1a7a40" stroke-width="1.3" fill="none"/><path d="M5 7h6M5 10h4" stroke="#1a7a40" stroke-width="1.2"/></svg></div>
+                        </div>
+                        <div class="sc-val" id="stat-docentes">—</div>
+                        <div class="sc-note">Registrados</div>
+                    </div>
+                    <div class="sc sc-materias">
+                        <div class="sc-top">
+                            <div class="sc-label">Materias</div>
+                            <div class="sc-icon"><svg viewBox="0 0 16 16" fill="none"><path d="M8 2L9.5 6.5H14L10.3 9l1.5 4.5L8 11 4.2 13.5l1.5-4.5L2 6.5h4.5L8 2z" stroke="#1a5f9a" stroke-width="1.2" fill="none"/></svg></div>
+                        </div>
+                        <div class="sc-val" id="stat-materias">—</div>
+                        <div class="sc-note">Activas</div>
+                    </div>
+                </div>
+
+                <div class="dash-grid">
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <div class="dash-card-title"><span class="gs-dot"></span>Alumnos por grado</div>
+                        </div>
+                        <div class="dash-card-body">
+                            <div class="chart-wrap"><canvas id="chart-alumnos-grado"></canvas></div>
+                        </div>
+                    </div>
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <div class="dash-card-title"><span class="gs-dot"></span>Últimos alumnos registrados</div>
+                        </div>
+                        <div class="dash-card-body" id="dash-recientes">
+                            <div class="empty-bubbles">Sin alumnos todavía</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dash-card">
+                    <div class="dash-card-header">
+                        <div class="dash-card-title"><span class="gs-dot"></span>Grados</div>
+                    </div>
+                    <div class="dash-card-body">
+                        <div class="grado-cards" id="dash-grado-cards">
+                            <div class="empty-bubbles">No hay grados todavía.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- GRADOS -->
-            <div id="vista-grados">
+            <div id="vista-grados" class="hidden">
                 <div class="grados-section">
                     <div class="gs-header">
                         <div class="gs-title"><span class="gs-dot"></span>Secciones registradas</div>
@@ -405,6 +498,7 @@
         });
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script type="module">
         import './src/js/admin.js';

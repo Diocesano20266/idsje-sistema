@@ -530,14 +530,52 @@ window.actualizarDetalleLocal = (alumnoId, tipo, idx, valor) => {
     actualizarResumenAlumno(alumnoId);
 };
 
+// Al cambiar el peso de una actividad, el resto se redistribuye proporcionalmente
+// (según su peso relativo actual) para que la categoría siempre sume 100%.
+function redistribuirPesos(pesos, idx, nuevoValor) {
+    const n = pesos.length;
+    const nuevo = Math.max(0, Math.min(100, parseFloat(nuevoValor) || 0));
+    if (n <= 1) return [100];
+
+    const otros = pesos.map((_, i) => i).filter(i => i !== idx);
+    const restante  = 100 - nuevo;
+    const sumaOtros = otros.reduce((s, i) => s + (parseFloat(pesos[i]) || 0), 0);
+
+    const resultado = [...pesos];
+    resultado[idx] = nuevo;
+
+    if (sumaOtros > 0) {
+        // Escala cada uno de los demás manteniendo su proporción relativa entre sí
+        otros.forEach(i => {
+            const proporcion = (parseFloat(pesos[i]) || 0) / sumaOtros;
+            resultado[i] = parseFloat((proporcion * restante).toFixed(2));
+        });
+    } else {
+        // Si los demás estaban en 0, se reparte el restante equitativamente entre ellos
+        const cada = restante / otros.length;
+        otros.forEach(i => { resultado[i] = parseFloat(cada.toFixed(2)); });
+    }
+
+    // Corrige el residuo de redondeo para que la suma dé exactamente 100
+    const diff = parseFloat((100 - resultado.reduce((s, v) => s + v, 0)).toFixed(2));
+    if (diff !== 0) {
+        const ultimo = otros[otros.length - 1];
+        resultado[ultimo] = parseFloat((resultado[ultimo] + diff).toFixed(2));
+    }
+
+    return resultado;
+}
+
 // El peso es compartido por todo el grado_materia + período: al cambiarlo hay que
 // sincronizar el mismo campo en las demás cards abiertas y recalcular a TODOS los alumnos.
 window.actualizarPesoLocal = (grupo, idx, valor) => {
     if (!pesosActuales[grupo]) return;
-    pesosActuales[grupo][idx] = valor;
+    pesosActuales[grupo] = redistribuirPesos(pesosActuales[grupo], idx, valor);
 
-    document.querySelectorAll(`.detalle-peso-input[data-grupo="${grupo}"][data-idx="${idx}"]`).forEach(inp => {
-        if (inp !== document.activeElement) inp.value = valor;
+    pesosActuales[grupo].forEach((p, i) => {
+        document.querySelectorAll(`.detalle-peso-input[data-grupo="${grupo}"][data-idx="${i}"]`).forEach(inp => {
+            if (inp !== document.activeElement) inp.value = p;
+        });
     });
 
     document.querySelectorAll(`.detalle-total[data-grupo="${grupo}"]`).forEach(el => {

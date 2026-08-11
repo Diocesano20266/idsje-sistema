@@ -16,9 +16,10 @@ let periodoActual     = 1;
 let alumnosNotas      = [];
 let notasCache        = {};   // alumnoId -> fila de `notas` guardada en BD
 let criteriosActuales = null; // { cotidianas, integradoras, examenes } del grado_materia + período actual
-let notasDetalle      = {};   // alumnoId -> { cotidianas:[], integradoras:[], examenes:[] } (edición local)
+let notasDetalle      = {};   // alumnoId -> { cotidianas:[], integradoras:[], examenes:[] } (notas, edición local)
 let notasRecEdit      = {};   // alumnoId -> valor de recuperación editado localmente
 let detallesAbiertos  = new Set(); // ids de alumnos con la fila de detalle expandida
+let pesosActuales     = {};   // { cotidianas:[%,%,...], integradoras:[...], examenes:[...] } — compartido por todo el grado_materia + período
 
 // Competencias ciudadanas
 let compGradoId  = null;
@@ -298,6 +299,7 @@ async function cargarAlumnosYNotas() {
     }
 
     alumnosNotas.forEach(al => inicializarDetalle(al.id));
+    inicializarPesos();
 
     renderTablaNotas();
 }
@@ -309,28 +311,72 @@ function ajustarLongitud(arr, n) {
     return base;
 }
 
+// El campo `detalle` de una categoría puede venir en formato viejo (arreglo plano de notas,
+// sin pesos) o en el formato nuevo { notas:[...], pesos:[...] }. Estas dos funciones normalizan
+// la lectura para que las notas guardadas antes de esta función sigan funcionando.
+function extraerNotas(detalleGrupo) {
+    if (Array.isArray(detalleGrupo)) return detalleGrupo;
+    return detalleGrupo?.notas || [];
+}
+function extraerPesos(detalleGrupo) {
+    if (Array.isArray(detalleGrupo)) return null;
+    return Array.isArray(detalleGrupo?.pesos) ? detalleGrupo.pesos : null;
+}
+
 function inicializarDetalle(alumnoId) {
     const detalle = notasCache[alumnoId]?.detalle || {};
     notasDetalle[alumnoId] = {
-        cotidianas:   ajustarLongitud(detalle.cotidianas,   criteriosActuales.cotidianas),
-        integradoras: ajustarLongitud(detalle.integradoras, criteriosActuales.integradoras),
-        examenes:     ajustarLongitud(detalle.examenes,     criteriosActuales.examenes),
+        cotidianas:   ajustarLongitud(extraerNotas(detalle.cotidianas),   criteriosActuales.cotidianas),
+        integradoras: ajustarLongitud(extraerNotas(detalle.integradoras), criteriosActuales.integradoras),
+        examenes:     ajustarLongitud(extraerNotas(detalle.examenes),     criteriosActuales.examenes),
     };
 }
 
-function promedio(arr) {
-    if (!arr.length) return 0;
-    const suma = arr.reduce((s, v) => s + (parseFloat(v) || 0), 0);
-    return suma / arr.length;
+// Reparte 100% equitativamente entre `n` actividades (ajustando la última para que sume exacto)
+function pesosEquitativos(n) {
+    if (n <= 0) return [];
+    const base = parseFloat((100 / n).toFixed(2));
+    const pesos = new Array(n).fill(base);
+    const suma = pesos.reduce((a, b) => a + b, 0);
+    pesos[pesos.length - 1] = parseFloat((pesos[pesos.length - 1] + (100 - suma)).toFixed(2));
+    return pesos;
 }
 
-// Fórmula IDSJE 35/35/30 sobre notas ingresadas en escala 0–10
-// promCotRaw/promIntRaw/promExaRaw = promedio simple (sin ponderar, para mostrar en la tabla)
-// promCot/promInt/promExa = esos mismos promedios ya ponderados (35/35/30, para guardar y calcular NF)
+// Los pesos son compartidos por todo el grado_materia + período (no por alumno).
+// Se buscan en cualquier alumno que ya tenga guardados pesos con la cantidad correcta;
+// si nadie los tiene todavía, se reparte equitativamente.
+function inicializarPesos() {
+    pesosActuales = {};
+    GRUPOS_NOTAS.forEach(g => {
+        const cantidad = criteriosActuales[g.clave];
+        const guardados = Object.values(notasCache)
+            .map(n => extraerPesos(n.detalle?.[g.clave]))
+            .find(p => Array.isArray(p) && p.length === cantidad);
+        pesosActuales[g.clave] = guardados ? [...guardados] : pesosEquitativos(cantidad);
+    });
+}
+
+function sumaPesos(pesos) {
+    return pesos.reduce((s, v) => s + (parseFloat(v) || 0), 0);
+}
+
+// Σ(nota × peso%) / 100
+function promedioPonderado(notas, pesos) {
+    if (!notas.length) return 0;
+    let suma = 0;
+    for (let i = 0; i < notas.length; i++) {
+        suma += (parseFloat(notas[i]) || 0) * (parseFloat(pesos[i]) || 0);
+    }
+    return suma / 100;
+}
+
+// Fórmula IDSJE 35/35/30 sobre notas ingresadas en escala 0–10, ponderadas por el peso de cada actividad
+// promCotRaw/promIntRaw/promExaRaw = promedio ponderado de la categoría (para mostrar en la tabla)
+// promCot/promInt/promExa = esos mismos promedios ya multiplicados por 35/35/30 (para guardar y calcular NF)
 function calcularResumen(det) {
-    const promCotRaw = promedio(det.cotidianas);
-    const promIntRaw = promedio(det.integradoras);
-    const promExaRaw = promedio(det.examenes);
+    const promCotRaw = promedioPonderado(det.cotidianas,   pesosActuales.cotidianas);
+    const promIntRaw = promedioPonderado(det.integradoras, pesosActuales.integradoras);
+    const promExaRaw = promedioPonderado(det.examenes,     pesosActuales.examenes);
     const promCot = promCotRaw * 0.35;
     const promInt = promIntRaw * 0.35;
     const promExa = promExaRaw * 0.30;
@@ -354,18 +400,41 @@ const GRUPOS_NOTAS = [
 const ICONO_ESTRELLA = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 1.5l2.47 5.27 5.78.63-4.31 3.95 1.19 5.7L10 14.15l-5.13 2.9 1.19-5.7L1.75 7.4l5.78-.63L10 1.5z"/></svg>';
 
 function tarjetaDetalle(alumnoId, grupo, valores) {
+    const pesos = pesosActuales[grupo.clave] || [];
+
     const items = valores.map((v, i) => `
         <div class="detalle-item">
             <span>${grupo.item} ${i + 1}</span>
-            <input type="number" step="0.01" min="0" max="10" value="${v}" placeholder="0.00"
-                oninput="actualizarDetalleLocal('${alumnoId}','${grupo.clave}',${i},this.value)">
+            <div class="detalle-item-campos">
+                <input type="number" step="0.01" min="0" max="10" value="${v}" placeholder="0.00"
+                    class="detalle-nota" title="Nota"
+                    oninput="actualizarDetalleLocal('${alumnoId}','${grupo.clave}',${i},this.value)">
+                <span class="detalle-peso-wrap">
+                    <input type="number" step="1" min="0" max="100" value="${pesos[i] ?? 0}"
+                        class="detalle-peso-input" title="Peso %"
+                        data-grupo="${grupo.clave}" data-idx="${i}"
+                        oninput="actualizarPesoLocal('${grupo.clave}', ${i}, this.value)">%
+                </span>
+            </div>
         </div>`).join('');
 
     return `
     <div class="detalle-card">
         <div class="detalle-card-title">${grupo.card} <span class="detalle-peso">${grupo.peso}</span></div>
         <div class="detalle-items">${items}</div>
+        <div class="${claseTotalPeso(grupo.clave)}" data-grupo="${grupo.clave}">${textoTotalPeso(grupo.clave)}</div>
     </div>`;
+}
+
+function textoTotalPeso(grupo) {
+    const total = sumaPesos(pesosActuales[grupo] || []);
+    const ok = Math.abs(total - 100) < 0.01;
+    return `Total: ${total.toFixed(0)}% ${ok ? '✓' : '⚠'}`;
+}
+
+function claseTotalPeso(grupo) {
+    const total = sumaPesos(pesosActuales[grupo] || []);
+    return 'detalle-total ' + (Math.abs(total - 100) < 0.01 ? 'total-ok' : 'total-mal');
 }
 
 function filaRecuperacionHTML(al, visible) {
@@ -434,11 +503,10 @@ function actualizarCeldaResumen(id, valor) {
     celda.className = 'td-prom-color ' + colorEscala(valor);
 }
 
-window.actualizarDetalleLocal = (alumnoId, tipo, idx, valor) => {
-    if (!notasDetalle[alumnoId]) return;
-    notasDetalle[alumnoId][tipo][idx] = valor;
-
+// Recalcula y repinta las celdas de un alumno (promedios + NF + bloque de recuperación)
+function actualizarResumenAlumno(alumnoId) {
     const det = notasDetalle[alumnoId];
+    if (!det) return;
     const { promCotRaw, promIntRaw, promExaRaw, nf } = calcularResumen(det);
 
     actualizarCeldaResumen(`promcot-${alumnoId}`, promCotRaw);
@@ -454,6 +522,30 @@ window.actualizarDetalleLocal = (alumnoId, tipo, idx, valor) => {
     // La recuperación solo aplica si NF < 6 — su bloque cambia de visibilidad sin destruir los demás inputs
     const wrapRec = document.getElementById(`rec-wrap-${alumnoId}`);
     if (wrapRec) wrapRec.classList.toggle('hidden', nf >= 6);
+}
+
+window.actualizarDetalleLocal = (alumnoId, tipo, idx, valor) => {
+    if (!notasDetalle[alumnoId]) return;
+    notasDetalle[alumnoId][tipo][idx] = valor;
+    actualizarResumenAlumno(alumnoId);
+};
+
+// El peso es compartido por todo el grado_materia + período: al cambiarlo hay que
+// sincronizar el mismo campo en las demás cards abiertas y recalcular a TODOS los alumnos.
+window.actualizarPesoLocal = (grupo, idx, valor) => {
+    if (!pesosActuales[grupo]) return;
+    pesosActuales[grupo][idx] = valor;
+
+    document.querySelectorAll(`.detalle-peso-input[data-grupo="${grupo}"][data-idx="${idx}"]`).forEach(inp => {
+        if (inp !== document.activeElement) inp.value = valor;
+    });
+
+    document.querySelectorAll(`.detalle-total[data-grupo="${grupo}"]`).forEach(el => {
+        el.textContent = textoTotalPeso(grupo);
+        el.className   = claseTotalPeso(grupo);
+    });
+
+    alumnosNotas.forEach(al => actualizarResumenAlumno(al.id));
 };
 
 window.actualizarRecuperacionLocal = (alumnoId, valor) => {
@@ -485,9 +577,9 @@ window.guardarTodasLasNotas = async () => {
             recuperacion:     recValor || null,
             nota_final_rec:   notaFinalRec,
             detalle: {
-                cotidianas:   det.cotidianas.map(v => parseFloat(v) || 0),
-                integradoras: det.integradoras.map(v => parseFloat(v) || 0),
-                examenes:     det.examenes.map(v => parseFloat(v) || 0),
+                cotidianas:   { notas: det.cotidianas.map(v => parseFloat(v) || 0),   pesos: (pesosActuales.cotidianas   || []).map(v => parseFloat(v) || 0) },
+                integradoras: { notas: det.integradoras.map(v => parseFloat(v) || 0), pesos: (pesosActuales.integradoras || []).map(v => parseFloat(v) || 0) },
+                examenes:     { notas: det.examenes.map(v => parseFloat(v) || 0),     pesos: (pesosActuales.examenes     || []).map(v => parseFloat(v) || 0) },
             },
         };
     });

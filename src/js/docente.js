@@ -121,7 +121,7 @@ function renderDashboard() {
         return `
         <div class="dg-item">
             <div class="dg-info">
-                <div class="dg-nombre">${g.nombre} · Sección ${g.seccion}</div>
+                <div class="dg-nombre">${g.nombre} ${g.modalidad} · Sección ${g.seccion}</div>
                 <div class="dg-materias">${materias.join(' · ')}</div>
             </div>
             <div>
@@ -143,7 +143,7 @@ function renderMisMaterias() {
     cont.innerHTML = gradoMatCache.map(gm => `
         <div class="materia-card">
             <div class="mc-nombre">${gm.materias.nombre}</div>
-            <div class="mc-grado">${gm.grados.nombre} · Sección ${gm.grados.seccion}</div>
+            <div class="mc-grado">${gm.grados.nombre} ${gm.grados.modalidad} · Sección ${gm.grados.seccion}</div>
             <div class="mc-foot">
                 <div class="mc-alumnos"><b>${alumnosPorGrado[gm.grados.id] || 0}</b>&nbsp;alumnos</div>
                 <button class="btn-primary" onclick="irARegistrarNotas('${gm.grado_id}', '${gm.id}')">Registrar Notas</button>
@@ -161,7 +161,7 @@ window.irARegistrarNotas = (gradoId, gradoMateriaId) => {
 // ── REGISTRO DE NOTAS ────────────────────────
 function poblarSelectGradoNotas() {
     const sel = document.getElementById('notas-grado');
-    sel.innerHTML = gradosUnicosDocente().map(g => `<option value="${g.id}">${g.nombre} ${g.seccion}</option>`).join('');
+    sel.innerHTML = gradosUnicosDocente().map(g => `<option value="${g.id}">${g.nombre} ${g.modalidad} · Sección ${g.seccion}</option>`).join('');
 }
 
 function poblarSelectMateriaNotas(gradoId) {
@@ -655,7 +655,7 @@ window.guardarTodasLasNotas = async () => {
 // ── COMPETENCIAS CIUDADANAS ──────────────────
 function poblarSelectGradoComp() {
     const sel = document.getElementById('comp-grado');
-    sel.innerHTML = gradosGuiaCache.map(g => `<option value="${g.id}">${g.nombre} ${g.seccion}</option>`).join('');
+    sel.innerHTML = gradosGuiaCache.map(g => `<option value="${g.id}">${g.nombre} ${g.modalidad} · Sección ${g.seccion}</option>`).join('');
 }
 
 function initVistaCompetencias() {

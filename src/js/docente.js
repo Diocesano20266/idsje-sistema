@@ -332,13 +332,12 @@ function inicializarDetalle(alumnoId) {
     };
 }
 
-// Reparte 100% equitativamente entre `n` actividades (ajustando la última para que sume exacto)
+// Reparte 100% equitativamente entre `n` actividades, en enteros (la última absorbe el residuo)
 function pesosEquitativos(n) {
     if (n <= 0) return [];
-    const base = parseFloat((100 / n).toFixed(2));
+    const base = Math.floor(100 / n);
     const pesos = new Array(n).fill(base);
-    const suma = pesos.reduce((a, b) => a + b, 0);
-    pesos[pesos.length - 1] = parseFloat((pesos[pesos.length - 1] + (100 - suma)).toFixed(2));
+    pesos[pesos.length - 1] += 100 - base * n;
     return pesos;
 }
 
@@ -534,7 +533,7 @@ window.actualizarDetalleLocal = (alumnoId, tipo, idx, valor) => {
 // (según su peso relativo actual) para que la categoría siempre sume 100%.
 function redistribuirPesos(pesos, idx, nuevoValor) {
     const n = pesos.length;
-    const nuevo = Math.max(0, Math.min(100, parseFloat(nuevoValor) || 0));
+    const nuevo = Math.max(0, Math.min(100, Math.round(parseFloat(nuevoValor) || 0)));
     if (n <= 1) return [100];
 
     const otros = pesos.map((_, i) => i).filter(i => i !== idx);
@@ -545,22 +544,22 @@ function redistribuirPesos(pesos, idx, nuevoValor) {
     resultado[idx] = nuevo;
 
     if (sumaOtros > 0) {
-        // Escala cada uno de los demás manteniendo su proporción relativa entre sí
+        // Escala cada uno de los demás manteniendo su proporción relativa entre sí, redondeado a entero
         otros.forEach(i => {
             const proporcion = (parseFloat(pesos[i]) || 0) / sumaOtros;
-            resultado[i] = parseFloat((proporcion * restante).toFixed(2));
+            resultado[i] = Math.round(proporcion * restante);
         });
     } else {
         // Si los demás estaban en 0, se reparte el restante equitativamente entre ellos
-        const cada = restante / otros.length;
-        otros.forEach(i => { resultado[i] = parseFloat(cada.toFixed(2)); });
+        const cada = Math.round(restante / otros.length);
+        otros.forEach(i => { resultado[i] = cada; });
     }
 
-    // Corrige el residuo de redondeo para que la suma dé exactamente 100
-    const diff = parseFloat((100 - resultado.reduce((s, v) => s + v, 0)).toFixed(2));
+    // El último de "los demás" absorbe el residuo de redondeo para que la suma dé exactamente 100
+    const diff = 100 - resultado.reduce((s, v) => s + v, 0);
     if (diff !== 0) {
         const ultimo = otros[otros.length - 1];
-        resultado[ultimo] = parseFloat((resultado[ultimo] + diff).toFixed(2));
+        resultado[ultimo] += diff;
     }
 
     return resultado;

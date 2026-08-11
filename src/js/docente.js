@@ -529,40 +529,58 @@ window.actualizarDetalleLocal = (alumnoId, tipo, idx, valor) => {
     actualizarResumenAlumno(alumnoId);
 };
 
-// Al cambiar el peso de una actividad, el resto se redistribuye proporcionalmente
-// (según su peso relativo actual) para que la categoría siempre sume 100%.
+// Ningún peso puede quedar por debajo de este mínimo (%)
+const PESO_MINIMO = 1;
+
+// Si algún peso quedó por debajo de PESO_MINIMO, lo sube al mínimo y le quita
+// la diferencia al peso más grande del conjunto (repite hasta que todo quede válido).
+function aplicarPesoMinimo(pesos) {
+    let intentos = 0;
+    let ajustado = true;
+    while (ajustado && intentos < pesos.length * 2) {
+        ajustado = false;
+        intentos++;
+        for (let i = 0; i < pesos.length; i++) {
+            if (pesos[i] < PESO_MINIMO) {
+                const faltante = PESO_MINIMO - pesos[i];
+                pesos[i] = PESO_MINIMO;
+
+                let iMax = -1;
+                for (let j = 0; j < pesos.length; j++) {
+                    if (j !== i && (iMax === -1 || pesos[j] > pesos[iMax])) iMax = j;
+                }
+                if (iMax !== -1) pesos[iMax] -= faltante;
+                ajustado = true;
+            }
+        }
+    }
+    return pesos;
+}
+
+// Al cambiar el peso de una actividad:
+// 1. Se toma el valor ingresado.
+// 2. El restante (100 - ese valor) se reparte EQUITATIVAMENTE entre los demás.
+// 3. El último de los demás absorbe el residuo del redondeo.
+// 4. Ningún peso queda por debajo de PESO_MINIMO (se reajusta quitándoselo al más grande).
 function redistribuirPesos(pesos, idx, nuevoValor) {
     const n = pesos.length;
     const nuevo = Math.max(0, Math.min(100, Math.round(parseFloat(nuevoValor) || 0)));
     if (n <= 1) return [100];
 
     const otros = pesos.map((_, i) => i).filter(i => i !== idx);
-    const restante  = 100 - nuevo;
-    const sumaOtros = otros.reduce((s, i) => s + (parseFloat(pesos[i]) || 0), 0);
+    const restante = 100 - nuevo;
 
     const resultado = [...pesos];
     resultado[idx] = nuevo;
 
-    if (sumaOtros > 0) {
-        // Escala cada uno de los demás manteniendo su proporción relativa entre sí, redondeado a entero
-        otros.forEach(i => {
-            const proporcion = (parseFloat(pesos[i]) || 0) / sumaOtros;
-            resultado[i] = Math.round(proporcion * restante);
-        });
-    } else {
-        // Si los demás estaban en 0, se reparte el restante equitativamente entre ellos
-        const cada = Math.round(restante / otros.length);
-        otros.forEach(i => { resultado[i] = cada; });
-    }
+    const cada = Math.floor(restante / otros.length);
+    otros.forEach(i => { resultado[i] = cada; });
 
-    // El último de "los demás" absorbe el residuo de redondeo para que la suma dé exactamente 100
-    const diff = 100 - resultado.reduce((s, v) => s + v, 0);
-    if (diff !== 0) {
-        const ultimo = otros[otros.length - 1];
-        resultado[ultimo] += diff;
-    }
+    // El último de "los demás" absorbe el residuo del redondeo (puede ser negativo si restante < 0)
+    const residuo = restante - cada * otros.length;
+    resultado[otros[otros.length - 1]] += residuo;
 
-    return resultado;
+    return aplicarPesoMinimo(resultado);
 }
 
 // El peso es compartido por todo el grado_materia + período: al cambiarlo hay que

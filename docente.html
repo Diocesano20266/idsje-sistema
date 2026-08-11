@@ -104,6 +104,13 @@
         .info-rangos{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
         .rango-tag{padding:5px 12px;border-radius:100px;font-size:11px;font-weight:600;background:#e0f2fe;color:#0369a1}
 
+        /* ── CRITERIOS DE EVALUACIÓN ── */
+        .criterios-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:18px;max-width:560px}
+        .criterios-grid .field label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:6px}
+        .criterios-grid .field input{width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;outline:none;transition:border-color .2s}
+        .criterios-grid .field input:focus{border-color:#1B3A6B}
+        .notas-toolbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px}
+
         /* ── TABLA ── */
         .tabla-wrap{background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;overflow-x:auto}
         table{width:100%;border-collapse:collapse;min-width:680px}
@@ -122,6 +129,7 @@
         .td-nf{font-family:'Playfair Display',serif;font-weight:700;font-size:15px;text-align:center}
         .nf-aprobado{color:#059669}
         .nf-reprobado{color:#dc2626}
+        .td-prom{font-weight:600;color:#0a1628;text-align:center;background:#f8fafc}
         .comp-select{padding:6px 8px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;outline:none;background:#fff;font-weight:600;text-align:center}
         .comp-select:focus{border-color:#1B3A6B}
         .inasis-input{width:60px;padding:7px 8px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;text-align:center;outline:none}
@@ -279,32 +287,52 @@
                     <button class="periodo-btn" onclick="setPeriodo(4)">Periodo 4</button>
                 </div>
 
-                <div class="info-rangos">
-                    <span class="rango-tag">Actividades: máx 3.5</span>
-                    <span class="rango-tag">Laboratorio: máx 3.5</span>
-                    <span class="rango-tag">Examen: máx 3.0</span>
-                    <span class="rango-tag">Nota Final: suma de los tres</span>
+                <div class="empty-state hidden" id="notas-empty">No tenés grados asignados todavía.</div>
+
+                <!-- PASO 1: CRITERIOS DE EVALUACIÓN -->
+                <div class="dash-card hidden" id="panel-criterios">
+                    <div class="dash-card-header">
+                        <div class="dash-card-title"><span class="gs-dot"></span>Definí los criterios de evaluación para este período</div>
+                    </div>
+                    <div class="dash-card-body">
+                        <div class="criterios-grid">
+                            <div class="field">
+                                <label>Actividades Cotidianas</label>
+                                <input type="number" id="crit-cotidianas" min="1" max="20" value="4">
+                            </div>
+                            <div class="field">
+                                <label>Integradoras</label>
+                                <input type="number" id="crit-integradoras" min="1" max="20" value="2">
+                            </div>
+                            <div class="field">
+                                <label>Exámenes</label>
+                                <input type="number" id="crit-examenes" min="1" max="10" value="1">
+                            </div>
+                        </div>
+                        <button class="btn-primary" onclick="generarTablaNotas()">Generar tabla</button>
+                    </div>
                 </div>
 
-                <div class="tabla-wrap">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Nº</th>
-                                <th>Apellidos y Nombres</th>
-                                <th>Actividades<br><small>35%</small></th>
-                                <th>Laboratorio<br><small>35%</small></th>
-                                <th>Examen<br><small>30%</small></th>
-                                <th class="th-nf">NF</th>
-                                <th>Recuperación</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tbody-notas">
-                            <tr><td colspan="7" class="empty-state">Seleccioná un grado y materia para comenzar</td></tr>
-                        </tbody>
-                    </table>
-                    <div class="tabla-footer">
-                        <button class="btn-primary" onclick="guardarTodasLasNotas()">💾 Guardar todo</button>
+                <!-- PASO 2: TABLA DE NOTAS -->
+                <div id="wrap-tabla-notas" class="hidden">
+                    <div class="notas-toolbar">
+                        <div class="info-rangos">
+                            <span class="rango-tag">Cotidianas × 35%</span>
+                            <span class="rango-tag">Integradoras × 35%</span>
+                            <span class="rango-tag">Examen × 30%</span>
+                            <span class="rango-tag">Notas sobre 10</span>
+                        </div>
+                        <button class="btn-secondary" onclick="editarCriterios()">⚙ Cambiar criterios</button>
+                    </div>
+
+                    <div class="tabla-wrap">
+                        <table>
+                            <thead id="thead-notas"></thead>
+                            <tbody id="tbody-notas"></tbody>
+                        </table>
+                        <div class="tabla-footer">
+                            <button class="btn-primary" onclick="guardarTodasLasNotas()">💾 Guardar todo</button>
+                        </div>
                     </div>
                 </div>
             </div>

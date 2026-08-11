@@ -413,7 +413,7 @@ function tarjetaDetalle(alumnoId, grupo, valores) {
                     <input type="number" step="1" min="0" max="100" value="${pesos[i] ?? 0}"
                         class="detalle-peso-input" title="Peso %"
                         data-grupo="${grupo.clave}" data-idx="${i}"
-                        oninput="actualizarPesoLocal('${grupo.clave}', ${i}, this.value)">%
+                        onchange="actualizarPesoLocal('${grupo.clave}', ${i}, this.value)">%
                 </span>
             </div>
         </div>`).join('');

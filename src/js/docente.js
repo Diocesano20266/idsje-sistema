@@ -18,6 +18,7 @@ let notasCache        = {};   // alumnoId -> fila de `notas` guardada en BD
 let criteriosActuales = null; // { cotidianas, integradoras, examenes } del grado_materia + período actual
 let notasDetalle      = {};   // alumnoId -> { cotidianas:[], integradoras:[], examenes:[] } (edición local)
 let notasRecEdit      = {};   // alumnoId -> valor de recuperación editado localmente
+let gruposExpandidos  = { cotidianas: false, integradoras: false, examenes: false }; // columnas individuales visibles por grupo
 
 // Competencias ciudadanas
 let compGradoId  = null;
@@ -280,9 +281,10 @@ async function cargarAlumnosYNotas() {
         .order('apellidos');
     alumnosNotas = alumnos || [];
 
-    notasCache   = {};
-    notasDetalle = {};
-    notasRecEdit = {};
+    notasCache       = {};
+    notasDetalle     = {};
+    notasRecEdit     = {};
+    gruposExpandidos = { cotidianas: false, integradoras: false, examenes: false };
 
     const alumnoIds = alumnosNotas.map(a => a.id);
     if (alumnoIds.length) {
@@ -332,22 +334,38 @@ function calcularPromedios(det) {
     return { promCot, promInt, promExa, nf };
 }
 
+const GRUPOS_NOTAS = [
+    { clave: 'cotidianas',   etiqueta: 'Cotidianas',   peso: '×0.35', prefijo: 'C' },
+    { clave: 'integradoras', etiqueta: 'Integradoras', peso: '×0.35', prefijo: 'I' },
+    { clave: 'examenes',     etiqueta: 'Examen',       peso: '×0.30', prefijo: 'E' },
+];
+
+window.toggleGrupo = (grupo) => {
+    gruposExpandidos[grupo] = !gruposExpandidos[grupo];
+    renderCabeceraNotas();
+    renderTablaNotas();
+};
+
 function renderCabeceraNotas() {
-    const { cotidianas, integradoras, examenes } = criteriosActuales;
     let cols = '<th>Nº</th><th>Apellidos y Nombres</th>';
-    for (let i = 1; i <= cotidianas;   i++) cols += `<th>C${i}</th>`;
-    for (let i = 1; i <= integradoras; i++) cols += `<th>I${i}</th>`;
-    for (let i = 1; i <= examenes;     i++) cols += `<th>E${i}</th>`;
-    cols += '<th>Prom. Cot.<br><small>35%</small></th>';
-    cols += '<th>Prom. Int.<br><small>35%</small></th>';
-    cols += '<th>Prom. Exam.<br><small>30%</small></th>';
+    GRUPOS_NOTAS.forEach(g => {
+        const expandido = gruposExpandidos[g.clave];
+        cols += `<th class="th-grupo" onclick="toggleGrupo('${g.clave}')"><span class="grupo-icono">${expandido ? '▼' : '▶'}</span> ${g.etiqueta}<br><small>${g.peso}</small></th>`;
+        if (expandido) {
+            for (let i = 1; i <= criteriosActuales[g.clave]; i++) cols += `<th>${g.prefijo}${i}</th>`;
+        }
+    });
     cols += '<th class="th-nf">NF</th>';
     cols += '<th>Recuperación</th>';
     document.getElementById('thead-notas').innerHTML = `<tr>${cols}</tr>`;
 }
 
 function totalColumnasNotas() {
-    return 2 + criteriosActuales.cotidianas + criteriosActuales.integradoras + criteriosActuales.examenes + 4;
+    let total = 2; // Nº + nombre
+    GRUPOS_NOTAS.forEach(g => {
+        total += 1 + (gruposExpandidos[g.clave] ? criteriosActuales[g.clave] : 0);
+    });
+    return total + 2; // NF + Recuperación
 }
 
 function filaNotas(al, idx) {
@@ -358,19 +376,17 @@ function filaNotas(al, idx) {
 
     let celdas = `<td class="td-num">${idx + 1}</td><td class="td-nombre">${al.apellidos}, ${al.nombres}</td>`;
 
-    det.cotidianas.forEach((v, i) => {
-        celdas += `<td><input type="number" step="0.01" min="0" max="10" value="${v}" placeholder="0.00" class="nota-input" oninput="actualizarDetalleLocal('${al.id}','cotidianas',${i},this.value)"></td>`;
-    });
-    det.integradoras.forEach((v, i) => {
-        celdas += `<td><input type="number" step="0.01" min="0" max="10" value="${v}" placeholder="0.00" class="nota-input" oninput="actualizarDetalleLocal('${al.id}','integradoras',${i},this.value)"></td>`;
-    });
-    det.examenes.forEach((v, i) => {
-        celdas += `<td><input type="number" step="0.01" min="0" max="10" value="${v}" placeholder="0.00" class="nota-input" oninput="actualizarDetalleLocal('${al.id}','examenes',${i},this.value)"></td>`;
+    const promedios = { cotidianas: promCot, integradoras: promInt, examenes: promExa };
+    const idsProm   = { cotidianas: `promcot-${al.id}`, integradoras: `promint-${al.id}`, examenes: `promexa-${al.id}` };
+    GRUPOS_NOTAS.forEach(g => {
+        celdas += `<td class="td-prom" id="${idsProm[g.clave]}">${promedios[g.clave].toFixed(2)}</td>`;
+        if (gruposExpandidos[g.clave]) {
+            det[g.clave].forEach((v, i) => {
+                celdas += `<td><input type="number" step="0.01" min="0" max="10" value="${v}" placeholder="0.00" class="nota-input" oninput="actualizarDetalleLocal('${al.id}','${g.clave}',${i},this.value)"></td>`;
+            });
+        }
     });
 
-    celdas += `<td class="td-prom" id="promcot-${al.id}">${promCot.toFixed(2)}</td>`;
-    celdas += `<td class="td-prom" id="promint-${al.id}">${promInt.toFixed(2)}</td>`;
-    celdas += `<td class="td-prom" id="promexa-${al.id}">${promExa.toFixed(2)}</td>`;
     celdas += `<td class="td-nf ${colorNF}" id="nf-${al.id}">${nf > 0 ? nf.toFixed(2) : '—'}</td>`;
     celdas += `<td>${nf < 6
         ? `<input type="number" step="0.01" min="0" max="10" value="${recValor}" placeholder="—" class="nota-input nota-rec" oninput="actualizarRecuperacionLocal('${al.id}', this.value)">`

@@ -18,7 +18,7 @@ let notasCache        = {};   // alumnoId -> fila de `notas` guardada en BD
 let criteriosActuales = null; // { cotidianas, integradoras, examenes } del grado_materia + período actual
 let notasDetalle      = {};   // alumnoId -> { cotidianas:[], integradoras:[], examenes:[] } (edición local)
 let notasRecEdit      = {};   // alumnoId -> valor de recuperación editado localmente
-let gruposExpandidos  = { cotidianas: false, integradoras: false, examenes: false }; // columnas individuales visibles por grupo
+let detallesAbiertos  = new Set(); // ids de alumnos con la fila de detalle expandida
 
 // Competencias ciudadanas
 let compGradoId  = null;
@@ -281,10 +281,10 @@ async function cargarAlumnosYNotas() {
         .order('apellidos');
     alumnosNotas = alumnos || [];
 
-    notasCache       = {};
-    notasDetalle     = {};
-    notasRecEdit     = {};
-    gruposExpandidos = { cotidianas: false, integradoras: false, examenes: false };
+    notasCache      = {};
+    notasDetalle    = {};
+    notasRecEdit    = {};
+    detallesAbiertos = new Set();
 
     const alumnoIds = alumnosNotas.map(a => a.id);
     if (alumnoIds.length) {
@@ -299,7 +299,6 @@ async function cargarAlumnosYNotas() {
 
     alumnosNotas.forEach(al => inicializarDetalle(al.id));
 
-    renderCabeceraNotas();
     renderTablaNotas();
 }
 
@@ -326,82 +325,113 @@ function promedio(arr) {
 }
 
 // Fórmula IDSJE 35/35/30 sobre notas ingresadas en escala 0–10
-function calcularPromedios(det) {
-    const promCot = promedio(det.cotidianas)   * 0.35;
-    const promInt = promedio(det.integradoras) * 0.35;
-    const promExa = promedio(det.examenes)     * 0.30;
+// promCotRaw/promIntRaw/promExaRaw = promedio simple (sin ponderar, para mostrar en la tabla)
+// promCot/promInt/promExa = esos mismos promedios ya ponderados (35/35/30, para guardar y calcular NF)
+function calcularResumen(det) {
+    const promCotRaw = promedio(det.cotidianas);
+    const promIntRaw = promedio(det.integradoras);
+    const promExaRaw = promedio(det.examenes);
+    const promCot = promCotRaw * 0.35;
+    const promInt = promIntRaw * 0.35;
+    const promExa = promExaRaw * 0.30;
     const nf = parseFloat((promCot + promInt + promExa).toFixed(2));
-    return { promCot, promInt, promExa, nf };
+    return { promCotRaw, promIntRaw, promExaRaw, promCot, promInt, promExa, nf };
+}
+
+// Escala de color: verde ≥6, naranja 4–6, rojo <4
+function colorEscala(valor) {
+    if (valor >= 6) return 'nivel-verde';
+    if (valor >= 4) return 'nivel-naranja';
+    return 'nivel-rojo';
 }
 
 const GRUPOS_NOTAS = [
-    { clave: 'cotidianas',   etiqueta: 'Cotidianas',   peso: '×0.35', prefijo: 'C' },
-    { clave: 'integradoras', etiqueta: 'Integradoras', peso: '×0.35', prefijo: 'I' },
-    { clave: 'examenes',     etiqueta: 'Examen',       peso: '×0.30', prefijo: 'E' },
+    { clave: 'cotidianas',   card: 'Cotidianas',   item: 'Cotidiana',   peso: '35%' },
+    { clave: 'integradoras', card: 'Integradoras', item: 'Integradora', peso: '35%' },
+    { clave: 'examenes',     card: 'Examen',       item: 'Examen',      peso: '30%' },
 ];
 
-window.toggleGrupo = (grupo) => {
-    gruposExpandidos[grupo] = !gruposExpandidos[grupo];
-    renderCabeceraNotas();
-    renderTablaNotas();
-};
+const ICONO_ESTRELLA = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 1.5l2.47 5.27 5.78.63-4.31 3.95 1.19 5.7L10 14.15l-5.13 2.9 1.19-5.7L1.75 7.4l5.78-.63L10 1.5z"/></svg>';
 
-function renderCabeceraNotas() {
-    let cols = '<th>Nº</th><th>Apellidos y Nombres</th>';
-    GRUPOS_NOTAS.forEach(g => {
-        const expandido = gruposExpandidos[g.clave];
-        cols += `<th class="th-grupo" onclick="toggleGrupo('${g.clave}')"><span class="grupo-icono">${expandido ? '▼' : '▶'}</span> ${g.etiqueta}<br><small>${g.peso}</small></th>`;
-        if (expandido) {
-            for (let i = 1; i <= criteriosActuales[g.clave]; i++) cols += `<th>${g.prefijo}${i}</th>`;
-        }
-    });
-    cols += '<th class="th-nf">NF</th>';
-    cols += '<th>Recuperación</th>';
-    document.getElementById('thead-notas').innerHTML = `<tr>${cols}</tr>`;
+function tarjetaDetalle(alumnoId, grupo, valores) {
+    const items = valores.map((v, i) => `
+        <div class="detalle-item">
+            <span>${grupo.item} ${i + 1}</span>
+            <input type="number" step="0.01" min="0" max="10" value="${v}" placeholder="0.00"
+                oninput="actualizarDetalleLocal('${alumnoId}','${grupo.clave}',${i},this.value)">
+        </div>`).join('');
+
+    return `
+    <div class="detalle-card">
+        <div class="detalle-card-title">${grupo.card} <span class="detalle-peso">${grupo.peso}</span></div>
+        <div class="detalle-items">${items}</div>
+    </div>`;
 }
 
-function totalColumnasNotas() {
-    let total = 2; // Nº + nombre
-    GRUPOS_NOTAS.forEach(g => {
-        total += 1 + (gruposExpandidos[g.clave] ? criteriosActuales[g.clave] : 0);
-    });
-    return total + 2; // NF + Recuperación
+function filaRecuperacionHTML(al, visible) {
+    const recValor = notasRecEdit[al.id] ?? notasCache[al.id]?.recuperacion ?? '';
+    return `
+    <div class="detalle-recuperacion ${visible ? '' : 'hidden'}" id="rec-wrap-${al.id}">
+        <label>Nota de Recuperación</label>
+        <input type="number" step="0.01" min="0" max="10" value="${recValor}" placeholder="—"
+            class="nota-rec" oninput="actualizarRecuperacionLocal('${al.id}', this.value)">
+    </div>`;
 }
 
 function filaNotas(al, idx) {
     const det = notasDetalle[al.id];
-    const { promCot, promInt, promExa, nf } = calcularPromedios(det);
-    const colorNF = nf >= 6 ? 'nf-aprobado' : nf > 0 ? 'nf-reprobado' : '';
-    const recValor = notasCache[al.id]?.recuperacion ?? '';
+    const { promCotRaw, promIntRaw, promExaRaw, nf } = calcularResumen(det);
+    const abierta = detallesAbiertos.has(al.id);
 
-    let celdas = `<td class="td-num">${idx + 1}</td><td class="td-nombre">${al.apellidos}, ${al.nombres}</td>`;
+    const filaPrincipal = `
+    <tr class="fila-alumno">
+        <td class="td-num">${idx + 1}</td>
+        <td class="td-apellido">${al.apellidos}</td>
+        <td class="td-nombre-alumno">${al.nombres}</td>
+        <td class="td-prom-color ${colorEscala(promCotRaw)}" id="promcot-${al.id}">${promCotRaw.toFixed(2)}</td>
+        <td class="td-prom-color ${colorEscala(promIntRaw)}" id="promint-${al.id}">${promIntRaw.toFixed(2)}</td>
+        <td class="td-prom-color ${colorEscala(promExaRaw)}" id="promexa-${al.id}">${promExaRaw.toFixed(2)}</td>
+        <td class="td-final ${colorEscala(nf)}" id="nf-${al.id}">${nf.toFixed(2)}</td>
+        <td class="td-detalle-btn">
+            <button class="btn-detalle ${abierta ? 'activo' : ''}" id="btn-detalle-${al.id}" onclick="toggleDetalleAlumno('${al.id}')">${ICONO_ESTRELLA}</button>
+        </td>
+    </tr>`;
 
-    const promedios = { cotidianas: promCot, integradoras: promInt, examenes: promExa };
-    const idsProm   = { cotidianas: `promcot-${al.id}`, integradoras: `promint-${al.id}`, examenes: `promexa-${al.id}` };
-    GRUPOS_NOTAS.forEach(g => {
-        celdas += `<td class="td-prom" id="${idsProm[g.clave]}">${promedios[g.clave].toFixed(2)}</td>`;
-        if (gruposExpandidos[g.clave]) {
-            det[g.clave].forEach((v, i) => {
-                celdas += `<td><input type="number" step="0.01" min="0" max="10" value="${v}" placeholder="0.00" class="nota-input" oninput="actualizarDetalleLocal('${al.id}','${g.clave}',${i},this.value)"></td>`;
-            });
-        }
-    });
+    const filaDetalle = `
+    <tr class="fila-detalle ${abierta ? '' : 'hidden'}" id="detalle-${al.id}">
+        <td colspan="8">
+            <div class="detalle-cards">
+                ${GRUPOS_NOTAS.map(g => tarjetaDetalle(al.id, g, det[g.clave])).join('')}
+            </div>
+            ${filaRecuperacionHTML(al, nf < 6)}
+        </td>
+    </tr>`;
 
-    celdas += `<td class="td-nf ${colorNF}" id="nf-${al.id}">${nf > 0 ? nf.toFixed(2) : '—'}</td>`;
-    celdas += `<td>${nf < 6
-        ? `<input type="number" step="0.01" min="0" max="10" value="${recValor}" placeholder="—" class="nota-input nota-rec" oninput="actualizarRecuperacionLocal('${al.id}', this.value)">`
-        : '<span class="text-muted">—</span>'}</td>`;
-
-    return `<tr>${celdas}</tr>`;
+    return filaPrincipal + filaDetalle;
 }
 
 function renderTablaNotas() {
     const tbody = document.getElementById('tbody-notas');
     if (!alumnosNotas.length) {
-        tbody.innerHTML = `<tr><td colspan="${totalColumnasNotas()}" class="empty-state">Este grado no tiene alumnos activos.</td></tr>`;
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Este grado no tiene alumnos activos.</td></tr>';
         return;
     }
     tbody.innerHTML = alumnosNotas.map((al, idx) => filaNotas(al, idx)).join('');
+}
+
+window.toggleDetalleAlumno = (alumnoId) => {
+    if (detallesAbiertos.has(alumnoId)) detallesAbiertos.delete(alumnoId);
+    else detallesAbiertos.add(alumnoId);
+
+    document.getElementById(`detalle-${alumnoId}`)?.classList.toggle('hidden', !detallesAbiertos.has(alumnoId));
+    document.getElementById(`btn-detalle-${alumnoId}`)?.classList.toggle('activo', detallesAbiertos.has(alumnoId));
+};
+
+function actualizarCeldaResumen(id, valor) {
+    const celda = document.getElementById(id);
+    if (!celda) return;
+    celda.textContent = valor.toFixed(2);
+    celda.className = 'td-prom-color ' + colorEscala(valor);
 }
 
 window.actualizarDetalleLocal = (alumnoId, tipo, idx, valor) => {
@@ -409,15 +439,21 @@ window.actualizarDetalleLocal = (alumnoId, tipo, idx, valor) => {
     notasDetalle[alumnoId][tipo][idx] = valor;
 
     const det = notasDetalle[alumnoId];
-    const { promCot, promInt, promExa, nf } = calcularPromedios(det);
+    const { promCotRaw, promIntRaw, promExaRaw, nf } = calcularResumen(det);
 
-    document.getElementById(`promcot-${alumnoId}`).textContent = promCot.toFixed(2);
-    document.getElementById(`promint-${alumnoId}`).textContent = promInt.toFixed(2);
-    document.getElementById(`promexa-${alumnoId}`).textContent = promExa.toFixed(2);
+    actualizarCeldaResumen(`promcot-${alumnoId}`, promCotRaw);
+    actualizarCeldaResumen(`promint-${alumnoId}`, promIntRaw);
+    actualizarCeldaResumen(`promexa-${alumnoId}`, promExaRaw);
 
     const celdaNF = document.getElementById(`nf-${alumnoId}`);
-    celdaNF.textContent = nf > 0 ? nf.toFixed(2) : '—';
-    celdaNF.className = 'td-nf ' + (nf >= 6 ? 'nf-aprobado' : nf > 0 ? 'nf-reprobado' : '');
+    if (celdaNF) {
+        celdaNF.textContent = nf.toFixed(2);
+        celdaNF.className = 'td-final ' + colorEscala(nf);
+    }
+
+    // La recuperación solo aplica si NF < 6 — su bloque cambia de visibilidad sin destruir los demás inputs
+    const wrapRec = document.getElementById(`rec-wrap-${alumnoId}`);
+    if (wrapRec) wrapRec.classList.toggle('hidden', nf >= 6);
 };
 
 window.actualizarRecuperacionLocal = (alumnoId, valor) => {
@@ -430,7 +466,7 @@ window.guardarTodasLasNotas = async () => {
 
     const payload = alumnosNotas.map(al => {
         const det = notasDetalle[al.id];
-        const { promCot, promInt, promExa, nf } = calcularPromedios(det);
+        const { promCot, promInt, promExa, nf } = calcularResumen(det);
         const recValor = notasRecEdit[al.id] ?? notasCache[al.id]?.recuperacion ?? null;
 
         let notaFinalRec = null;

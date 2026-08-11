@@ -97,9 +97,10 @@
         .filtros select{padding:9px 14px;border:1px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;outline:none;background:#fff;transition:border-color .2s;min-width:200px}
         .filtros select:focus{border-color:#1B3A6B}
 
-        .periodos{display:flex;background:#eef1f8;border-radius:10px;padding:3px;margin-bottom:16px;width:fit-content}
-        .periodo-btn{padding:8px 18px;border-radius:8px;border:none;background:transparent;font-weight:700;font-size:11px;cursor:pointer;color:#64748b;transition:all .2s;font-family:'Plus Jakarta Sans',sans-serif}
-        .periodo-btn.active{background:#0a1628;color:#d4af37;box-shadow:0 2px 4px rgba(0,0,0,.15)}
+        .periodos{display:flex;justify-content:flex-end;gap:6px;background:#0a1628;border-radius:12px;padding:10px 14px;margin-bottom:16px}
+        .periodo-btn{padding:9px 20px;border-radius:8px;border:none;background:rgba(255,255,255,.06);font-weight:700;font-size:11px;cursor:pointer;color:rgba(255,255,255,.5);transition:all .2s;font-family:'Plus Jakarta Sans',sans-serif}
+        .periodo-btn:hover:not(.active){background:rgba(255,255,255,.14);color:rgba(255,255,255,.8)}
+        .periodo-btn.active{background:#fff;color:#0a1628;box-shadow:0 2px 6px rgba(0,0,0,.25)}
 
         .info-rangos{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
         .rango-tag{padding:5px 12px;border-radius:100px;font-size:11px;font-weight:600;background:#e0f2fe;color:#0369a1}
@@ -121,15 +122,37 @@
         tr:hover td{background:#fafbfd}
         .td-num{width:36px;text-align:center;color:#94a3b8;font-size:11px}
         .td-nombre{font-weight:600;min-width:190px}
-        .th-nf{background:#0a1628!important;color:#d4af37!important}
-        .nota-input{width:70px;padding:7px 8px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;text-align:center;outline:none;transition:border-color .2s}
-        .nota-input:focus{border-color:#1B3A6B}
-        .nota-input:disabled{background:#f8fafc;color:#94a3b8;cursor:not-allowed}
-        .nota-rec{border-style:dashed;background:#fff9f0}
-        .td-nf{font-family:'Playfair Display',serif;font-weight:700;font-size:15px;text-align:center}
-        .nf-aprobado{color:#059669}
-        .nf-reprobado{color:#dc2626}
-        .td-prom{font-weight:600;color:#0a1628;text-align:center;background:#f8fafc}
+
+        /* ── TABLA DE NOTAS (rediseño estilo Gradus) ── */
+        .tabla-notas-nueva thead{background:#0a1628}
+        .tabla-notas-nueva th{color:rgba(255,255,255,.55);border-bottom-color:rgba(255,255,255,.08)}
+        .tabla-notas-nueva .th-final{background:#2E5FAC;color:#fff;font-style:italic}
+        .td-apellido{font-weight:700;color:#0a1628;min-width:150px}
+        .td-nombre-alumno{font-weight:400;color:#64748b;min-width:150px}
+        .td-prom-color{text-align:center;font-weight:600}
+        .td-final{text-align:center;font-weight:800;font-style:italic;text-decoration:underline;text-underline-offset:3px;font-family:'Playfair Display',serif;font-size:17px}
+        .nivel-verde{color:#059669}
+        .nivel-naranja{color:#d97706}
+        .nivel-rojo{color:#dc2626}
+        .td-detalle-btn{text-align:center}
+        .btn-detalle{width:34px;height:34px;border-radius:50%;border:none;background:#e8f0fe;color:#2E5FAC;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;padding:0}
+        .btn-detalle svg{width:16px;height:16px}
+        .btn-detalle:hover{background:#d5e3fb}
+        .btn-detalle.activo{background:#2E5FAC;color:#fff}
+        .fila-detalle td{padding:18px 20px;background:#f8fafc}
+        .detalle-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+        .detalle-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px}
+        .detalle-card-title{font-size:12px;font-weight:700;color:#0a1628;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+        .detalle-peso{font-size:10px;font-weight:600;color:#94a3b8;background:#f1f5f9;padding:2px 8px;border-radius:100px}
+        .detalle-items{display:flex;flex-direction:column;gap:8px}
+        .detalle-item{display:flex;justify-content:space-between;align-items:center;gap:10px}
+        .detalle-item span{font-size:12px;color:#64748b}
+        .detalle-item input{width:64px;padding:6px 8px;border:1.5px solid #e2e8f0;border-radius:7px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;text-align:center;outline:none;transition:border-color .2s}
+        .detalle-item input:focus{border-color:#1B3A6B}
+        .detalle-recuperacion{margin-top:14px;padding-top:14px;border-top:1px solid #e2e8f0;display:flex;align-items:center;gap:12px}
+        .detalle-recuperacion label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#64748b}
+        .detalle-recuperacion input{width:80px;padding:8px 10px;border:1.5px dashed #d4af37;background:#fff9f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;text-align:center;outline:none}
+
         .comp-select{padding:6px 8px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;outline:none;background:#fff;font-weight:600;text-align:center}
         .comp-select:focus{border-color:#1B3A6B}
         .inasis-input{width:60px;padding:7px 8px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;text-align:center;outline:none}
@@ -325,9 +348,20 @@
                         <button class="btn-secondary" onclick="editarCriterios()">⚙ Cambiar criterios</button>
                     </div>
 
-                    <div class="tabla-wrap">
+                    <div class="tabla-wrap tabla-notas-nueva">
                         <table>
-                            <thead id="thead-notas"></thead>
+                            <thead>
+                                <tr>
+                                    <th>Nº</th>
+                                    <th>Apellidos</th>
+                                    <th>Nombres</th>
+                                    <th>Prom C.</th>
+                                    <th>Prom I.</th>
+                                    <th>Examen</th>
+                                    <th class="th-final">Final</th>
+                                    <th>Detalle</th>
+                                </tr>
+                            </thead>
                             <tbody id="tbody-notas"></tbody>
                         </table>
                         <div class="tabla-footer">

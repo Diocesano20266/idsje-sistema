@@ -10,12 +10,14 @@ let gradosGuiaCache = [];  // grados donde el docente es guía (docente_guia_id)
 let alumnosPorGrado = {};  // conteo de alumnos activos por grado_id
 
 // Registro de notas
-let notasGradoId   = null;
-let notasMateriaId = null; // id de grado_materia
-let periodoActual  = 1;
-let alumnosNotas   = [];
-let notasCache     = {};   // alumnoId -> nota guardada en BD
-let notasEdit      = {};   // alumnoId -> nota editada localmente (pendiente de guardar)
+let notasGradoId      = null;
+let notasMateriaId    = null; // id de grado_materia
+let periodoActual     = 1;
+let alumnosNotas      = [];
+let notasCache        = {};   // alumnoId -> fila de `notas` guardada en BD
+let criteriosActuales = null; // { cotidianas, integradoras, examenes } del grado_materia + período actual
+let notasDetalle      = {};   // alumnoId -> { cotidianas:[], integradoras:[], examenes:[] } (edición local)
+let notasRecEdit      = {};   // alumnoId -> valor de recuperación editado localmente
 
 // Competencias ciudadanas
 let compGradoId  = null;
@@ -169,9 +171,12 @@ function poblarSelectMateriaNotas(gradoId) {
 function initVistaNotas() {
     const grados = gradosUnicosDocente();
     if (!grados.length) {
-        document.getElementById('tbody-notas').innerHTML = '<tr><td colspan="7" class="empty-state">No tenés grados asignados todavía.</td></tr>';
+        document.getElementById('notas-empty').classList.remove('hidden');
+        document.getElementById('panel-criterios').classList.add('hidden');
+        document.getElementById('wrap-tabla-notas').classList.add('hidden');
         return;
     }
+    document.getElementById('notas-empty').classList.add('hidden');
 
     poblarSelectGradoNotas();
     if (!notasGradoId || !grados.find(g => g.id === notasGradoId)) {
@@ -186,7 +191,7 @@ function initVistaNotas() {
     }
     document.getElementById('notas-materia').value = notasMateriaId || '';
 
-    cargarAlumnosYNotas();
+    cargarCriteriosYTabla();
 }
 
 window.cambiarGradoNotas = () => {
@@ -195,26 +200,78 @@ window.cambiarGradoNotas = () => {
     const materiasGrado = gradoMatCache.filter(gm => gm.grado_id === notasGradoId);
     notasMateriaId = materiasGrado[0]?.id || null;
     document.getElementById('notas-materia').value = notasMateriaId || '';
-    cargarAlumnosYNotas();
+    cargarCriteriosYTabla();
 };
 
 window.cambiarMateriaNotas = () => {
     notasMateriaId = document.getElementById('notas-materia').value;
-    cargarAlumnosYNotas();
+    cargarCriteriosYTabla();
 };
 
 window.setPeriodo = (n) => {
     periodoActual = n;
     document.querySelectorAll('.periodo-btn').forEach((b, i) => b.classList.toggle('active', i + 1 === n));
-    cargarAlumnosYNotas();
+    cargarCriteriosYTabla();
+};
+
+function mostrarPanelConfig(mostrar) {
+    document.getElementById('panel-criterios').classList.toggle('hidden', !mostrar);
+    document.getElementById('wrap-tabla-notas').classList.toggle('hidden', mostrar);
+}
+
+// Paso 1: revisa si ya existen criterios guardados para este grado_materia + período
+async function cargarCriteriosYTabla() {
+    if (!notasGradoId || !notasMateriaId) return;
+
+    const { data: criterio } = await supabase
+        .from('criterios_evaluacion')
+        .select('*')
+        .eq('grado_materia_id', notasMateriaId)
+        .eq('periodo', periodoActual)
+        .maybeSingle();
+
+    if (criterio) {
+        criteriosActuales = criterio;
+        mostrarPanelConfig(false);
+        await cargarAlumnosYNotas();
+    } else {
+        criteriosActuales = null;
+        document.getElementById('crit-cotidianas').value   = 4;
+        document.getElementById('crit-integradoras').value = 2;
+        document.getElementById('crit-examenes').value     = 1;
+        mostrarPanelConfig(true);
+    }
+}
+
+window.editarCriterios = () => {
+    document.getElementById('crit-cotidianas').value   = criteriosActuales?.cotidianas   ?? 4;
+    document.getElementById('crit-integradoras').value = criteriosActuales?.integradoras ?? 2;
+    document.getElementById('crit-examenes').value     = criteriosActuales?.examenes     ?? 1;
+    mostrarPanelConfig(true);
+};
+
+// Paso 1 → guarda los criterios elegidos y genera la tabla (paso 2)
+window.generarTablaNotas = async () => {
+    if (!notasMateriaId) return;
+
+    const cotidianas   = Math.max(1, parseInt(document.getElementById('crit-cotidianas').value) || 1);
+    const integradoras = Math.max(1, parseInt(document.getElementById('crit-integradoras').value) || 1);
+    const examenes     = Math.max(1, parseInt(document.getElementById('crit-examenes').value) || 1);
+
+    const { data, error } = await supabase
+        .from('criterios_evaluacion')
+        .upsert([{ grado_materia_id: notasMateriaId, periodo: periodoActual, cotidianas, integradoras, examenes }], { onConflict: 'grado_materia_id,periodo' })
+        .select()
+        .single();
+
+    if (error) return alert('Error guardando criterios: ' + error.message);
+
+    criteriosActuales = data;
+    mostrarPanelConfig(false);
+    await cargarAlumnosYNotas();
 };
 
 async function cargarAlumnosYNotas() {
-    if (!notasGradoId || !notasMateriaId) {
-        document.getElementById('tbody-notas').innerHTML = '<tr><td colspan="7" class="empty-state">Seleccioná un grado y materia para comenzar</td></tr>';
-        return;
-    }
-
     const { data: alumnos } = await supabase
         .from('alumnos')
         .select('*')
@@ -223,8 +280,10 @@ async function cargarAlumnosYNotas() {
         .order('apellidos');
     alumnosNotas = alumnos || [];
 
-    notasCache = {};
-    notasEdit  = {};
+    notasCache   = {};
+    notasDetalle = {};
+    notasRecEdit = {};
+
     const alumnoIds = alumnosNotas.map(a => a.id);
     if (alumnoIds.length) {
         const { data: notas } = await supabase
@@ -236,99 +295,148 @@ async function cargarAlumnosYNotas() {
         (notas || []).forEach(n => { notasCache[n.alumno_id] = n; });
     }
 
+    alumnosNotas.forEach(al => inicializarDetalle(al.id));
+
+    renderCabeceraNotas();
     renderTablaNotas();
 }
 
-function calcularNF(act, lab, exa) {
-    const a = Math.min(3.5, parseFloat(act) || 0);
-    const l = Math.min(3.5, parseFloat(lab) || 0);
-    const e = Math.min(3.0, parseFloat(exa) || 0);
-    return parseFloat((a + l + e).toFixed(2));
+// Ajusta el arreglo guardado (detalle) al número de columnas definido por los criterios actuales
+function ajustarLongitud(arr, n) {
+    const base = Array.isArray(arr) ? arr.slice(0, n) : [];
+    while (base.length < n) base.push('');
+    return base;
+}
+
+function inicializarDetalle(alumnoId) {
+    const detalle = notasCache[alumnoId]?.detalle || {};
+    notasDetalle[alumnoId] = {
+        cotidianas:   ajustarLongitud(detalle.cotidianas,   criteriosActuales.cotidianas),
+        integradoras: ajustarLongitud(detalle.integradoras, criteriosActuales.integradoras),
+        examenes:     ajustarLongitud(detalle.examenes,     criteriosActuales.examenes),
+    };
+}
+
+function promedio(arr) {
+    if (!arr.length) return 0;
+    const suma = arr.reduce((s, v) => s + (parseFloat(v) || 0), 0);
+    return suma / arr.length;
+}
+
+// Fórmula IDSJE 35/35/30 sobre notas ingresadas en escala 0–10
+function calcularPromedios(det) {
+    const promCot = promedio(det.cotidianas)   * 0.35;
+    const promInt = promedio(det.integradoras) * 0.35;
+    const promExa = promedio(det.examenes)     * 0.30;
+    const nf = parseFloat((promCot + promInt + promExa).toFixed(2));
+    return { promCot, promInt, promExa, nf };
+}
+
+function renderCabeceraNotas() {
+    const { cotidianas, integradoras, examenes } = criteriosActuales;
+    let cols = '<th>Nº</th><th>Apellidos y Nombres</th>';
+    for (let i = 1; i <= cotidianas;   i++) cols += `<th>C${i}</th>`;
+    for (let i = 1; i <= integradoras; i++) cols += `<th>I${i}</th>`;
+    for (let i = 1; i <= examenes;     i++) cols += `<th>E${i}</th>`;
+    cols += '<th>Prom. Cot.<br><small>35%</small></th>';
+    cols += '<th>Prom. Int.<br><small>35%</small></th>';
+    cols += '<th>Prom. Exam.<br><small>30%</small></th>';
+    cols += '<th class="th-nf">NF</th>';
+    cols += '<th>Recuperación</th>';
+    document.getElementById('thead-notas').innerHTML = `<tr>${cols}</tr>`;
+}
+
+function totalColumnasNotas() {
+    return 2 + criteriosActuales.cotidianas + criteriosActuales.integradoras + criteriosActuales.examenes + 4;
+}
+
+function filaNotas(al, idx) {
+    const det = notasDetalle[al.id];
+    const { promCot, promInt, promExa, nf } = calcularPromedios(det);
+    const colorNF = nf >= 6 ? 'nf-aprobado' : nf > 0 ? 'nf-reprobado' : '';
+    const recValor = notasCache[al.id]?.recuperacion ?? '';
+
+    let celdas = `<td class="td-num">${idx + 1}</td><td class="td-nombre">${al.apellidos}, ${al.nombres}</td>`;
+
+    det.cotidianas.forEach((v, i) => {
+        celdas += `<td><input type="number" step="0.01" min="0" max="10" value="${v}" placeholder="0.00" class="nota-input" oninput="actualizarDetalleLocal('${al.id}','cotidianas',${i},this.value)"></td>`;
+    });
+    det.integradoras.forEach((v, i) => {
+        celdas += `<td><input type="number" step="0.01" min="0" max="10" value="${v}" placeholder="0.00" class="nota-input" oninput="actualizarDetalleLocal('${al.id}','integradoras',${i},this.value)"></td>`;
+    });
+    det.examenes.forEach((v, i) => {
+        celdas += `<td><input type="number" step="0.01" min="0" max="10" value="${v}" placeholder="0.00" class="nota-input" oninput="actualizarDetalleLocal('${al.id}','examenes',${i},this.value)"></td>`;
+    });
+
+    celdas += `<td class="td-prom" id="promcot-${al.id}">${promCot.toFixed(2)}</td>`;
+    celdas += `<td class="td-prom" id="promint-${al.id}">${promInt.toFixed(2)}</td>`;
+    celdas += `<td class="td-prom" id="promexa-${al.id}">${promExa.toFixed(2)}</td>`;
+    celdas += `<td class="td-nf ${colorNF}" id="nf-${al.id}">${nf > 0 ? nf.toFixed(2) : '—'}</td>`;
+    celdas += `<td>${nf < 6
+        ? `<input type="number" step="0.01" min="0" max="10" value="${recValor}" placeholder="—" class="nota-input nota-rec" oninput="actualizarRecuperacionLocal('${al.id}', this.value)">`
+        : '<span class="text-muted">—</span>'}</td>`;
+
+    return `<tr>${celdas}</tr>`;
 }
 
 function renderTablaNotas() {
     const tbody = document.getElementById('tbody-notas');
     if (!alumnosNotas.length) {
-        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Este grado no tiene alumnos activos.</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="${totalColumnasNotas()}" class="empty-state">Este grado no tiene alumnos activos.</td></tr>`;
         return;
     }
-
-    tbody.innerHTML = alumnosNotas.map((al, idx) => {
-        const n  = notasCache[al.id] || {};
-        const nf = calcularNF(n.actividades, n.laboratorio, n.examen);
-        const colorNF = nf >= 6 ? 'nf-aprobado' : nf > 0 ? 'nf-reprobado' : '';
-
-        return `
-        <tr>
-            <td class="td-num">${idx + 1}</td>
-            <td class="td-nombre">${al.apellidos}, ${al.nombres}</td>
-            <td>
-                <input type="number" step="0.01" min="0" max="3.5"
-                    value="${n.actividades ?? ''}" placeholder="0.00"
-                    class="nota-input"
-                    oninput="actualizarNotaLocal('${al.id}', 'actividades', this.value)">
-            </td>
-            <td>
-                <input type="number" step="0.01" min="0" max="3.5"
-                    value="${n.laboratorio ?? ''}" placeholder="0.00"
-                    class="nota-input"
-                    oninput="actualizarNotaLocal('${al.id}', 'laboratorio', this.value)">
-            </td>
-            <td>
-                <input type="number" step="0.01" min="0" max="3.0"
-                    value="${n.examen ?? ''}" placeholder="0.00"
-                    class="nota-input"
-                    oninput="actualizarNotaLocal('${al.id}', 'examen', this.value)">
-            </td>
-            <td class="td-nf ${colorNF}" id="nf-${al.id}">${nf > 0 ? nf.toFixed(1) : '—'}</td>
-            <td>
-                <input type="number" step="0.01" min="0" max="10"
-                    value="${n.recuperacion ?? ''}" placeholder="—"
-                    class="nota-input nota-rec"
-                    oninput="actualizarNotaLocal('${al.id}', 'recuperacion', this.value)"
-                    ${nf >= 6 ? 'disabled' : ''}>
-            </td>
-        </tr>`;
-    }).join('');
+    tbody.innerHTML = alumnosNotas.map((al, idx) => filaNotas(al, idx)).join('');
 }
 
-window.actualizarNotaLocal = (alumnoId, campo, valor) => {
-    const base = notasEdit[alumnoId] || { ...(notasCache[alumnoId] || {}) };
-    base[campo] = valor;
-    notasEdit[alumnoId] = base;
+window.actualizarDetalleLocal = (alumnoId, tipo, idx, valor) => {
+    if (!notasDetalle[alumnoId]) return;
+    notasDetalle[alumnoId][tipo][idx] = valor;
 
-    const nf = calcularNF(base.actividades, base.laboratorio, base.examen);
-    const celda = document.getElementById(`nf-${alumnoId}`);
-    if (celda) {
-        celda.textContent = nf > 0 ? nf.toFixed(1) : '—';
-        celda.className = 'td-nf ' + (nf >= 6 ? 'nf-aprobado' : nf > 0 ? 'nf-reprobado' : '');
-    }
+    const det = notasDetalle[alumnoId];
+    const { promCot, promInt, promExa, nf } = calcularPromedios(det);
+
+    document.getElementById(`promcot-${alumnoId}`).textContent = promCot.toFixed(2);
+    document.getElementById(`promint-${alumnoId}`).textContent = promInt.toFixed(2);
+    document.getElementById(`promexa-${alumnoId}`).textContent = promExa.toFixed(2);
+
+    const celdaNF = document.getElementById(`nf-${alumnoId}`);
+    celdaNF.textContent = nf > 0 ? nf.toFixed(2) : '—';
+    celdaNF.className = 'td-nf ' + (nf >= 6 ? 'nf-aprobado' : nf > 0 ? 'nf-reprobado' : '');
+};
+
+window.actualizarRecuperacionLocal = (alumnoId, valor) => {
+    notasRecEdit[alumnoId] = valor;
 };
 
 window.guardarTodasLasNotas = async () => {
-    if (!notasGradoId || !notasMateriaId) return alert('Seleccioná un grado y materia primero.');
+    if (!notasGradoId || !notasMateriaId || !criteriosActuales) return alert('Generá la tabla primero.');
     if (!alumnosNotas.length) return;
 
     const payload = alumnosNotas.map(al => {
-        const edit = notasEdit[al.id] || notasCache[al.id] || {};
-        const actividades = parseFloat(edit.actividades) || 0;
-        const laboratorio = parseFloat(edit.laboratorio) || 0;
-        const examen      = parseFloat(edit.examen) || 0;
-        const nf = calcularNF(actividades, laboratorio, examen);
+        const det = notasDetalle[al.id];
+        const { promCot, promInt, promExa, nf } = calcularPromedios(det);
+        const recValor = notasRecEdit[al.id] ?? notasCache[al.id]?.recuperacion ?? null;
 
         let notaFinalRec = null;
-        if (edit.recuperacion && nf < 6) {
-            notaFinalRec = Math.min(10, parseFloat(edit.recuperacion) || 0);
+        if (recValor && nf < 6) {
+            notaFinalRec = Math.min(10, parseFloat(recValor) || 0);
         }
 
         return {
             alumno_id:        al.id,
             grado_materia_id: notasMateriaId,
             periodo:          periodoActual,
-            actividades, laboratorio, examen,
+            actividades:      parseFloat(promCot.toFixed(2)),
+            laboratorio:      parseFloat(promInt.toFixed(2)),
+            examen:           parseFloat(promExa.toFixed(2)),
             nota_final:       nf,
-            recuperacion:     edit.recuperacion || null,
+            recuperacion:     recValor || null,
             nota_final_rec:   notaFinalRec,
+            detalle: {
+                cotidianas:   det.cotidianas.map(v => parseFloat(v) || 0),
+                integradoras: det.integradoras.map(v => parseFloat(v) || 0),
+                examenes:     det.examenes.map(v => parseFloat(v) || 0),
+            },
         };
     });
 
@@ -340,7 +448,7 @@ window.guardarTodasLasNotas = async () => {
     if (error) return alert('Error guardando notas: ' + error.message);
 
     (data || []).forEach(n => { notasCache[n.alumno_id] = n; });
-    notasEdit = {};
+    notasRecEdit = {};
     renderTablaNotas();
     alert('✅ Notas guardadas correctamente.');
 };

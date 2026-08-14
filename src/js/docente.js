@@ -3,6 +3,16 @@
 // ═══════════════════════════════════════════
 import { supabase, verificarSesion, cerrarSesion } from './auth.js';
 import { CONCEPTOS } from './config.js';
+import {
+    calcularNotaFinal,
+    promedioPonderado,
+    sumaPesos,
+    pesosEquitativos,
+    aplicarPesoMinimo,
+    redistribuirPesos,
+    colorEscala,
+    puedeAccederCompetencias,
+} from './utils.js';
 
 let usuarioActual   = null;
 let gradoMatCache   = [];  // grado_materia asignadas al docente (con grados y materias embebidos)
@@ -68,7 +78,7 @@ async function cargarDatosDocente() {
 
     // Competencias Ciudadanas solo es visible/accesible si el docente es guía de algún grado
     const navComp = document.getElementById('nav-competencias');
-    if (navComp) navComp.classList.toggle('hidden', gradosGuiaCache.length === 0);
+    if (navComp) navComp.classList.toggle('hidden', !puedeAccederCompetencias(gradosGuiaCache));
 }
 
 function gradosUnicosDocente() {
@@ -84,7 +94,7 @@ const TITULOS = {
 };
 
 window.mostrarVista = (vista) => {
-    if (vista === 'competencias' && gradosGuiaCache.length === 0) return;
+    if (vista === 'competencias' && !puedeAccederCompetencias(gradosGuiaCache)) return;
 
     document.querySelectorAll('[id^="vista-"]').forEach(v => v.classList.add('hidden'));
     document.getElementById(`vista-${vista}`)?.classList.remove('hidden');
@@ -332,15 +342,6 @@ function inicializarDetalle(alumnoId) {
     };
 }
 
-// Reparte 100% equitativamente entre `n` actividades, en enteros (la última absorbe el residuo)
-function pesosEquitativos(n) {
-    if (n <= 0) return [];
-    const base = Math.floor(100 / n);
-    const pesos = new Array(n).fill(base);
-    pesos[pesos.length - 1] += 100 - base * n;
-    return pesos;
-}
-
 // Los pesos son compartidos por todo el grado_materia + período (no por alumno).
 // Se buscan en cualquier alumno que ya tenga guardados pesos con la cantidad correcta;
 // si nadie los tiene todavía, se reparte equitativamente.
@@ -355,39 +356,22 @@ function inicializarPesos() {
     });
 }
 
-function sumaPesos(pesos) {
-    return pesos.reduce((s, v) => s + (parseFloat(v) || 0), 0);
+function combinarNotasPesos(notas, pesos) {
+    return notas.map((nota, i) => ({ nota, peso: pesos[i] }));
 }
 
-// Σ(nota × peso%) / 100
-function promedioPonderado(notas, pesos) {
-    if (!notas.length) return 0;
-    let suma = 0;
-    for (let i = 0; i < notas.length; i++) {
-        suma += (parseFloat(notas[i]) || 0) * (parseFloat(pesos[i]) || 0);
-    }
-    return suma / 100;
-}
-
-// Fórmula IDSJE 35/35/30 sobre notas ingresadas en escala 0–10, ponderadas por el peso de cada actividad
 // promCotRaw/promIntRaw/promExaRaw = promedio ponderado de la categoría (para mostrar en la tabla)
-// promCot/promInt/promExa = esos mismos promedios ya multiplicados por 35/35/30 (para guardar y calcular NF)
+// promCot/promInt/promExa = esos mismos promedios ya multiplicados por 35/35/30 (para guardar en BD)
+// nf = fórmula IDSJE 35/35/30 (src/js/utils.js#calcularNotaFinal)
 function calcularResumen(det) {
-    const promCotRaw = promedioPonderado(det.cotidianas,   pesosActuales.cotidianas);
-    const promIntRaw = promedioPonderado(det.integradoras, pesosActuales.integradoras);
-    const promExaRaw = promedioPonderado(det.examenes,     pesosActuales.examenes);
+    const promCotRaw = promedioPonderado(combinarNotasPesos(det.cotidianas,   pesosActuales.cotidianas));
+    const promIntRaw = promedioPonderado(combinarNotasPesos(det.integradoras, pesosActuales.integradoras));
+    const promExaRaw = promedioPonderado(combinarNotasPesos(det.examenes,     pesosActuales.examenes));
     const promCot = promCotRaw * 0.35;
     const promInt = promIntRaw * 0.35;
     const promExa = promExaRaw * 0.30;
-    const nf = parseFloat((promCot + promInt + promExa).toFixed(2));
+    const nf = calcularNotaFinal(promCotRaw, promIntRaw, promExaRaw);
     return { promCotRaw, promIntRaw, promExaRaw, promCot, promInt, promExa, nf };
-}
-
-// Escala de color: verde ≥6, naranja 4–6, rojo <4
-function colorEscala(valor) {
-    if (valor >= 6) return 'nivel-verde';
-    if (valor >= 4) return 'nivel-naranja';
-    return 'nivel-rojo';
 }
 
 const GRUPOS_NOTAS = [
@@ -529,60 +513,6 @@ window.actualizarDetalleLocal = (alumnoId, tipo, idx, valor) => {
     actualizarResumenAlumno(alumnoId);
 };
 
-// Ningún peso puede quedar por debajo de este mínimo (%)
-const PESO_MINIMO = 1;
-
-// Si algún peso quedó por debajo de PESO_MINIMO, lo sube al mínimo y le quita
-// la diferencia al peso más grande del conjunto (repite hasta que todo quede válido).
-function aplicarPesoMinimo(pesos) {
-    let intentos = 0;
-    let ajustado = true;
-    while (ajustado && intentos < pesos.length * 2) {
-        ajustado = false;
-        intentos++;
-        for (let i = 0; i < pesos.length; i++) {
-            if (pesos[i] < PESO_MINIMO) {
-                const faltante = PESO_MINIMO - pesos[i];
-                pesos[i] = PESO_MINIMO;
-
-                let iMax = -1;
-                for (let j = 0; j < pesos.length; j++) {
-                    if (j !== i && (iMax === -1 || pesos[j] > pesos[iMax])) iMax = j;
-                }
-                if (iMax !== -1) pesos[iMax] -= faltante;
-                ajustado = true;
-            }
-        }
-    }
-    return pesos;
-}
-
-// Al cambiar el peso de una actividad:
-// 1. Se toma el valor ingresado.
-// 2. El restante (100 - ese valor) se reparte EQUITATIVAMENTE entre los demás.
-// 3. El último de los demás absorbe el residuo del redondeo.
-// 4. Ningún peso queda por debajo de PESO_MINIMO (se reajusta quitándoselo al más grande).
-function redistribuirPesos(pesos, idx, nuevoValor) {
-    const n = pesos.length;
-    const nuevo = Math.max(0, Math.min(100, Math.round(parseFloat(nuevoValor) || 0)));
-    if (n <= 1) return [100];
-
-    const otros = pesos.map((_, i) => i).filter(i => i !== idx);
-    const restante = 100 - nuevo;
-
-    const resultado = [...pesos];
-    resultado[idx] = nuevo;
-
-    const cada = Math.floor(restante / otros.length);
-    otros.forEach(i => { resultado[i] = cada; });
-
-    // El último de "los demás" absorbe el residuo del redondeo (puede ser negativo si restante < 0)
-    const residuo = restante - cada * otros.length;
-    resultado[otros[otros.length - 1]] += residuo;
-
-    return aplicarPesoMinimo(resultado);
-}
-
 // El peso es compartido por todo el grado_materia + período: al cambiarlo hay que
 // sincronizar el mismo campo en las demás cards abiertas y recalcular a TODOS los alumnos.
 window.actualizarPesoLocal = (grupo, idx, valor) => {
@@ -659,7 +589,7 @@ function poblarSelectGradoComp() {
 }
 
 function initVistaCompetencias() {
-    if (!gradosGuiaCache.length) {
+    if (!puedeAccederCompetencias(gradosGuiaCache)) {
         document.getElementById('tbody-comp').innerHTML = '<tr><td colspan="8" class="empty-state">No sos docente guía de ningún grado.</td></tr>';
         return;
     }

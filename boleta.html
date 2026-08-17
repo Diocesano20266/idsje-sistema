@@ -45,7 +45,7 @@
             background:#fff;
             max-width:760px;
             margin:24px auto;
-            padding:24px 28px;
+            padding:14px 28px 24px;
             box-shadow:0 2px 12px rgba(0,0,0,.1);
             border-radius:8px;
             position:relative;
@@ -55,18 +55,18 @@
         }
 
         /* Encabezado */
-        .boleta-header{display:flex;align-items:center;gap:16px;border-bottom:2px solid #1B3A6B;padding-bottom:12px;margin-bottom:8px;font-family:'DM Sans',sans-serif}
+        .boleta-header{display:flex;align-items:center;gap:12px;border-bottom:2px solid #1B3A6B;padding-bottom:8px;margin-bottom:6px;font-family:'DM Sans',sans-serif}
         .header-logos{flex-shrink:0}
         .logo-placeholder{width:60px;height:60px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px;text-align:center}
         .logo-idsje{background:#1B3A6B;color:#fff}
         .logo-mined{background:#003087;color:#fff}
-        .logo-img{height:80px;width:80px;object-fit:cover;border-radius:10px;display:block}
-        .logo-mined-img{object-fit:contain;background:#fff;padding:2px}
+        .logo-img{height:56px;width:56px;object-fit:cover;border-radius:8px;display:block}
+        .logo-mined-img{object-fit:contain}
         .header-info{flex:1;text-align:center}
         .inst-nombre{font-family:'Syne',sans-serif;font-weight:800;font-size:13px;color:#1B3A6B}
         .inst-dir{font-size:10px;color:#64748b;margin-top:2px}
 
-        .boleta-titulo{text-align:center;font-family:'Syne',sans-serif;font-weight:800;font-size:13px;background:#f1f5f9;padding:8px;border-radius:6px;margin:10px 0 4px}
+        .boleta-titulo{text-align:center;font-family:'Times New Roman', Times, serif;font-weight:700;font-size:14px;margin:8px 0 4px}
         .boleta-subtitulo{text-align:center;font-size:11px;font-weight:600;color:#64748b;margin-bottom:12px}
 
         /* Datos alumno */
@@ -85,9 +85,9 @@
         .tabla-notas .td-num{width:24px;font-size:10px;color:#94a3b8}
         .tabla-notas .td-materia{text-align:left;font-weight:500}
         .tabla-notas .td-nf{font-weight:800;font-size:12px}
-        .tabla-notas .reprobado{color:#dc2626;background:#fef2f2}
-        .tabla-notas tr.fila-roja td{background:#fef2f2}
-        .tabla-notas tr.fila-amarilla td{background:#fffbeb}
+        .tabla-notas .reprobado{color:#dc2626}
+        .tabla-notas tbody tr:nth-child(even) td{background:#f8fafc}
+        .tabla-notas tbody tr.fila-roja td{background:#ffcccc}
         .tabla-notas tfoot td{background:#f8fafc;font-weight:600;font-size:10px}
         .td-reprobadas{text-align:right;padding-right:16px}
 
@@ -103,7 +103,7 @@
         .tabla-obs{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:10px}
         .tabla-obs td{padding:5px 10px;border:1px solid #e2e8f0}
         .td-obs-label{font-weight:700;width:140px;background:#f8fafc}
-        .td-promedio{font-family:'Syne',sans-serif;font-weight:800;font-size:24px;color:#1B3A6B;text-align:right;padding-right:16px}
+        .td-promedio{font-weight:700;color:#1B3A6B;text-align:right}
 
         /* Firmas */
         .firmas{display:flex;justify-content:space-around;margin-top:32px;margin-bottom:12px}

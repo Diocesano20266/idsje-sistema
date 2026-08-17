@@ -61,7 +61,11 @@
         .logo-idsje{background:#1B3A6B;color:#fff}
         .logo-mined{background:#003087;color:#fff}
         .logo-img{height:80px;width:80px;object-fit:cover;border-radius:8px;display:block}
-        .logo-mined-img{object-fit:contain}
+        .logo-mined-img{
+            height:80px !important;
+            width:auto !important;
+            object-fit:contain;
+        }
         .header-info{flex:1;text-align:center}
         .inst-nombre{font-family:'Times New Roman', Times, serif;font-weight:700;font-size:18px;color:#1B3A6B}
         .inst-dir{font-family:'Times New Roman', Times, serif;font-size:11px;color:#64748b;margin-top:2px}
@@ -70,12 +74,12 @@
         .boleta-subtitulo{text-align:center;font-size:11px;font-weight:600;color:#64748b;margin-bottom:12px}
 
         /* Datos alumno */
-        .alumno-datos{position:relative;padding-right:112px;min-height:120px;margin-bottom:0}
+        .alumno-datos{position:relative;padding-right:130px;min-height:120px;margin-bottom:0}
         .dato-row{display:flex;gap:6px;margin-bottom:4px;font-size:11px}
         .dato-label{font-weight:700;white-space:nowrap}
         .dato-valor{font-weight:600;color:#1B3A6B}
-        .foto-alumno{position:absolute;top:0;margin-top:0;right:0;width:100px;height:120px;object-fit:cover;border:1.5px solid #1B3A6B;border-radius:4px}
-        .foto-vacia{position:absolute;top:0;margin-top:0;right:0;width:100px;height:120px;background:#f1f5f9;border:1.5px solid #1B3A6B;border-radius:4px}
+        .foto-alumno{position:absolute;top:0;right:0;margin:0;padding:0;width:100px;height:120px;object-fit:cover;border:1.5px solid #1B3A6B;border-radius:4px}
+        .foto-vacia{position:absolute;top:0;right:0;margin:0;padding:0;width:100px;height:120px;background:#f1f5f9;border:1.5px solid #1B3A6B;border-radius:4px}
 
         /* Tabla notas */
         .tabla-notas{width:100%;margin-top:0;border-collapse:collapse;margin-bottom:10px;font-size:10px}

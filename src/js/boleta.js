@@ -32,7 +32,7 @@ async function cargarGrados() {
 
         const sel = document.getElementById('sel-grado');
         sel.innerHTML = '<option value="">— Seleccionar sección —</option>' +
-            gradosCache.map(g => `<option value="${g.id}">${g.nombre} — Sección ${g.seccion}</option>`).join('');
+            gradosCache.map(g => `<option value="${g.id}">${g.nombre} ${g.modalidad} — Sección ${g.seccion}</option>`).join('');
     } catch (err) {
         if (esErrorDeRed(err)) {
             mostrarBannerSinConexion(() => cargarGrados());

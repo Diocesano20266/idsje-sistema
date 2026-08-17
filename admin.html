@@ -6,6 +6,7 @@
     <title>IDSJE — Administración</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./src/css/ui.css">
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:'Plus Jakarta Sans',sans-serif;background:#f0f3f9;color:#1e293b;min-height:100vh;display:flex}
@@ -403,7 +404,7 @@
             <div class="field"><label>Año</label><input type="number" id="grado-anio" value="2026"></div>
             <div class="field"><label>Docente Guía</label><select id="grado-guia"></select></div>
             <div class="modal-actions">
-                <button class="btn-primary" onclick="guardarGrado()">Guardar</button>
+                <button class="btn-primary" id="btn-guardar-grado" onclick="guardarGrado()">Guardar</button>
                 <button class="btn-secondary" onclick="cerrarModal('modal-grado')">Cancelar</button>
             </div>
         </div>
@@ -416,7 +417,7 @@
             <input type="hidden" id="mgrado-id">
             <div id="lista-grado-materias"></div>
             <div class="modal-actions">
-                <button class="btn-primary" onclick="guardarMateriasGrado()">Guardar todo</button>
+                <button class="btn-primary" id="btn-guardar-materias-grado" onclick="guardarMateriasGrado()">Guardar todo</button>
                 <button class="btn-secondary" onclick="cerrarModal('modal-grado-materias')">Cancelar</button>
             </div>
         </div>
@@ -435,7 +436,7 @@
             </div>
             <div class="info-box" style="background:#e8fdf0;border-color:#bbf7d0;color:#166534">✅ El sistema creará automáticamente la cuenta de acceso del docente. Solo completá los campos y guardá.</div>
             <div class="modal-actions">
-                <button class="btn-primary" onclick="guardarDocente()">Guardar</button>
+                <button class="btn-primary" id="btn-guardar-docente" onclick="guardarDocente()">Guardar</button>
                 <button class="btn-secondary" onclick="cerrarModal('modal-docente')">Cancelar</button>
             </div>
         </div>
@@ -450,7 +451,7 @@
             <div class="field"><label>Código (opcional)</label><input type="text" id="materia-codigo" placeholder="Ej: LEN"></div>
             <div class="field"><label>Docente por defecto</label><select id="materia-docente"></select></div>
             <div class="modal-actions">
-                <button class="btn-primary" onclick="guardarMateria()">Guardar</button>
+                <button class="btn-primary" id="btn-guardar-materia" onclick="guardarMateria()">Guardar</button>
                 <button class="btn-secondary" onclick="cerrarModal('modal-materia')">Cancelar</button>
             </div>
         </div>
@@ -469,7 +470,7 @@
             <div class="field"><label>Grado y Sección</label><select id="alumno-grado"></select></div>
             <div class="field"><label>Año de ingreso</label><input type="number" id="alumno-anio" value="2026"></div>
             <div class="modal-actions">
-                <button class="btn-primary" onclick="guardarAlumno()">Guardar</button>
+                <button class="btn-primary" id="btn-guardar-alumno" onclick="guardarAlumno()">Guardar</button>
                 <button class="btn-secondary" onclick="cerrarModal('modal-alumno')">Cancelar</button>
             </div>
         </div>

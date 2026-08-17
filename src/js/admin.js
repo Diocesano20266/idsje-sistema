@@ -3,6 +3,18 @@
 // ═══════════════════════════════════════════
 import { supabase, verificarSesion, cerrarSesion, subirFoto } from './auth.js';
 import { CLOUDINARY_CLOUD, CLOUDINARY_PRESET, MATERIAS_DEFAULT, INSTITUTO } from './config.js';
+import {
+    mostrarToast,
+    mostrarConfirm,
+    notificarError,
+    esErrorDeRed,
+    mostrarBannerSinConexion,
+    ocultarBannerSinConexion,
+    setBotonCargando,
+    mostrarErrorCampo,
+    limpiarErroresFormulario,
+    renderSkeletonFilas,
+} from './utils.js';
 
 let usuarioActual = null;
 let gradosCache   = [];
@@ -39,25 +51,46 @@ async function init() {
 }
 
 async function cargarTodo() {
-    const [{ data: grados }, { data: usuarios }, { data: materias }, { count: cAlumnos }] = await Promise.all([
-        supabase.from('grados').select('*').order('nombre'),
-        supabase.from('usuarios').select('*').order('nombre_completo'),
-        supabase.from('materias').select('*').order('nombre'),
-        supabase.from('alumnos').select('*', { count: 'exact', head: true }),
-    ]);
-    gradosCache   = grados   || [];
-    usuariosCache = usuarios || [];
-    materiasCache = materias || [];
-    const sg = document.getElementById('stat-grados');
-    const sa = document.getElementById('stat-alumnos');
-    const sd = document.getElementById('stat-docentes');
-    const sm = document.getElementById('stat-materias');
-    if (sg) sg.textContent = gradosCache.length;
-    if (sa) sa.textContent = cAlumnos || 0;
-    if (sd) sd.textContent = usuariosCache.length;
-    if (sm) sm.textContent = materiasCache.length;
-    const ini = document.getElementById('admin-inicial');
-    if (ini && usuarioActual?.nombre_completo) ini.textContent = usuarioActual.nombre_completo.charAt(0).toUpperCase();
+    try {
+        const [
+            { data: grados,   error: eGrados },
+            { data: usuarios, error: eUsuarios },
+            { data: materias, error: eMaterias },
+            { count: cAlumnos, error: eAlumnos },
+        ] = await Promise.all([
+            supabase.from('grados').select('*').order('nombre'),
+            supabase.from('usuarios').select('*').order('nombre_completo'),
+            supabase.from('materias').select('*').order('nombre'),
+            supabase.from('alumnos').select('*', { count: 'exact', head: true }),
+        ]);
+
+        const errorDeRed = [eGrados, eUsuarios, eMaterias, eAlumnos].find(e => e && esErrorDeRed(e));
+        if (errorDeRed) {
+            mostrarBannerSinConexion(() => cargarTodo());
+            return;
+        }
+        ocultarBannerSinConexion();
+
+        gradosCache   = grados   || [];
+        usuariosCache = usuarios || [];
+        materiasCache = materias || [];
+        const sg = document.getElementById('stat-grados');
+        const sa = document.getElementById('stat-alumnos');
+        const sd = document.getElementById('stat-docentes');
+        const sm = document.getElementById('stat-materias');
+        if (sg) sg.textContent = gradosCache.length;
+        if (sa) sa.textContent = cAlumnos || 0;
+        if (sd) sd.textContent = usuariosCache.length;
+        if (sm) sm.textContent = materiasCache.length;
+        const ini = document.getElementById('admin-inicial');
+        if (ini && usuarioActual?.nombre_completo) ini.textContent = usuarioActual.nombre_completo.charAt(0).toUpperCase();
+    } catch (err) {
+        if (esErrorDeRed(err)) {
+            mostrarBannerSinConexion(() => cargarTodo());
+            return;
+        }
+        notificarError(err, 'Error cargando los datos');
+    }
 }
 
 // ── VISTAS ──────────────────────────────────
@@ -102,7 +135,8 @@ window.mostrarVista = async (vista) => {
     if (vista === 'materias') renderMaterias();
     if (vista === 'alumnos') {
         // Poblar filtro grado
-        const { data } = await supabase.from('grados').select('*').order('nombre');
+        const { data, error } = await supabase.from('grados').select('*').order('nombre');
+        if (error) { notificarError(error, 'Error cargando grados'); return; }
         const sel = document.getElementById('filtro-grado');
         if (sel) {
             sel.innerHTML = '<option value="">— Todos los grados —</option>' +
@@ -166,6 +200,11 @@ async function renderDashboard() {
         notaGrados.className = 'sc-note' + (varGrados === null ? '' : varGrados >= 0 ? ' up' : ' down');
     }
 
+    const cont = document.getElementById('dash-recientes');
+    const gc   = document.getElementById('dash-grado-cards');
+    if (cont) cont.innerHTML = '<div class="skeleton-bar" style="height:52px;margin-bottom:10px"></div>'.repeat(3);
+    if (gc)   gc.innerHTML   = '<div class="skeleton-bar" style="height:88px"></div>'.repeat(3);
+
     const alumnosDash = await cargarAlumnosDashboard();
 
     const varAlumnos = calcularVariacion(alumnosDash, 'anio_ingreso');
@@ -216,7 +255,6 @@ async function renderDashboard() {
     }
 
     // Últimos alumnos registrados
-    const cont = document.getElementById('dash-recientes');
     if (cont) {
         const recientes = alumnosDash.slice(0, 5);
         cont.innerHTML = recientes.map(a => `
@@ -231,7 +269,6 @@ async function renderDashboard() {
     }
 
     // Tarjetas de grados
-    const gc = document.getElementById('dash-grado-cards');
     if (gc) {
         gc.innerHTML = gradosCache.map(g => {
             const guia = usuariosCache.find(u => u.id === g.docente_guia_id);
@@ -307,7 +344,10 @@ function renderGrados() {
     if (sg) sg.textContent = gradosCache.length;
 }
 
+const CAMPOS_GRADO = ['grado-nombre', 'grado-seccion'];
+
 window.abrirModalGrado = (id = null) => {
+    limpiarErroresFormulario(CAMPOS_GRADO);
     const grado = id ? gradosCache.find(g => g.id === id) : null;
     document.getElementById('modal-grado-title').textContent = grado ? 'Editar Grado' : 'Nuevo Grado';
     document.getElementById('grado-id').value     = grado?.id || '';
@@ -327,6 +367,7 @@ window.abrirModalGrado = (id = null) => {
 window.editarGrado = (id) => window.abrirModalGrado(id);
 
 window.guardarGrado = async () => {
+    limpiarErroresFormulario(CAMPOS_GRADO);
     const id       = document.getElementById('grado-id').value;
     const nombre   = document.getElementById('grado-nombre').value.trim().toUpperCase();
     const seccion  = document.getElementById('grado-seccion').value.trim().toUpperCase();
@@ -334,23 +375,34 @@ window.guardarGrado = async () => {
     const anio     = parseInt(document.getElementById('grado-anio').value);
     const guia     = document.getElementById('grado-guia').value || null;
 
-    if (!nombre || !seccion) return alert('Nombre y sección son obligatorios');
+    let valido = true;
+    if (!nombre)  { mostrarErrorCampo('grado-nombre', 'El nombre es obligatorio'); valido = false; }
+    if (!seccion) { mostrarErrorCampo('grado-seccion', 'La sección es obligatoria'); valido = false; }
+    if (!valido) return;
+
+    const btn = document.getElementById('btn-guardar-grado');
+    setBotonCargando(btn, true);
 
     const payload = { nombre, seccion, modalidad, anio, docente_guia_id: guia };
     const { error } = id
         ? await supabase.from('grados').update(payload).eq('id', id)
         : await supabase.from('grados').insert([payload]);
 
-    if (error) return alert('Error: ' + error.message);
+    setBotonCargando(btn, false);
+    if (error) return notificarError(error, 'Error guardando el grado');
+
+    mostrarToast(id ? 'Grado actualizado correctamente' : 'Grado creado correctamente', 'exito');
     cerrarModal('modal-grado');
     await cargarTodo();
     renderGrados();
 };
 
 window.eliminarGrado = async (id) => {
-    if (!confirm('¿Eliminar este grado y todos sus datos?')) return;
+    const ok = await mostrarConfirm('¿Eliminar este grado y todos sus datos?', { textoConfirmar: 'Eliminar' });
+    if (!ok) return;
     const { error } = await supabase.from('grados').delete().eq('id', id);
-    if (error) return alert('Error: ' + error.message);
+    if (error) return notificarError(error, 'Error eliminando el grado');
+    mostrarToast('Grado eliminado', 'exito');
     await cargarTodo();
     renderGrados();
 };
@@ -361,10 +413,12 @@ window.gestionarMateriaGrado = async (gradoId) => {
     document.getElementById('mgrado-titulo').textContent = `${grado.nombre} ${grado.seccion} — Materias`;
     document.getElementById('mgrado-id').value = gradoId;
 
-    const { data: asignadas } = await supabase
+    const { data: asignadas, error } = await supabase
         .from('grado_materia')
         .select('*')
         .eq('grado_id', gradoId);
+
+    if (error) { notificarError(error, 'Error cargando materias del grado'); return; }
 
     const asignadasPorMateria = {};
     (asignadas || []).forEach(a => { asignadasPorMateria[a.materia_id] = a; });
@@ -405,6 +459,7 @@ window.toggleMgmRow = (materiaId) => {
 window.guardarMateriasGrado = async () => {
     const gradoId = document.getElementById('mgrado-id').value;
     const checks  = document.querySelectorAll('.mgm-checkbox');
+    const btn     = document.getElementById('btn-guardar-materias-grado');
 
     const paraGuardar = [];
     const paraQuitar  = [];
@@ -419,10 +474,12 @@ window.guardarMateriasGrado = async () => {
         }
     });
 
+    setBotonCargando(btn, true);
+
     if (paraGuardar.length) {
         const { error } = await supabase.from('grado_materia')
             .upsert(paraGuardar, { onConflict: 'grado_id,materia_id' });
-        if (error) return alert('Error: ' + error.message);
+        if (error) { setBotonCargando(btn, false); return notificarError(error, 'Error guardando materias'); }
     }
 
     if (paraQuitar.length) {
@@ -430,9 +487,11 @@ window.guardarMateriasGrado = async () => {
             .delete()
             .eq('grado_id', gradoId)
             .in('materia_id', paraQuitar);
-        if (error) return alert('Error: ' + error.message);
+        if (error) { setBotonCargando(btn, false); return notificarError(error, 'Error quitando materias'); }
     }
 
+    setBotonCargando(btn, false);
+    mostrarToast('Materias del grado actualizadas', 'exito');
     cerrarModal('modal-grado-materias');
 };
 
@@ -451,7 +510,10 @@ function renderDocentes() {
     `).join('');
 }
 
+const CAMPOS_DOCENTE = ['docente-nombre', 'docente-correo', 'docente-pass'];
+
 window.abrirModalDocente = (id = null) => {
+    limpiarErroresFormulario(CAMPOS_DOCENTE);
     const u = id ? usuariosCache.find(x => x.id === id) : null;
     document.getElementById('modal-docente-title').textContent = u ? 'Editar Docente' : 'Nuevo Docente';
     document.getElementById('docente-id').value     = u?.id || '';
@@ -466,43 +528,57 @@ window.abrirModalDocente = (id = null) => {
 window.editarDocente = (id) => window.abrirModalDocente(id);
 
 window.guardarDocente = async () => {
+    limpiarErroresFormulario(CAMPOS_DOCENTE);
     const id     = document.getElementById('docente-id').value;
     const nombre = document.getElementById('docente-nombre').value.trim();
     const correo = document.getElementById('docente-correo').value.trim().toLowerCase();
     const rol    = document.getElementById('docente-rol').value;
     const pass   = document.getElementById('docente-pass').value;
 
-    if (!nombre || !correo) return alert('Nombre y correo son obligatorios');
+    let valido = true;
+    if (!nombre) { mostrarErrorCampo('docente-nombre', 'El nombre es obligatorio'); valido = false; }
+    if (!correo) { mostrarErrorCampo('docente-correo', 'El correo es obligatorio'); valido = false; }
+    if (!id && (!pass || pass.length < 6)) {
+        mostrarErrorCampo('docente-pass', 'La contraseña debe tener al menos 6 caracteres');
+        valido = false;
+    }
+    if (!valido) return;
+
+    const btn = document.getElementById('btn-guardar-docente');
+    setBotonCargando(btn, true);
 
     if (!id) {
-        // Crear usuario nuevo
-        if (!pass || pass.length < 6) return alert('La contraseña debe tener al menos 6 caracteres');
-
-        // 1. Crear en Supabase Auth vía endpoint serverless (usa la service key en el servidor)
+        // Crear usuario nuevo — 1. Crear en Supabase Auth vía endpoint serverless
         try {
             await llamarApiAdmin('crear', { correo, password: pass });
         } catch (err) {
-            return alert('Error creando cuenta: ' + err.message);
+            setBotonCargando(btn, false);
+            return notificarError(err, 'Error creando la cuenta');
         }
 
         // 2. Insertar en tabla usuarios
         const { error } = await supabase.from('usuarios').insert([{ correo, nombre_completo: nombre, rol }]);
-        if (error) return alert('Error guardando usuario: ' + error.message);
+        setBotonCargando(btn, false);
+        if (error) return notificarError(error, 'Error guardando el usuario');
 
-        alert(`✅ Docente "${nombre}" creado correctamente.`);
+        mostrarToast(`Docente "${nombre}" creado correctamente`, 'exito');
     } else {
         // Actualizar datos existentes
         const { error } = await supabase.from('usuarios').update({ nombre_completo: nombre, rol }).eq('id', id);
-        if (error) return alert('Error: ' + error.message);
+        if (error) { setBotonCargando(btn, false); return notificarError(error, 'Error actualizando el docente'); }
 
         // Cambiar contraseña si se ingresó una nueva
         if (pass && pass.length >= 6) {
             try {
                 await llamarApiAdmin('cambiar-password', { correo, password: pass });
             } catch (err) {
-                return alert('Error cambiando contraseña: ' + err.message);
+                setBotonCargando(btn, false);
+                return notificarError(err, 'Error cambiando la contraseña');
             }
         }
+
+        setBotonCargando(btn, false);
+        mostrarToast('Docente actualizado correctamente', 'exito');
     }
 
     cerrarModal('modal-docente');
@@ -511,8 +587,11 @@ window.guardarDocente = async () => {
 };
 
 window.eliminarDocente = async (id) => {
-    if (!confirm('¿Eliminar este docente?')) return;
-    await supabase.from('usuarios').delete().eq('id', id);
+    const ok = await mostrarConfirm('¿Eliminar este docente?', { textoConfirmar: 'Eliminar' });
+    if (!ok) return;
+    const { error } = await supabase.from('usuarios').delete().eq('id', id);
+    if (error) return notificarError(error, 'Error eliminando el docente');
+    mostrarToast('Docente eliminado', 'exito');
     await cargarTodo();
     renderDocentes();
 };
@@ -531,7 +610,10 @@ function renderMaterias() {
     `).join('');
 }
 
+const CAMPOS_MATERIA = ['materia-nombre'];
+
 window.abrirModalMateria = (id = null) => {
+    limpiarErroresFormulario(CAMPOS_MATERIA);
     const m = id ? materiasCache.find(x => x.id === id) : null;
     document.getElementById('modal-materia-title').textContent = m ? 'Editar Materia' : 'Nueva Materia';
     document.getElementById('materia-id').value     = m?.id || '';
@@ -549,48 +631,73 @@ window.abrirModalMateria = (id = null) => {
 window.editarMateria = (id) => window.abrirModalMateria(id);
 
 window.guardarMateria = async () => {
+    limpiarErroresFormulario(CAMPOS_MATERIA);
     const id        = document.getElementById('materia-id').value;
     const nombre    = document.getElementById('materia-nombre').value.trim();
     const codigo    = document.getElementById('materia-codigo').value.trim();
     const docenteId = document.getElementById('materia-docente').value || null;
-    if (!nombre) return alert('El nombre es obligatorio');
+
+    if (!nombre) { mostrarErrorCampo('materia-nombre', 'El nombre es obligatorio'); return; }
+
+    const btn = document.getElementById('btn-guardar-materia');
+    setBotonCargando(btn, true);
 
     const { error } = id
         ? await supabase.from('materias').update({ nombre, codigo, docente_id: docenteId }).eq('id', id)
         : await supabase.from('materias').insert([{ nombre, codigo, docente_id: docenteId }]);
-    if (error) return alert('Error: ' + error.message);
 
+    setBotonCargando(btn, false);
+    if (error) return notificarError(error, 'Error guardando la materia');
+
+    mostrarToast(id ? 'Materia actualizada' : 'Materia creada', 'exito');
     cerrarModal('modal-materia');
     await cargarTodo();
     renderMaterias();
 };
 
 window.eliminarMateria = async (id) => {
-    if (!confirm('¿Eliminar esta materia?')) return;
-    await supabase.from('materias').delete().eq('id', id);
+    const ok = await mostrarConfirm('¿Eliminar esta materia?', { textoConfirmar: 'Eliminar' });
+    if (!ok) return;
+    const { error } = await supabase.from('materias').delete().eq('id', id);
+    if (error) return notificarError(error, 'Error eliminando la materia');
+    mostrarToast('Materia eliminada', 'exito');
     await cargarTodo();
     renderMaterias();
 };
 
 window.cargarMateriasDefault = async () => {
-    if (!confirm('¿Cargar las 10 materias del IDSJE? Solo agrega las que no existen.')) return;
+    const ok = await mostrarConfirm('¿Cargar las 10 materias del IDSJE? Solo agrega las que no existen.', {
+        textoConfirmar: 'Cargar',
+        peligroso: false,
+    });
+    if (!ok) return;
+
     const existentes = materiasCache.map(m => m.nombre.toLowerCase());
     const nuevas = MATERIAS_DEFAULT
         .filter(n => !existentes.includes(n.toLowerCase()))
         .map(n => ({ nombre: n }));
-    if (nuevas.length === 0) { alert('Todas las materias ya existen.'); return; }
-    await supabase.from('materias').insert(nuevas);
+
+    if (nuevas.length === 0) { mostrarToast('Todas las materias ya existen', 'info'); return; }
+
+    const { error } = await supabase.from('materias').insert(nuevas);
+    if (error) return notificarError(error, 'Error cargando materias');
+
     await cargarTodo();
     renderMaterias();
-    alert(`✅ ${nuevas.length} materia(s) agregada(s).`);
+    mostrarToast(`${nuevas.length} materia(s) agregada(s)`, 'exito');
 };
 
 // ── ALUMNOS ─────────────────────────────────
 window.renderAlumnos = async function renderAlumnos() {
+    renderSkeletonFilas('tbody-alumnos', 6, 6);
+
     const gradoFiltro = document.getElementById('filtro-grado')?.value || '';
     let query = supabase.from('alumnos').select('*, grados(nombre, seccion)').order('apellidos');
     if (gradoFiltro) query = query.eq('grado_id', gradoFiltro);
-    const { data } = await query;
+    const { data, error } = await query;
+
+    if (error) { notificarError(error, 'Error cargando alumnos'); return; }
+
     alumnosCache = data || [];
 
     document.getElementById('tbody-alumnos').innerHTML = alumnosCache.map(a => `
@@ -612,7 +719,10 @@ window.renderAlumnos = async function renderAlumnos() {
     `).join('') || '<tr><td colspan="6" class="text-center text-muted">Sin alumnos</td></tr>';
 }
 
+const CAMPOS_ALUMNO = ['alumno-nie', 'alumno-nombres', 'alumno-apellidos', 'alumno-grado'];
+
 window.abrirModalAlumno = async (id = null) => {
+    limpiarErroresFormulario(CAMPOS_ALUMNO);
     const a = id ? alumnosCache.find(x => x.id === id) : null;
     document.getElementById('modal-alumno-title').textContent = a ? 'Editar Alumno' : 'Nuevo Alumno';
     document.getElementById('alumno-id').value        = a?.id || '';
@@ -633,6 +743,7 @@ window.abrirModalAlumno = async (id = null) => {
 window.editarAlumno = (id) => window.abrirModalAlumno(id);
 
 window.guardarAlumno = async () => {
+    limpiarErroresFormulario(CAMPOS_ALUMNO);
     const id        = document.getElementById('alumno-id').value;
     const nie       = document.getElementById('alumno-nie').value.trim();
     const nombres   = document.getElementById('alumno-nombres').value.trim().toUpperCase();
@@ -641,15 +752,23 @@ window.guardarAlumno = async () => {
     const anio      = parseInt(document.getElementById('alumno-anio').value);
     const fotoFile  = document.getElementById('alumno-foto').files[0];
 
-    if (!nie || !nombres || !apellidos || !gradoId) return alert('Todos los campos son obligatorios');
+    let valido = true;
+    if (!nie)       { mostrarErrorCampo('alumno-nie', 'El NIE es obligatorio'); valido = false; }
+    if (!nombres)   { mostrarErrorCampo('alumno-nombres', 'Los nombres son obligatorios'); valido = false; }
+    if (!apellidos) { mostrarErrorCampo('alumno-apellidos', 'Los apellidos son obligatorios'); valido = false; }
+    if (!gradoId)   { mostrarErrorCampo('alumno-grado', 'Seleccioná un grado'); valido = false; }
+    if (!valido) return;
+
+    const btn = document.getElementById('btn-guardar-alumno');
+    setBotonCargando(btn, true);
 
     let foto_url = alumnosCache.find(a => a.id === id)?.foto_url || null;
 
     if (fotoFile) {
         try {
             foto_url = await subirFoto(fotoFile, CLOUDINARY_CLOUD, CLOUDINARY_PRESET);
-        } catch(e) {
-            alert('Error subiendo foto: ' + e.message);
+        } catch (e) {
+            notificarError(e, 'Error subiendo la foto');
         }
     }
 
@@ -658,25 +777,36 @@ window.guardarAlumno = async () => {
         ? await supabase.from('alumnos').update(payload).eq('id', id)
         : await supabase.from('alumnos').insert([{ ...payload, activo: true }]);
 
-    if (error) return alert('Error: ' + error.message);
+    setBotonCargando(btn, false);
+    if (error) return notificarError(error, 'Error guardando el alumno');
+
+    mostrarToast(id ? 'Alumno actualizado' : 'Alumno creado', 'exito');
     cerrarModal('modal-alumno');
     await renderAlumnos();
 };
 
 window.eliminarAlumno = async (id) => {
-    if (!confirm('¿Eliminar este alumno y todas sus notas?')) return;
-    await supabase.from('alumnos').delete().eq('id', id);
+    const ok = await mostrarConfirm('¿Eliminar este alumno y todas sus notas?', { textoConfirmar: 'Eliminar' });
+    if (!ok) return;
+    const { error } = await supabase.from('alumnos').delete().eq('id', id);
+    if (error) return notificarError(error, 'Error eliminando el alumno');
+    mostrarToast('Alumno eliminado', 'exito');
     await renderAlumnos();
 };
 
 window.eliminarAlumnosMasivo = async () => {
     const gradoId = document.getElementById('filtro-grado').value;
-    if (!gradoId) return alert('Seleccioná un grado primero para hacer eliminación masiva.');
+    if (!gradoId) return mostrarToast('Seleccioná un grado primero para hacer eliminación masiva', 'advertencia');
     const grado = gradosCache.find(g => g.id === gradoId);
-    if (!confirm(`¿Eliminar TODOS los alumnos de ${grado.nombre} ${grado.seccion}? Esta acción no se puede deshacer.`)) return;
-    await supabase.from('alumnos').delete().eq('grado_id', gradoId);
+    const ok = await mostrarConfirm(
+        `¿Eliminar TODOS los alumnos de ${grado.nombre} ${grado.seccion}? Esta acción no se puede deshacer.`,
+        { textoConfirmar: 'Eliminar todos' }
+    );
+    if (!ok) return;
+    const { error } = await supabase.from('alumnos').delete().eq('grado_id', gradoId);
+    if (error) return notificarError(error, 'Error eliminando alumnos');
     await renderAlumnos();
-    alert('✅ Alumnos eliminados.');
+    mostrarToast('Alumnos eliminados', 'exito');
 };
 
 window.previsualizarFoto = (input) => {
@@ -709,7 +839,7 @@ window.importarAlumnosExcel = async (event) => {
 
     const gradoId = document.getElementById('filtro-grado')?.value;
     if (!gradoId) {
-        alert('Seleccioná un grado en el filtro antes de importar.');
+        mostrarToast('Seleccioná un grado en el filtro antes de importar', 'advertencia');
         event.target.value = '';
         return;
     }
@@ -730,15 +860,15 @@ window.importarAlumnosExcel = async (event) => {
                 nuevos.push({ nie, apellidos, nombres, grado_id: gradoId, activo: true, anio_ingreso: 2026 });
             }
 
-            if (!nuevos.length) { alert('No se encontraron alumnos en el archivo.'); return; }
+            if (!nuevos.length) { mostrarToast('No se encontraron alumnos en el archivo', 'advertencia'); return; }
 
             const { error } = await supabase.from('alumnos').insert(nuevos);
-            if (error) { alert('Error: ' + error.message); return; }
+            if (error) { notificarError(error, 'Error importando alumnos'); return; }
 
-            alert(`✅ ${nuevos.length} alumno(s) importado(s) correctamente.`);
+            mostrarToast(`${nuevos.length} alumno(s) importado(s) correctamente`, 'exito');
             await renderAlumnos();
-        } catch(err) {
-            alert('Error leyendo el archivo: ' + err.message);
+        } catch (err) {
+            notificarError(err, 'Error leyendo el archivo');
         }
     };
     reader.readAsBinaryString(file);

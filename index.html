@@ -6,6 +6,7 @@
     <title>IDSJE — Sistema Académico</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./src/css/ui.css">
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
 
@@ -175,20 +176,29 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script type="module">
-        import { supabase, verificarSesion } from './src/js/auth.js';
+        import { supabase, mostrarMensajeLoginPendiente } from './src/js/auth.js';
+        import { mostrarToast, esErrorDeRed, mostrarBannerSinConexion, ocultarBannerSinConexion } from './src/js/utils.js';
+
+        // Si venimos de un redirect (ej. sesión expirada), mostrar el mensaje una sola vez
+        mostrarMensajeLoginPendiente(mostrarToast);
 
         // Si ya hay sesión activa, redirigir
         (async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                const { data: usuario } = await supabase
-                    .from('usuarios')
-                    .select('rol')
-                    .eq('correo', session.user.email)
-                    .single();
-                if (usuario) {
-                    window.location.href = usuario.rol === 'admin' ? './admin.html' : './docente.html';
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session) {
+                    const { data: usuario } = await supabase
+                        .from('usuarios')
+                        .select('rol')
+                        .eq('correo', session.user.email)
+                        .single();
+                    if (usuario) {
+                        window.location.href = usuario.rol === 'admin' ? './admin.html' : './docente.html';
+                    }
                 }
+                ocultarBannerSinConexion();
+            } catch (err) {
+                if (esErrorDeRed(err)) mostrarBannerSinConexion();
             }
         })();
 
@@ -208,11 +218,28 @@
             btn.disabled = true;
             btn.textContent = 'Ingresando...';
 
-            const { error } = await supabase.auth.signInWithPassword({ email: correo, password });
+            let resultado;
+            try {
+                resultado = await supabase.auth.signInWithPassword({ email: correo, password });
+            } catch (err) {
+                btn.disabled = false;
+                btn.textContent = 'Iniciar Sesión';
+                if (esErrorDeRed(err)) {
+                    mostrarBannerSinConexion(() => window.iniciarSesion());
+                    return;
+                }
+                throw err;
+            }
+
+            const { error } = resultado;
 
             if (error) {
-                errEl.textContent = 'Correo o contraseña incorrectos.';
-                errEl.style.display = 'block';
+                if (esErrorDeRed(error)) {
+                    mostrarBannerSinConexion(() => window.iniciarSesion());
+                } else {
+                    errEl.textContent = 'Correo o contraseña incorrectos.';
+                    errEl.style.display = 'block';
+                }
                 btn.disabled = false;
                 btn.textContent = 'Iniciar Sesión';
                 return;

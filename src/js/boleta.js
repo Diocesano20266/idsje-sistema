@@ -47,6 +47,7 @@ window.setPeriodoBoleta = (n) => {
     document.querySelectorAll('.periodo-btn-b').forEach((b, i) => {
         b.classList.toggle('active', i + 1 === n);
     });
+    if (gradoSel) window.generarBoletas();
 };
 
 window.generarBoletas = async () => {
@@ -156,10 +157,12 @@ function generarHTMLBoleta(al, materias, notas, comp, reprobadas, promedio, num,
         const nf  = n.nota_final?.toFixed(1) ?? '0.0';
         const rec = n.recuperacion?.toFixed(2) ?? '';
         const nfr = n.nota_final_rec?.toFixed(1) ?? '';
-        const reprobada = (n.nota_final_rec ?? n.nota_final ?? 0) < 6 && (n.nota_final ?? 0) > 0;
+        const nfEfectiva = n.nota_final_rec ?? n.nota_final ?? 0;
+        const reprobada = nfEfectiva < 6 && (n.nota_final ?? 0) > 0;
+        const claseFila = nfEfectiva <= 0 ? '' : nfEfectiva < 6 ? 'fila-roja' : nfEfectiva < 7 ? 'fila-amarilla' : '';
 
         return `
-        <tr>
+        <tr class="${claseFila}">
             <td class="td-num">${i + 1}</td>
             <td class="td-materia">${gm.materias?.nombre || ''}</td>
             <td class="td-nota">${act}</td>
@@ -180,6 +183,10 @@ function generarHTMLBoleta(al, materias, notas, comp, reprobadas, promedio, num,
 
     return `
     <div class="boleta-page" id="boleta-${al.id}">
+        <div class="boleta-toolbar no-print">
+            <button type="button" class="btn-imprimir-boleta" onclick="imprimirBoletaIndividual('${al.id}')">🖨 Imprimir</button>
+        </div>
+
         <!-- ENCABEZADO -->
         <div class="boleta-header">
             <div class="header-logos">
@@ -191,7 +198,7 @@ function generarHTMLBoleta(al, materias, notas, comp, reprobadas, promedio, num,
                 <div class="inst-dir">Teléfono: ${INSTITUTO.telefono} | ${INSTITUTO.correo}</div>
             </div>
             <div class="header-logos">
-                <div class="logo-placeholder logo-mined">MINED</div>
+                <img src="https://raw.githubusercontent.com/Diocesano20266/idsje-sistema/main/logo-mineducyt.png" alt="Logo MINED" class="logo-img logo-mined-img" onerror="this.onerror=null;this.src='https://www.mined.gob.sv/images/logo-mined.png'">
             </div>
         </div>
 
@@ -296,6 +303,19 @@ function generarHTMLBoleta(al, materias, notas, comp, reprobadas, promedio, num,
 }
 
 window.imprimirBoletas = () => window.print();
+
+window.imprimirBoletaIndividual = (alumnoId) => {
+    const actual = document.getElementById(`boleta-${alumnoId}`);
+    if (!actual) return;
+    document.body.classList.add('imprimir-individual');
+    document.querySelectorAll('.boleta-page').forEach(p => p.classList.toggle('imprimir-actual', p === actual));
+    window.print();
+};
+
+window.addEventListener('afterprint', () => {
+    document.body.classList.remove('imprimir-individual');
+    document.querySelectorAll('.boleta-page').forEach(p => p.classList.remove('imprimir-actual'));
+});
 
 window.cerrarSesionBoleta = async () => {
     await supabase.auth.signOut();

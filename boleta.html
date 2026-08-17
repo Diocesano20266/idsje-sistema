@@ -50,14 +50,17 @@
             border-radius:8px;
             position:relative;
             font-size:11px;
+            font-family:'Times New Roman', Times, serif;
+            letter-spacing:normal;
         }
 
         /* Encabezado */
-        .boleta-header{display:flex;align-items:center;gap:16px;border-bottom:2px solid #1B3A6B;padding-bottom:12px;margin-bottom:8px}
+        .boleta-header{display:flex;align-items:center;gap:16px;border-bottom:2px solid #1B3A6B;padding-bottom:12px;margin-bottom:8px;font-family:'DM Sans',sans-serif}
         .header-logos{flex-shrink:0}
         .logo-placeholder{width:60px;height:60px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px;text-align:center}
         .logo-idsje{background:#1B3A6B;color:#fff}
         .logo-mined{background:#003087;color:#fff}
+        .logo-img{height:80px;width:80px;object-fit:cover;border-radius:10px;display:block}
         .header-info{flex:1;text-align:center}
         .inst-nombre{font-family:'Syne',sans-serif;font-weight:800;font-size:13px;color:#1B3A6B}
         .inst-dir{font-size:10px;color:#64748b;margin-top:2px}
@@ -66,16 +69,16 @@
         .boleta-subtitulo{text-align:center;font-size:11px;font-weight:600;color:#64748b;margin-bottom:12px}
 
         /* Datos alumno */
-        .alumno-datos{position:relative;padding-right:90px;margin-bottom:12px}
+        .alumno-datos{position:relative;padding-right:112px;min-height:120px;margin-bottom:12px}
         .dato-row{display:flex;gap:6px;margin-bottom:4px;font-size:11px}
         .dato-label{font-weight:700;white-space:nowrap}
         .dato-valor{font-weight:600;color:#1B3A6B}
-        .foto-alumno{position:absolute;top:0;right:0;width:80px;height:96px;object-fit:cover;border:1px solid #e2e8f0;border-radius:4px}
-        .foto-vacia{position:absolute;top:0;right:0;width:80px;height:96px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px}
+        .foto-alumno{position:absolute;top:0;right:0;width:100px;height:120px;object-fit:cover;border:1.5px solid #1B3A6B;border-radius:4px}
+        .foto-vacia{position:absolute;top:0;right:0;width:100px;height:120px;background:#f1f5f9;border:1.5px solid #1B3A6B;border-radius:4px}
 
         /* Tabla notas */
         .tabla-notas{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:10px}
-        .tabla-notas th{background:#1B3A6B;color:#fff;padding:6px 8px;text-align:center;font-weight:700;font-size:10px}
+        .tabla-notas th{background:#1B3A6B;color:#fff;padding:6px 8px;text-align:center;font-weight:700;font-size:10px;letter-spacing:-.1px}
         .tabla-notas .th-materia{text-align:left}
         .tabla-notas td{padding:5px 8px;border:1px solid #e2e8f0;text-align:center}
         .tabla-notas .td-num{width:24px;font-size:10px;color:#94a3b8}
@@ -87,7 +90,7 @@
 
         /* Competencias */
         .tabla-competencias{width:100%;border-collapse:collapse;margin-bottom:8px;font-size:10px}
-        .tabla-competencias th{background:#334155;color:#fff;padding:5px 10px;font-size:10px;font-weight:700}
+        .tabla-competencias th{background:#334155;color:#fff;padding:5px 10px;font-size:10px;font-weight:700;letter-spacing:-.1px}
         .tabla-competencias .th-comp{text-align:left}
         .tabla-competencias .th-concepto{width:80px;text-align:center}
         .tabla-competencias td{padding:5px 10px;border:1px solid #e2e8f0}

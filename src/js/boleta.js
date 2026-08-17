@@ -183,7 +183,7 @@ function generarHTMLBoleta(al, materias, notas, comp, reprobadas, promedio, num,
         <!-- ENCABEZADO -->
         <div class="boleta-header">
             <div class="header-logos">
-                <div class="logo-placeholder logo-idsje">IDSJE</div>
+                <img src="https://raw.githubusercontent.com/Diocesano20266/idsje-sistema/main/logo-idsje.png" alt="Logo IDSJE" class="logo-img">
             </div>
             <div class="header-info">
                 <div class="inst-nombre">${INSTITUTO.nombre}</div>
@@ -214,8 +214,8 @@ function generarHTMLBoleta(al, materias, notas, comp, reprobadas, promedio, num,
                 <span class="dato-label">GRADO:</span>
                 <span class="dato-valor">${gradoNombre}</span>
             </div>
+            ${al.foto_url ? `<img src="${al.foto_url}" class="foto-alumno" alt="${nombreCompleto}">` : '<div class="foto-alumno foto-vacia"></div>'}
         </div>
-        ${al.foto_url ? `<img src="${al.foto_url}" class="foto-alumno" alt="${nombreCompleto}">` : '<div class="foto-alumno foto-vacia"></div>'}
 
         <!-- TABLA DE NOTAS -->
         <table class="tabla-notas">

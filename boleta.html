@@ -70,19 +70,21 @@
         .inst-nombre{font-family:'Times New Roman', Times, serif;font-weight:700;font-size:18px;color:#1B3A6B}
         .inst-dir{font-family:'Times New Roman', Times, serif;font-size:11px;color:#64748b;margin-top:2px}
 
-        .boleta-titulo{text-align:center;font-family:'Times New Roman', Times, serif;font-weight:700;font-size:14px;margin:8px 0 4px}
-        .boleta-subtitulo{text-align:center;font-size:11px;font-weight:600;color:#64748b;margin-bottom:12px}
-
-        /* Datos alumno — dos columnas: info a la izquierda, foto a la derecha.
+        /* Título + foto — dos columnas: título/subtítulo a la izquierda, foto a la derecha.
            Sin position:absolute ni valores de top calculados a mano: el flex layout
-           acomoda la foto naturalmente al lado de los datos. */
-        .alumno-datos{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:8px}
-        .alumno-info{flex:1}
+           acomoda la foto naturalmente a la altura del título. */
+        .titulo-foto-wrap{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:8px}
+        .titulo-info{flex:1}
+        .boleta-titulo{text-align:center;font-family:'Times New Roman', Times, serif;font-weight:700;font-size:14px;margin:8px 0 4px}
+        .boleta-subtitulo{text-align:center;font-size:11px;font-weight:600;color:#64748b}
+        .foto-alumno{flex-shrink:0;width:100px;height:120px;object-fit:cover;border:1.5px solid #1B3A6B;border-radius:4px}
+        .foto-vacia{flex-shrink:0;width:100px;height:120px;background:#f1f5f9;border:1.5px solid #1B3A6B;border-radius:4px}
+
+        /* Datos alumno */
+        .alumno-datos{margin-bottom:8px}
         .dato-row{display:flex;gap:6px;margin-bottom:4px;font-size:11px}
         .dato-label{font-weight:700;white-space:nowrap}
         .dato-valor{font-weight:600;color:#1B3A6B}
-        .foto-alumno{flex-shrink:0;width:100px;height:120px;object-fit:cover;border:1.5px solid #1B3A6B;border-radius:4px}
-        .foto-vacia{flex-shrink:0;width:100px;height:120px;background:#f1f5f9;border:1.5px solid #1B3A6B;border-radius:4px}
 
         /* Tabla notas */
         .tabla-notas{width:100%;margin-top:0;border-collapse:collapse;margin-bottom:10px;font-size:10px}

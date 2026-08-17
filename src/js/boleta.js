@@ -225,24 +225,24 @@ function generarHTMLBoleta(al, materias, notas, comp, reprobadas, promedio, num,
                     BOLETA DE CALIFICACIONES PERIODO ${periodoSel} AÑO ${INSTITUTO.anio}
                 </div>
                 <div class="boleta-subtitulo">EDUCACIÓN MEDIA</div>
+
+                <!-- DATOS DEL ALUMNO -->
+                <div class="alumno-datos">
+                    <div class="dato-row">
+                        <span class="dato-label">NOMBRE DEL ESTUDIANTE:</span>
+                        <span class="dato-valor">${nombreCompleto}</span>
+                    </div>
+                    <div class="dato-row">
+                        <span class="dato-label">NIE:</span>
+                        <span class="dato-valor">${al.nie}</span>
+                    </div>
+                    <div class="dato-row">
+                        <span class="dato-label">GRADO:</span>
+                        <span class="dato-valor">${gradoNombre}</span>
+                    </div>
+                </div>
             </div>
             ${al.foto_url ? `<img src="${al.foto_url}" class="foto-alumno" alt="${nombreCompleto}">` : '<div class="foto-alumno foto-vacia"></div>'}
-        </div>
-
-        <!-- DATOS DEL ALUMNO -->
-        <div class="alumno-datos">
-            <div class="dato-row">
-                <span class="dato-label">NOMBRE DEL ESTUDIANTE:</span>
-                <span class="dato-valor">${nombreCompleto}</span>
-            </div>
-            <div class="dato-row">
-                <span class="dato-label">NIE:</span>
-                <span class="dato-valor">${al.nie}</span>
-            </div>
-            <div class="dato-row">
-                <span class="dato-label">GRADO:</span>
-                <span class="dato-valor">${gradoNombre}</span>
-            </div>
         </div>
 
         <!-- TABLA DE NOTAS -->

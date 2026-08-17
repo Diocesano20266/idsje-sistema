@@ -61,6 +61,7 @@
         .logo-idsje{background:#1B3A6B;color:#fff}
         .logo-mined{background:#003087;color:#fff}
         .logo-img{height:80px;width:80px;object-fit:cover;border-radius:10px;display:block}
+        .logo-mined-img{object-fit:contain;background:#fff;padding:2px}
         .header-info{flex:1;text-align:center}
         .inst-nombre{font-family:'Syne',sans-serif;font-weight:800;font-size:13px;color:#1B3A6B}
         .inst-dir{font-size:10px;color:#64748b;margin-top:2px}
@@ -85,6 +86,8 @@
         .tabla-notas .td-materia{text-align:left;font-weight:500}
         .tabla-notas .td-nf{font-weight:800;font-size:12px}
         .tabla-notas .reprobado{color:#dc2626;background:#fef2f2}
+        .tabla-notas tr.fila-roja td{background:#fef2f2}
+        .tabla-notas tr.fila-amarilla td{background:#fffbeb}
         .tabla-notas tfoot td{background:#f8fafc;font-weight:600;font-size:10px}
         .td-reprobadas{text-align:right;padding-right:16px}
 
@@ -100,7 +103,7 @@
         .tabla-obs{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:10px}
         .tabla-obs td{padding:5px 10px;border:1px solid #e2e8f0}
         .td-obs-label{font-weight:700;width:140px;background:#f8fafc}
-        .td-promedio{font-family:'Syne',sans-serif;font-weight:800;font-size:14px;color:#1B3A6B;text-align:right}
+        .td-promedio{font-family:'Syne',sans-serif;font-weight:800;font-size:24px;color:#1B3A6B;text-align:right;padding-right:16px}
 
         /* Firmas */
         .firmas{display:flex;justify-content:space-around;margin-top:32px;margin-bottom:12px}
@@ -111,9 +114,14 @@
 
         .boleta-footer{text-align:center;font-size:9px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:8px}
 
+        /* Botón de impresión individual (por boleta) */
+        .boleta-toolbar{text-align:right;margin-bottom:10px}
+        .btn-imprimir-boleta{background:#1B3A6B;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-weight:600;font-size:11px;cursor:pointer;transition:background .2s}
+        .btn-imprimir-boleta:hover{background:#2E5FAC}
+
         /* ═══ IMPRESIÓN ═══ */
         @media print {
-            .topbar,.controles,#loading-boletas{display:none!important}
+            .topbar,.controles,#loading-boletas,.no-print{display:none!important}
             body{background:white}
             .boleta-page{
                 box-shadow:none;
@@ -124,6 +132,7 @@
                 max-width:100%;
             }
             .boleta-page:last-child{page-break-after:avoid}
+            body.imprimir-individual .boleta-page:not(.imprimir-actual){display:none!important}
         }
     </style>
 </head>

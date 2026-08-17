@@ -12,6 +12,13 @@ import {
     redistribuirPesos,
     colorEscala,
     puedeAccederCompetencias,
+    mostrarToast,
+    notificarError,
+    esErrorDeRed,
+    mostrarBannerSinConexion,
+    ocultarBannerSinConexion,
+    setBotonCargando,
+    renderSkeletonFilas,
 } from './utils.js';
 
 let usuarioActual   = null;
@@ -53,32 +60,50 @@ async function init() {
 }
 
 async function cargarDatosDocente() {
-    const [{ data: gm }, { data: guia }] = await Promise.all([
-        supabase.from('grado_materia').select('*, grados(id, nombre, seccion, modalidad, anio), materias(id, nombre)').eq('docente_id', usuarioActual.id),
-        supabase.from('grados').select('*').eq('docente_guia_id', usuarioActual.id).order('nombre')
-    ]);
+    try {
+        const [{ data: gm, error: eGm }, { data: guia, error: eGuia }] = await Promise.all([
+            supabase.from('grado_materia').select('*, grados(id, nombre, seccion, modalidad, anio), materias(id, nombre)').eq('docente_id', usuarioActual.id),
+            supabase.from('grados').select('*').eq('docente_guia_id', usuarioActual.id).order('nombre')
+        ]);
 
-    gradoMatCache   = gm   || [];
-    gradosGuiaCache = guia || [];
+        if ((eGm && esErrorDeRed(eGm)) || (eGuia && esErrorDeRed(eGuia))) {
+            mostrarBannerSinConexion(() => cargarDatosDocente().then(() => mostrarVista(vistaActualDocente())));
+            return;
+        }
+        ocultarBannerSinConexion();
 
-    const gradoIds = [...new Set([
-        ...gradoMatCache.map(x => x.grado_id),
-        ...gradosGuiaCache.map(g => g.id)
-    ])];
+        gradoMatCache   = gm   || [];
+        gradosGuiaCache = guia || [];
 
-    alumnosPorGrado = {};
-    if (gradoIds.length) {
-        const { data: alumnos } = await supabase
-            .from('alumnos')
-            .select('id, grado_id')
-            .eq('activo', true)
-            .in('grado_id', gradoIds);
-        (alumnos || []).forEach(a => { alumnosPorGrado[a.grado_id] = (alumnosPorGrado[a.grado_id] || 0) + 1; });
+        const gradoIds = [...new Set([
+            ...gradoMatCache.map(x => x.grado_id),
+            ...gradosGuiaCache.map(g => g.id)
+        ])];
+
+        alumnosPorGrado = {};
+        if (gradoIds.length) {
+            const { data: alumnos } = await supabase
+                .from('alumnos')
+                .select('id, grado_id')
+                .eq('activo', true)
+                .in('grado_id', gradoIds);
+            (alumnos || []).forEach(a => { alumnosPorGrado[a.grado_id] = (alumnosPorGrado[a.grado_id] || 0) + 1; });
+        }
+
+        // Competencias Ciudadanas solo es visible/accesible si el docente es guía de algún grado
+        const navComp = document.getElementById('nav-competencias');
+        if (navComp) navComp.classList.toggle('hidden', !puedeAccederCompetencias(gradosGuiaCache));
+    } catch (err) {
+        if (esErrorDeRed(err)) {
+            mostrarBannerSinConexion(() => cargarDatosDocente());
+            return;
+        }
+        notificarError(err, 'Error cargando tus datos');
     }
+}
 
-    // Competencias Ciudadanas solo es visible/accesible si el docente es guía de algún grado
-    const navComp = document.getElementById('nav-competencias');
-    if (navComp) navComp.classList.toggle('hidden', !puedeAccederCompetencias(gradosGuiaCache));
+function vistaActualDocente() {
+    return document.querySelector('.nav-item.active')?.dataset.vista || 'inicio';
 }
 
 function gradosUnicosDocente() {
@@ -270,13 +295,17 @@ window.generarTablaNotas = async () => {
     const integradoras = Math.max(1, parseInt(document.getElementById('crit-integradoras').value) || 1);
     const examenes     = Math.max(1, parseInt(document.getElementById('crit-examenes').value) || 1);
 
+    const btn = document.getElementById('btn-generar-tabla');
+    setBotonCargando(btn, true, 'Generando...');
+
     const { data, error } = await supabase
         .from('criterios_evaluacion')
         .upsert([{ grado_materia_id: notasMateriaId, periodo: periodoActual, cotidianas, integradoras, examenes }], { onConflict: 'grado_materia_id,periodo' })
         .select()
         .single();
 
-    if (error) return alert('Error guardando criterios: ' + error.message);
+    setBotonCargando(btn, false);
+    if (error) return notificarError(error, 'Error guardando criterios');
 
     criteriosActuales = data;
     mostrarPanelConfig(false);
@@ -284,12 +313,17 @@ window.generarTablaNotas = async () => {
 };
 
 async function cargarAlumnosYNotas() {
-    const { data: alumnos } = await supabase
+    renderSkeletonFilas('tbody-notas', 8, 5);
+
+    const { data: alumnos, error } = await supabase
         .from('alumnos')
         .select('*')
         .eq('grado_id', notasGradoId)
         .eq('activo', true)
         .order('apellidos');
+
+    if (error) { notificarError(error, 'Error cargando alumnos'); return; }
+
     alumnosNotas = alumnos || [];
 
     notasCache      = {};
@@ -538,8 +572,11 @@ window.actualizarRecuperacionLocal = (alumnoId, valor) => {
 };
 
 window.guardarTodasLasNotas = async () => {
-    if (!notasGradoId || !notasMateriaId || !criteriosActuales) return alert('Generá la tabla primero.');
+    if (!notasGradoId || !notasMateriaId || !criteriosActuales) return mostrarToast('Generá la tabla primero', 'advertencia');
     if (!alumnosNotas.length) return;
+
+    const btn = document.getElementById('btn-guardar-notas');
+    setBotonCargando(btn, true);
 
     const payload = alumnosNotas.map(al => {
         const det = notasDetalle[al.id];
@@ -574,12 +611,13 @@ window.guardarTodasLasNotas = async () => {
         .upsert(payload, { onConflict: 'alumno_id,grado_materia_id,periodo' })
         .select();
 
-    if (error) return alert('Error guardando notas: ' + error.message);
+    setBotonCargando(btn, false);
+    if (error) return notificarError(error, 'Error guardando notas');
 
     (data || []).forEach(n => { notasCache[n.alumno_id] = n; });
     notasRecEdit = {};
     renderTablaNotas();
-    alert('✅ Notas guardadas correctamente.');
+    mostrarToast('Notas guardadas correctamente', 'exito');
 };
 
 // ── COMPETENCIAS CIUDADANAS ──────────────────
@@ -616,13 +654,17 @@ window.setCompPeriodo = (n) => {
 
 async function cargarAlumnosComp() {
     if (!compGradoId) return;
+    renderSkeletonFilas('tbody-comp', 8, 5);
 
-    const { data: alumnos } = await supabase
+    const { data: alumnos, error } = await supabase
         .from('alumnos')
         .select('*')
         .eq('grado_id', compGradoId)
         .eq('activo', true)
         .order('apellidos');
+
+    if (error) { notificarError(error, 'Error cargando alumnos'); return; }
+
     alumnosComp = alumnos || [];
 
     compCache = {};
@@ -684,6 +726,9 @@ window.guardarTodasLasCompetencias = async () => {
     if (!compGradoId) return;
     if (!alumnosComp.length) return;
 
+    const btn = document.getElementById('btn-guardar-competencias');
+    setBotonCargando(btn, true);
+
     const payload = alumnosComp.map(al => {
         const edit = compEdit[al.id] || compCache[al.id] || {};
         return {
@@ -703,11 +748,12 @@ window.guardarTodasLasCompetencias = async () => {
         .from('competencias')
         .upsert(payload, { onConflict: 'alumno_id,grado_id,periodo' });
 
-    if (error) return alert('Error guardando competencias: ' + error.message);
+    setBotonCargando(btn, false);
+    if (error) return notificarError(error, 'Error guardando competencias');
 
     compEdit = {};
     await cargarAlumnosComp();
-    alert('✅ Competencias guardadas correctamente.');
+    mostrarToast('Competencias guardadas correctamente', 'exito');
 };
 
 window.cerrarSesionDocente = cerrarSesion;

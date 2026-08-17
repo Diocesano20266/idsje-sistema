@@ -90,12 +90,12 @@ window.generarBoletas = async () => {
 
     const materiaIds = (gradoMaterias || []).map(gm => gm.id);
 
-    // Cargar todas las notas del periodo
+    // Cargar notas del periodo seleccionado y de los periodos anteriores (para las columnas de historial)
     const { data: todasNotas } = await supabase
         .from('notas')
         .select('*')
         .in('grado_materia_id', materiaIds)
-        .eq('periodo', periodoSel);
+        .lte('periodo', periodoSel);
 
     // Cargar competencias
     const alumnoIds = alumnos.map(a => a.id);
@@ -111,14 +111,17 @@ window.generarBoletas = async () => {
     let html = '';
 
     alumnos.forEach((al, idx) => {
+        // notasAlumno[materiaId][periodo] = fila de notas
         const notasAlumno = {};
         (todasNotas || []).forEach(n => {
-            if (n.alumno_id === al.id) notasAlumno[n.grado_materia_id] = n;
+            if (n.alumno_id !== al.id) return;
+            if (!notasAlumno[n.grado_materia_id]) notasAlumno[n.grado_materia_id] = {};
+            notasAlumno[n.grado_materia_id][n.periodo] = n;
         });
 
         const compAlumno = (competencias || []).find(c => c.alumno_id === al.id) || {};
         const reprobadas = (gradoMaterias || []).filter(gm => {
-            const n = notasAlumno[gm.id];
+            const n = notasAlumno[gm.id]?.[periodoSel];
             if (!n) return false;
             const nf = n.nota_final_rec ?? n.nota_final;
             return nf < 6;
@@ -135,7 +138,7 @@ window.generarBoletas = async () => {
 
 function calcularPromedio(materias, notas) {
     const nfs = materias.map(gm => {
-        const n = notas[gm.id];
+        const n = notas[gm.id]?.[periodoSel];
         if (!n) return null;
         return n.nota_final_rec ?? n.nota_final ?? 0;
     }).filter(n => n !== null && n > 0);
@@ -149,8 +152,12 @@ function generarHTMLBoleta(al, materias, notas, comp, reprobadas, promedio, num,
     const gradoNombre = `${gradoSel.nombre} ${gradoSel.modalidad} SECCION "${gradoSel.seccion}"`;
     const docGuia = gradoSel.usuarios?.nombre_completo || 'Docente Guía';
 
+    // Periodos anteriores al seleccionado, para las columnas de historial (P2→[1], P3→[1,2], P4→[1,2,3])
+    const periodosAnteriores = Array.from({ length: periodoSel - 1 }, (_, i) => i + 1);
+
     const filasNotas = materias.map((gm, i) => {
-        const n = notas[gm.id] || {};
+        const historial = notas[gm.id] || {};
+        const n = historial[periodoSel] || {};
         const act = n.actividades?.toFixed(2) ?? '0.00';
         const lab = n.laboratorio?.toFixed(2) ?? '0.00';
         const exa = n.examen?.toFixed(2) ?? '0.00';
@@ -159,12 +166,19 @@ function generarHTMLBoleta(al, materias, notas, comp, reprobadas, promedio, num,
         const nfr = n.nota_final_rec?.toFixed(1) ?? '';
         const nfEfectiva = n.nota_final_rec ?? n.nota_final ?? 0;
         const reprobada = nfEfectiva < 6 && (n.nota_final ?? 0) > 0;
-        const claseFila = nfEfectiva <= 0 ? '' : nfEfectiva < 6 ? 'fila-roja' : nfEfectiva < 7 ? 'fila-amarilla' : '';
+        const claseFila = nfEfectiva > 0 && nfEfectiva < 6 ? 'fila-roja' : '';
+
+        const tdPeriodosAnteriores = periodosAnteriores.map(p => {
+            const np = historial[p];
+            const nfAnterior = np ? (np.nota_final_rec ?? np.nota_final ?? 0) : null;
+            return `<td class="td-nota">${nfAnterior ? nfAnterior.toFixed(1) : ''}</td>`;
+        }).join('');
 
         return `
         <tr class="${claseFila}">
             <td class="td-num">${i + 1}</td>
             <td class="td-materia">${gm.materias?.nombre || ''}</td>
+            ${tdPeriodosAnteriores}
             <td class="td-nota">${act}</td>
             <td class="td-nota">${lab}</td>
             <td class="td-nota">${exa}</td>
@@ -173,6 +187,9 @@ function generarHTMLBoleta(al, materias, notas, comp, reprobadas, promedio, num,
             <td class="td-nota">${nfr}</td>
         </tr>`;
     }).join('');
+
+    const thPeriodosAnteriores = periodosAnteriores.map(p => `<th>P${p}</th>`).join('');
+    const colspanReprobadas = 6 + periodosAnteriores.length;
 
     const COMPETENCIAS_LABELS = [
         ['Evidencia actitudes favorables para la convivencia y cultura de paz', comp.convivencia || ''],
@@ -230,6 +247,7 @@ function generarHTMLBoleta(al, materias, notas, comp, reprobadas, promedio, num,
                 <tr>
                     <th>No</th>
                     <th class="th-materia">ASIGNATURAS:</th>
+                    ${thPeriodosAnteriores}
                     <th>ACTIVIDADES 35%</th>
                     <th>LABORATORIO 35%</th>
                     <th>EXAMEN 30%</th>
@@ -241,7 +259,7 @@ function generarHTMLBoleta(al, materias, notas, comp, reprobadas, promedio, num,
             <tbody>${filasNotas}</tbody>
             <tfoot>
                 <tr>
-                    <td colspan="6" class="td-reprobadas">
+                    <td colspan="${colspanReprobadas}" class="td-reprobadas">
                         ASIGNATURAS REPROBADAS: <strong>${reprobadas}</strong>
                     </td>
                     <td colspan="2"></td>

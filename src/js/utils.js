@@ -106,3 +106,206 @@ export function colorEscala(valor) {
 export function puedeAccederCompetencias(gradosGuia) {
     return Array.isArray(gradosGuia) && gradosGuia.length > 0;
 }
+
+// ═══════════════════════════════════════════
+//  UI reutilizable (toasts, confirm, banner de conexión, loading)
+//  Todo lo de acá abajo toca el DOM — solo se ejecuta al LLAMAR
+//  las funciones, nunca al importar el módulo, así que no rompe
+//  los tests de Jest (que corren sin `document`).
+// ═══════════════════════════════════════════
+
+// ── Toasts ────────────────────────────────────────────────────
+const TOAST_ICONOS = { exito: '✓', error: '✕', advertencia: '⚠', info: 'ℹ' };
+const TOAST_DURACION_MS = 3000;
+
+function obtenerContenedorToasts() {
+    let cont = document.getElementById('toast-contenedor');
+    if (!cont) {
+        cont = document.createElement('div');
+        cont.id = 'toast-contenedor';
+        document.body.appendChild(cont);
+    }
+    return cont;
+}
+
+// mostrarToast(mensaje, tipo) — tipo: 'exito' | 'error' | 'advertencia' | 'info'
+export function mostrarToast(mensaje, tipo = 'info') {
+    if (typeof document === 'undefined') return;
+    const tipoValido = TOAST_ICONOS[tipo] ? tipo : 'info';
+    const cont = obtenerContenedorToasts();
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${tipoValido}`;
+    toast.innerHTML = `
+        <span class="toast-icono">${TOAST_ICONOS[tipoValido]}</span>
+        <span class="toast-msg"></span>
+        <button type="button" class="toast-cerrar" aria-label="Cerrar">✕</button>`;
+    toast.querySelector('.toast-msg').textContent = mensaje;
+    cont.appendChild(toast);
+
+    requestAnimationFrame(() => toast.classList.add('toast-show'));
+
+    const cerrar = () => {
+        toast.classList.remove('toast-show');
+        toast.classList.add('toast-hide');
+        setTimeout(() => toast.remove(), 250);
+    };
+    toast.querySelector('.toast-cerrar').addEventListener('click', cerrar);
+    setTimeout(cerrar, TOAST_DURACION_MS);
+}
+
+// ── Modal de confirmación (reemplaza confirm()) ──────────────
+// mostrarConfirm(mensaje, { textoConfirmar, textoCancelar, peligroso }) → Promise<boolean>
+export function mostrarConfirm(mensaje, opciones = {}) {
+    if (typeof document === 'undefined') return Promise.resolve(false);
+    const {
+        textoConfirmar = 'Confirmar',
+        textoCancelar = 'Cancelar',
+        peligroso = true,
+    } = opciones;
+
+    return new Promise((resolve) => {
+        let overlay = document.getElementById('confirm-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'confirm-overlay';
+            overlay.innerHTML = `
+                <div class="confirm-box">
+                    <div class="confirm-icono">⚠</div>
+                    <div class="confirm-msg"></div>
+                    <div class="confirm-acciones">
+                        <button type="button" class="confirm-btn confirm-cancelar"></button>
+                        <button type="button" class="confirm-btn confirm-confirmar"></button>
+                    </div>
+                </div>`;
+            document.body.appendChild(overlay);
+        }
+
+        overlay.querySelector('.confirm-msg').textContent = mensaje;
+        const btnCancelar  = overlay.querySelector('.confirm-cancelar');
+        const btnConfirmar = overlay.querySelector('.confirm-confirmar');
+        btnCancelar.textContent  = textoCancelar;
+        btnConfirmar.textContent = textoConfirmar;
+        btnConfirmar.classList.toggle('confirm-confirmar-peligro', peligroso);
+
+        const cerrar = (resultado) => {
+            overlay.classList.remove('show');
+            btnCancelar.onclick = null;
+            btnConfirmar.onclick = null;
+            overlay.onclick = null;
+            resolve(resultado);
+        };
+
+        btnCancelar.onclick  = () => cerrar(false);
+        btnConfirmar.onclick = () => cerrar(true);
+        overlay.onclick = (e) => { if (e.target === overlay) cerrar(false); };
+
+        overlay.classList.add('show');
+    });
+}
+
+// ── Banner "sin conexión" ─────────────────────────────────────
+let reintentarConexionActual = null;
+
+export function mostrarBannerSinConexion(onReintentar) {
+    if (typeof document === 'undefined') return;
+    if (onReintentar) reintentarConexionActual = onReintentar;
+
+    let banner = document.getElementById('banner-conexion');
+    if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'banner-conexion';
+        banner.innerHTML = `
+            <span>Sin conexión. Verificá tu internet e intentá de nuevo.</span>
+            <button type="button" class="banner-reintentar">Reintentar</button>`;
+        banner.querySelector('.banner-reintentar').addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            if (!reintentarConexionActual) return;
+            btn.disabled = true;
+            try {
+                await reintentarConexionActual();
+            } finally {
+                btn.disabled = false;
+            }
+        });
+        document.body.appendChild(banner);
+    }
+    banner.classList.add('show');
+}
+
+export function ocultarBannerSinConexion() {
+    if (typeof document === 'undefined') return;
+    document.getElementById('banner-conexion')?.classList.remove('show');
+}
+
+// Heurística para distinguir una falla de red real de un error de negocio/validación
+export function esErrorDeRed(error) {
+    if (!error) return false;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
+    const msg = String(error?.message || error).toLowerCase();
+    return msg.includes('failed to fetch')
+        || msg.includes('networkerror')
+        || msg.includes('network request failed')
+        || msg.includes('load failed')
+        || msg.includes('conexión');
+}
+
+// Punto único para reportar errores de Supabase: banner si es de red, toast si no
+export function notificarError(error, prefijo = 'Error') {
+    if (esErrorDeRed(error)) {
+        mostrarBannerSinConexion();
+        return;
+    }
+    mostrarToast(`${prefijo}: ${error?.message || error}`, 'error');
+}
+
+// ── Estado de carga en botones ("Guardando...") ──────────────
+export function setBotonCargando(boton, cargando, textoCargando = 'Guardando...') {
+    if (!boton) return;
+    if (cargando) {
+        if (boton.dataset.textoOriginal === undefined) boton.dataset.textoOriginal = boton.textContent;
+        boton.textContent = textoCargando;
+        boton.disabled = true;
+    } else {
+        boton.textContent = boton.dataset.textoOriginal ?? boton.textContent;
+        boton.disabled = false;
+    }
+}
+
+// ── Validación inline de campos ───────────────────────────────
+export function mostrarErrorCampo(inputId, mensaje) {
+    if (typeof document === 'undefined') return;
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.classList.add('campo-invalido');
+
+    let error = input.parentElement.querySelector('.campo-error');
+    if (!error) {
+        error = document.createElement('div');
+        error.className = 'campo-error';
+        input.insertAdjacentElement('afterend', error);
+    }
+    error.textContent = mensaje;
+    error.classList.add('show');
+}
+
+export function limpiarErrorCampo(inputId) {
+    if (typeof document === 'undefined') return;
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.classList.remove('campo-invalido');
+    input.parentElement.querySelector('.campo-error')?.classList.remove('show');
+}
+
+export function limpiarErroresFormulario(inputIds) {
+    inputIds.forEach(limpiarErrorCampo);
+}
+
+// ── Skeleton de carga para tablas ─────────────────────────────
+export function renderSkeletonFilas(tbodyId, columnas, filas = 5) {
+    if (typeof document === 'undefined') return;
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
+    const fila = `<tr class="skeleton-fila">${'<td><div class="skeleton-bar"></div></td>'.repeat(columnas)}</tr>`;
+    tbody.innerHTML = fila.repeat(filas);
+}

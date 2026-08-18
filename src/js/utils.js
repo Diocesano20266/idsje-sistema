@@ -129,6 +129,26 @@ export function nombreCortoDocente(nombreCompleto) {
     return `${partes[0]} ${partes[partes.length - 1]}`;
 }
 
+// ── Días hábiles de un mes (reportes de asistencia) ──────────
+// Lunes a viernes únicamente. mes: 1–12. Devuelve el número de día (1..N).
+export function diasHabilesDelMes(anio, mes) {
+    const dias = [];
+    const ultimoDia = new Date(anio, mes, 0).getDate();
+    for (let d = 1; d <= ultimoDia; d++) {
+        const diaSemana = new Date(anio, mes - 1, d).getDay(); // 0=domingo, 6=sábado
+        if (diaSemana >= 1 && diaSemana <= 5) dias.push(d);
+    }
+    return dias;
+}
+
+// ── Totales de asistencia (P/A/J/T) ──────────────────────────
+// registros: [{ estado: 'P'|'A'|'J'|'T' }, ...]
+export function calcularTotalesAsistencia(registros) {
+    const totales = { P: 0, A: 0, J: 0, T: 0 };
+    (registros || []).forEach(r => { if (totales[r.estado] !== undefined) totales[r.estado]++; });
+    return totales;
+}
+
 // ═══════════════════════════════════════════
 //  UI reutilizable (toasts, confirm, banner de conexión, loading)
 //  Todo lo de acá abajo toca el DOM — solo se ejecuta al LLAMAR

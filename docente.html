@@ -97,6 +97,24 @@
         .filtros{display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
         .filtros select{padding:9px 14px;border:1px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;outline:none;background:#fff;transition:border-color .2s;min-width:200px}
         .filtros select:focus{border-color:#1B3A6B}
+        .filtros input[type="date"],.filtros input[type="month"]{padding:9px 14px;border:1px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;outline:none;background:#fff;transition:border-color .2s}
+        .filtros input[type="date"]:focus,.filtros input[type="month"]:focus{border-color:#1B3A6B}
+
+        /* ── ASISTENCIAS ── */
+        .asis-banner{background:#fef9e7;border:1px solid #fde68a;border-radius:9px;padding:10px 14px;font-size:12px;color:#92400e;margin-bottom:14px}
+        .asis-lista{background:#fff;border-radius:12px 12px 0 0;border:1px solid #e2e8f0;overflow:hidden}
+        .asis-fila{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #f7f9fc}
+        .asis-fila:last-child{border-bottom:none}
+        .asis-num{width:22px;color:#94a3b8;font-size:11px;text-align:center;flex-shrink:0}
+        .asis-nombre{flex:1;font-size:13px;font-weight:600;color:#0a1628}
+        .asis-pills{display:flex;gap:6px}
+        .asis-pill{width:32px;height:32px;border-radius:50%;border:1.5px solid #e2e8f0;background:#fff;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;color:#94a3b8}
+        .asis-pill:hover{border-color:#cbd5e1}
+        .asis-pill-P.activo{background:#059669;border-color:#059669;color:#fff}
+        .asis-pill-A.activo{background:#dc2626;border-color:#dc2626;color:#fff}
+        .asis-pill-J.activo{background:#2563eb;border-color:#2563eb;color:#fff}
+        .asis-pill-T.activo{background:#d97706;border-color:#d97706;color:#fff}
+        .asis-reporte-card{background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:18px;margin-top:20px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
 
         .periodos{display:flex;justify-content:flex-end;gap:6px;background:#0a1628;border-radius:12px;padding:10px 14px;margin-bottom:16px}
         .periodo-btn{padding:9px 20px;border-radius:8px;border:none;background:rgba(255,255,255,.06);font-weight:700;font-size:11px;cursor:pointer;color:rgba(255,255,255,.5);transition:all .2s;font-family:'Plus Jakarta Sans',sans-serif}
@@ -231,6 +249,10 @@
             <div class="nav-item" data-vista="horario" onclick="mostrarVista('horario')">
                 <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="rgba(255,255,255,.6)" stroke-width="1.3" fill="none"/><path d="M8 5v3l2 1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.3" stroke-linecap="round"/></svg>
                 <span class="nav-txt">Mi Horario</span>
+            </div>
+            <div class="nav-item" data-vista="asistencias" onclick="mostrarVista('asistencias')">
+                <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M5.5 8.5l2 2 3.5-4" stroke="rgba(255,255,255,.6)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="1.5" y="2.5" width="13" height="11.5" rx="1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/></svg>
+                <span class="nav-txt">Asistencias</span>
             </div>
             <div class="nav-item hidden" id="nav-competencias" data-vista="competencias" onclick="mostrarVista('competencias')">
                 <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5.5" r="3" stroke="rgba(255,255,255,.6)" stroke-width="1.3" fill="none"/><path d="M2 14c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" stroke="rgba(255,255,255,.6)" stroke-width="1.3" stroke-linecap="round" fill="none"/></svg>
@@ -409,6 +431,31 @@
                 </div>
                 <div class="horario-grid" id="mi-horario-grid">
                     <div class="empty-state">Cargando tu horario…</div>
+                </div>
+            </div>
+
+            <!-- ASISTENCIAS -->
+            <div id="vista-asistencias" class="hidden">
+                <div id="asis-empty" class="empty-state hidden">No tenés grados asignados todavía. Contactá al administrador.</div>
+                <div id="asis-panel">
+                    <div class="filtros">
+                        <select id="asis-grado" onchange="cambiarGradoAsistencia()"></select>
+                        <input type="date" id="asis-fecha" onchange="cambiarFechaAsistencia()">
+                    </div>
+                    <div id="asis-banner" class="asis-banner hidden"></div>
+                    <div class="asis-lista" id="lista-asistencia"></div>
+                    <div class="tabla-footer" style="background:#fff;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px">
+                        <button class="btn-primary" id="btn-guardar-asistencia" onclick="guardarAsistencia()">Guardar asistencia</button>
+                    </div>
+
+                    <div class="asis-reporte-card">
+                        <div class="filtros" style="margin-bottom:0">
+                            <select id="asis-rep-grado"></select>
+                            <input type="month" id="asis-rep-mes">
+                        </div>
+                        <button class="btn-secondary" onclick="imprimirReporteAsistencia()">🖨 Reporte mensual</button>
+                        <button class="btn-secondary" onclick="imprimirListaBlancoAsistencia()">📄 Lista en blanco</button>
+                    </div>
                 </div>
             </div>
 

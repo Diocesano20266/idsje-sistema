@@ -44,9 +44,23 @@
         .th-nombre{text-align:left!important;min-width:150px}
         .td-num{color:#94a3b8}
         .td-nombre{text-align:left;font-weight:600;white-space:nowrap}
-        .td-totales{font-weight:700;color:#1B3A6B;white-space:nowrap;background:#f8fafc}
+
         .tabla-asistencia tbody tr:nth-child(even) td{background:#f8fafc}
-        .tabla-asistencia tbody tr:nth-child(even) .td-totales{background:#eef2fb}
+
+        /* Totales — cada estado en su propio cuadrito de color (encabezado P/A/J/T),
+           y abajo solo el número correspondiente en cada columna. Los selectores
+           repiten tbody/tr a propósito para empatar (y ganar, por ir después) la
+           especificidad de la regla de zebra-striping de arriba. */
+        .th-tot{width:26px;font-size:9px}
+        .th-tot-P{background:#059669}
+        .th-tot-A{background:#dc2626}
+        .th-tot-J{background:#2563eb}
+        .th-tot-T{background:#a16207}
+        .tabla-asistencia tbody tr td.td-tot{font-weight:700;color:#0a1628}
+        .tabla-asistencia tbody tr td.td-tot-P{background:#d1fae5}
+        .tabla-asistencia tbody tr td.td-tot-A{background:#fee2e2}
+        .tabla-asistencia tbody tr td.td-tot-J{background:#dbeafe}
+        .tabla-asistencia tbody tr td.td-tot-T{background:#fef3c7}
 
         /* Botón de impresión */
         .boleta-toolbar{text-align:right;margin-bottom:10px}

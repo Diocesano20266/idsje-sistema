@@ -41,6 +41,10 @@ let asisCache         = {};   // alumnoId -> fila de `asistencias` guardada
 let asisEdit          = {};   // alumnoId -> estado editado localmente (P/A/J/T)
 let asisRegistroInfo  = null; // { nombre, hora } si ya hay asistencia guardada para esa fecha
 
+// Configuración — Períodos académicos
+let configAnioSel           = null;
+let periodosAcademicosCache = []; // filas de `periodos_academicos` del año elegido
+
 // Llama al endpoint serverless que gestiona usuarios con la service key
 async function llamarApiAdmin(action, datos) {
     const { data: { session } } = await supabase.auth.getSession();
@@ -119,6 +123,7 @@ const TITULOS = {
     materias: 'Materias',
     horarios: 'Horarios',
     asistencias: 'Asistencias',
+    configuracion: 'Configuración',
 };
 
 const VISTA_CONFIG = {
@@ -129,6 +134,7 @@ const VISTA_CONFIG = {
     materias:    { titulo: 'Materias',             accion: `<button class="btn-secondary" onclick="cargarMateriasDefault()">Cargar IDSJE</button><button class="btn-primary" onclick="abrirModalMateria()">+ Nueva Materia</button>` },
     horarios:    { titulo: 'Horarios',             accion: `<button class="btn-secondary" onclick="imprimirHorarioGrado()">🖨 Imprimir horario</button>` },
     asistencias: { titulo: 'Asistencias',          accion: `<button class="btn-secondary" onclick="imprimirReporteAsistenciaAdmin()">🖨 Reporte mensual</button><button class="btn-secondary" onclick="imprimirListaBlancoAsistenciaAdmin()">📄 Lista en blanco</button>` },
+    configuracion: { titulo: 'Configuración',      accion: '' },
 };
 
 window.mostrarVista = async (vista) => {
@@ -156,6 +162,7 @@ window.mostrarVista = async (vista) => {
     if (vista === 'materias') renderMaterias();
     if (vista === 'horarios') renderVistaHorarios();
     if (vista === 'asistencias') renderVistaAsistencias();
+    if (vista === 'configuracion') renderVistaConfiguracion();
     if (vista === 'alumnos') {
         // Poblar filtro grado
         const { data, error } = await supabase.from('grados').select('*').order('nombre');
@@ -1101,6 +1108,93 @@ window.imprimirListaBlancoAsistenciaAdmin = () => {
     const mes = document.getElementById('asis-res-mes')?.value;
     if (!gradoId || !mes) { mostrarToast('Seleccioná un grado y un mes', 'advertencia'); return; }
     window.open(`./asistencia-reporte.html?grado=${gradoId}&mes=${mes}&blanco=1`, '_blank');
+};
+
+// ── CONFIGURACIÓN — PERÍODOS ACADÉMICOS ─────
+function renderVistaConfiguracion() {
+    if (!configAnioSel) configAnioSel = new Date().getFullYear();
+    document.getElementById('config-anio').value = configAnioSel;
+    cargarPeriodosAcademicos();
+}
+
+window.cambiarAnioConfiguracion = () => {
+    configAnioSel = parseInt(document.getElementById('config-anio').value, 10) || new Date().getFullYear();
+    cargarPeriodosAcademicos();
+};
+
+async function cargarPeriodosAcademicos() {
+    document.getElementById('periodos-academicos-tabla').innerHTML = '<div class="empty-bubbles">Cargando…</div>';
+    try {
+        const { data, error } = await supabase
+            .from('periodos_academicos')
+            .select('*')
+            .eq('anio', configAnioSel)
+            .order('periodo');
+
+        if (error && esErrorDeRed(error)) { mostrarBannerSinConexion(() => cargarPeriodosAcademicos()); return; }
+        ocultarBannerSinConexion();
+        if (error) return notificarError(error, 'Error cargando los períodos académicos');
+
+        periodosAcademicosCache = data || [];
+        renderPeriodosAcademicos();
+    } catch (err) {
+        if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => cargarPeriodosAcademicos()); return; }
+        notificarError(err, 'Error cargando los períodos académicos');
+    }
+}
+
+function renderPeriodosAcademicos() {
+    const cont = document.getElementById('periodos-academicos-tabla');
+    const porPeriodo = {};
+    periodosAcademicosCache.forEach(p => { porPeriodo[p.periodo] = p; });
+
+    const aviso = periodosAcademicosCache.length < 4
+        ? `<div class="info-box">⚠ Configurá las fechas del año ${configAnioSel} para habilitar el conteo de inasistencias en las boletas.</div>`
+        : '';
+
+    cont.innerHTML = `
+    ${aviso}
+    <table>
+        <thead><tr><th>Período</th><th>Fecha inicio</th><th>Fecha fin</th></tr></thead>
+        <tbody>
+            ${[1, 2, 3, 4].map(p => {
+                const row = porPeriodo[p];
+                return `
+                <tr>
+                    <td class="td-bold">Período ${p}</td>
+                    <td><input type="date" id="periodo-inicio-${p}" value="${row?.fecha_inicio || ''}" style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px"></td>
+                    <td><input type="date" id="periodo-fin-${p}" value="${row?.fecha_fin || ''}" style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px"></td>
+                </tr>`;
+            }).join('')}
+        </tbody>
+    </table>
+    <div class="tabla-header" style="justify-content:flex-end;border-top:1px solid #f1f5fb;border-bottom:none">
+        <button class="btn-primary" id="btn-guardar-periodos" onclick="guardarPeriodosAcademicos()">Guardar</button>
+    </div>`;
+}
+
+window.guardarPeriodosAcademicos = async () => {
+    const payload = [1, 2, 3, 4]
+        .map(p => ({
+            anio: configAnioSel,
+            periodo: p,
+            fecha_inicio: document.getElementById(`periodo-inicio-${p}`).value || null,
+            fecha_fin: document.getElementById(`periodo-fin-${p}`).value || null,
+        }))
+        .filter(r => r.fecha_inicio && r.fecha_fin);
+
+    if (!payload.length) { mostrarToast('Completá al menos un período (inicio y fin)', 'advertencia'); return; }
+
+    const btn = document.getElementById('btn-guardar-periodos');
+    setBotonCargando(btn, true);
+
+    const { error } = await supabase.from('periodos_academicos').upsert(payload, { onConflict: 'anio,periodo' });
+
+    setBotonCargando(btn, false);
+    if (error) return notificarError(error, 'Error guardando los períodos académicos');
+
+    mostrarToast('Períodos académicos guardados', 'exito');
+    await cargarPeriodosAcademicos();
 };
 
 // ── ALUMNOS ─────────────────────────────────

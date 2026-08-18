@@ -2,7 +2,8 @@
 //  IDSJE — Panel Administrador
 // ═══════════════════════════════════════════
 import { supabase, verificarSesion, cerrarSesion, subirFoto } from './auth.js';
-import { CLOUDINARY_CLOUD, CLOUDINARY_PRESET, MATERIAS_DEFAULT, INSTITUTO, DIAS_HORARIO, BLOQUES_HORARIO, ESTADOS_ASISTENCIA } from './config.js';
+import { CLOUDINARY_CLOUD, CLOUDINARY_PRESET, MATERIAS_DEFAULT, INSTITUTO, DIAS_HORARIO, BLOQUES_HORARIO, ESTADOS_ASISTENCIA, TIPOS_EXPEDIENTE } from './config.js';
+import { generarHorario, verificarConflictos } from './generador-horarios.js';
 import {
     mostrarToast,
     mostrarConfirm,
@@ -32,6 +33,19 @@ let dashChart     = null;
 let horarioGradoSel  = null;  // grado_id actualmente elegido en la vista Horarios
 let horariosCache    = [];    // filas de `horarios` del grado elegido
 let gradoMatHorario   = [];   // grado_materia del grado elegido (para el selector de materia del modal)
+
+// Generador automático de horarios
+let genAsignaciones  = [];   // [{ id (grado_materia_id), gradoId, gradoNombre, materiaId, materiaNombre, docenteId, docenteNombre, horasPorSemana }]
+let genDocentes      = [];   // [{ id, nombre, disponibilidad: 'completa'|'manana' }]
+let genResultado     = null; // filas generadas (sin guardar), o null si no hay resultado aún / no se encontró solución
+let genSeed          = 1;
+let genGradoPreview  = null; // grado_id que se muestra en el grid de vista previa
+
+// Expedientes disciplinarios
+let expAdminAlumnos    = []; // resultados de la búsqueda actual
+let expAdminAlumnoSel  = null;
+let expAdminTimeline   = [];
+let expBuscarTimeout   = null;
 
 // Asistencias
 let asisGradoId      = null;
@@ -103,7 +117,7 @@ async function cargarTodo() {
         if (sa) sa.textContent = cAlumnos || 0;
         if (sd) sd.textContent = usuariosCache.length;
         if (sm) sm.textContent = materiasCache.length;
-        const ini = document.getElementById('admin-inicial');
+        const ini = document.getElementById('admin-iniciales');
         if (ini && usuarioActual?.nombre_completo) ini.textContent = usuarioActual.nombre_completo.charAt(0).toUpperCase();
     } catch (err) {
         if (esErrorDeRed(err)) {
@@ -122,7 +136,9 @@ const TITULOS = {
     docentes: 'Docentes',
     materias: 'Materias',
     horarios: 'Horarios',
+    generador: 'Generar Horario',
     asistencias: 'Asistencias',
+    expedientes: 'Expedientes',
     configuracion: 'Configuración',
     reportes: 'Reportes',
 };
@@ -134,7 +150,9 @@ const VISTA_CONFIG = {
     docentes:    { titulo: 'Docentes',             accion: `<button class="btn-primary" onclick="abrirModalDocente()">+ Nuevo Docente</button>` },
     materias:    { titulo: 'Materias',             accion: `<button class="btn-secondary" onclick="cargarMateriasDefault()">Cargar IDSJE</button><button class="btn-primary" onclick="abrirModalMateria()">+ Nueva Materia</button>` },
     horarios:    { titulo: 'Horarios',             accion: `<button class="btn-secondary" onclick="imprimirHorarioGrado()">🖨 Imprimir horario</button>` },
+    generador:   { titulo: 'Generar Horario',      accion: '' },
     asistencias: { titulo: 'Asistencias',          accion: `<button class="btn-secondary" onclick="imprimirReporteAsistenciaAdmin()">🖨 Reporte mensual</button><button class="btn-secondary" onclick="imprimirListaBlancoAsistenciaAdmin()">📄 Lista en blanco</button>` },
+    expedientes: { titulo: 'Expedientes',          accion: '' },
     configuracion: { titulo: 'Configuración',      accion: '' },
     reportes:    { titulo: 'Reportes',             accion: '' },
 };
@@ -163,7 +181,9 @@ window.mostrarVista = async (vista) => {
     if (vista === 'docentes') renderDocentes();
     if (vista === 'materias') renderMaterias();
     if (vista === 'horarios') renderVistaHorarios();
+    if (vista === 'generador') renderVistaGenerador();
     if (vista === 'asistencias') renderVistaAsistencias();
+    if (vista === 'expedientes') renderVistaExpedientes();
     if (vista === 'configuracion') renderVistaConfiguracion();
     if (vista === 'reportes') renderVistaReportes();
     if (vista === 'alumnos') {
@@ -885,6 +905,239 @@ window.imprimirHorarioGrado = () => {
     window.open(`./horario.html?grado=${horarioGradoSel}`, '_blank');
 };
 
+// ── GENERADOR AUTOMÁTICO DE HORARIOS ─────────
+async function renderVistaGenerador() {
+    document.getElementById('gen-formulario').classList.remove('hidden');
+    document.getElementById('gen-resultado').classList.add('hidden');
+    document.getElementById('gen-sin-solucion').classList.add('hidden');
+    document.getElementById('gen-materias-lista').innerHTML = '<div class="empty-bubbles">Cargando…</div>';
+
+    try {
+        const { data, error } = await supabase
+            .from('grado_materia')
+            .select('*, grados(id, nombre, seccion, modalidad), materias(id, nombre), usuarios(id, nombre_completo)')
+            .order('grado_id');
+
+        if (error && esErrorDeRed(error)) { mostrarBannerSinConexion(() => renderVistaGenerador()); return; }
+        ocultarBannerSinConexion();
+        if (error) return notificarError(error, 'Error cargando materias asignadas');
+
+        const filas = data || [];
+        const sinDocenteCount = filas.filter(gm => !gm.docente_id).length;
+
+        // Conserva las horas/disponibilidad que el admin ya haya tocado si vuelve a esta vista.
+        genAsignaciones = filas.filter(gm => gm.docente_id).map(gm => {
+            const anterior = genAsignaciones.find(a => a.id === gm.id);
+            return {
+                id: gm.id,
+                gradoId: gm.grado_id,
+                gradoNombre: `${gm.grados?.nombre || ''} ${gm.grados?.modalidad || ''} — Sección ${gm.grados?.seccion || ''}`,
+                materiaId: gm.materia_id,
+                materiaNombre: gm.materias?.nombre || '',
+                docenteId: gm.docente_id,
+                docenteNombre: gm.usuarios?.nombre_completo || '',
+                horasPorSemana: anterior ? anterior.horasPorSemana : 4,
+            };
+        });
+
+        const docenteIds = [...new Set(genAsignaciones.map(a => a.docenteId))];
+        genDocentes = docenteIds.map(id => {
+            const anterior = genDocentes.find(d => d.id === id);
+            const asign = genAsignaciones.find(a => a.docenteId === id);
+            return { id, nombre: asign?.docenteNombre || '', disponibilidad: anterior ? anterior.disponibilidad : 'completa' };
+        });
+
+        renderFormularioGenerador(sinDocenteCount);
+    } catch (err) {
+        if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => renderVistaGenerador()); return; }
+        notificarError(err, 'Error cargando materias asignadas');
+    }
+}
+
+function renderFormularioGenerador(sinDocenteCount) {
+    const avisoSinDocente = sinDocenteCount
+        ? `<div class="info-box">⚠ ${sinDocenteCount} materia(s) sin docente asignado no se incluyen — asignalas primero en Grados → Materias del grado.</div>`
+        : '';
+
+    if (!genAsignaciones.length) {
+        document.getElementById('gen-materias-lista').innerHTML = avisoSinDocente + '<div class="empty-bubbles">No hay materias con docente asignado todavía.</div>';
+        document.getElementById('gen-docentes-lista').innerHTML = '';
+        return;
+    }
+
+    const gradosAgrupados = new Map();
+    genAsignaciones.forEach(a => {
+        if (!gradosAgrupados.has(a.gradoId)) gradosAgrupados.set(a.gradoId, { nombre: a.gradoNombre, materias: [] });
+        gradosAgrupados.get(a.gradoId).materias.push(a);
+    });
+
+    document.getElementById('gen-materias-lista').innerHTML = avisoSinDocente + [...gradosAgrupados.values()].map(g => `
+        <div class="gen-grado-card">
+            <div class="gen-grado-titulo">${g.nombre}</div>
+            ${g.materias.map(a => `
+                <div class="gen-materia-row">
+                    <span>${a.materiaNombre} <span class="text-muted">— ${a.docenteNombre}</span></span>
+                    <input type="number" min="1" max="10" value="${a.horasPorSemana}" class="gen-horas-input"
+                        onchange="actualizarHorasGenerador('${a.id}', this.value)">
+                </div>
+            `).join('')}
+        </div>
+    `).join('');
+
+    document.getElementById('gen-docentes-lista').innerHTML = genDocentes.map(d => `
+        <div class="gen-docente-row">
+            <span>${d.nombre}</span>
+            <select onchange="actualizarDisponibilidadGenerador('${d.id}', this.value)">
+                <option value="completa" ${d.disponibilidad === 'completa' ? 'selected' : ''}>Jornada completa (P1-P10)</option>
+                <option value="manana" ${d.disponibilidad === 'manana' ? 'selected' : ''}>Solo mañana (P1-P7)</option>
+            </select>
+        </div>
+    `).join('');
+}
+
+window.actualizarHorasGenerador = (asignacionId, valor) => {
+    const a = genAsignaciones.find(x => x.id === asignacionId);
+    if (a) a.horasPorSemana = Math.max(1, Math.min(10, parseInt(valor, 10) || 1));
+};
+
+window.actualizarDisponibilidadGenerador = (docenteId, valor) => {
+    const d = genDocentes.find(x => x.id === docenteId);
+    if (d) d.disponibilidad = valor;
+};
+
+function construirConfigGenerador() {
+    const disponibilidadDocente = {};
+    genDocentes.forEach(d => { disponibilidadDocente[d.id] = d.disponibilidad; });
+    return {
+        asignaciones: genAsignaciones.map(a => ({
+            id: a.id, gradoId: a.gradoId, materiaId: a.materiaId,
+            materiaNombre: a.materiaNombre, docenteId: a.docenteId, horasPorSemana: a.horasPorSemana,
+        })),
+        disponibilidadDocente,
+    };
+}
+
+window.ejecutarGenerarHorario = () => {
+    if (!genAsignaciones.length) { mostrarToast('No hay materias con docente asignado para programar', 'advertencia'); return; }
+    genSeed = Date.now() % 100000;
+    genResultado = generarHorario(construirConfigGenerador(), genSeed);
+    mostrarResultadoGenerador();
+};
+
+window.generarOtroHorario = () => {
+    genSeed += 1;
+    genResultado = generarHorario(construirConfigGenerador(), genSeed);
+    mostrarResultadoGenerador();
+};
+
+function mostrarResultadoGenerador() {
+    document.getElementById('gen-formulario').classList.add('hidden');
+
+    if (!genResultado) {
+        document.getElementById('gen-sin-solucion').classList.remove('hidden');
+        document.getElementById('gen-resultado').classList.add('hidden');
+        return;
+    }
+
+    // Sanity check defensivo — el algoritmo nunca debería devolver choques,
+    // pero si algo cambia en el futuro esto lo hace visible en vez de guardarlo así.
+    const { ok } = verificarConflictos(genResultado);
+    if (!ok) {
+        genResultado = null;
+        document.getElementById('gen-sin-solucion').classList.remove('hidden');
+        document.getElementById('gen-resultado').classList.add('hidden');
+        notificarError({ message: 'El generador produjo choques internos' }, 'Error inesperado');
+        return;
+    }
+
+    document.getElementById('gen-sin-solucion').classList.add('hidden');
+    document.getElementById('gen-resultado').classList.remove('hidden');
+
+    const gradosConHoras = [...new Map(genAsignaciones.map(a => [a.gradoId, a.gradoNombre])).entries()];
+    const selPreview = document.getElementById('gen-grado-preview');
+    selPreview.innerHTML = gradosConHoras.map(([id, nombre]) => `<option value="${id}">${nombre}</option>`).join('');
+    if (!genGradoPreview || !gradosConHoras.find(([id]) => id === genGradoPreview)) {
+        genGradoPreview = gradosConHoras[0]?.[0] || null;
+    }
+    selPreview.value = genGradoPreview;
+    renderGridGenerador();
+}
+
+window.cambiarPreviewGenerador = () => {
+    genGradoPreview = document.getElementById('gen-grado-preview').value;
+    renderGridGenerador();
+};
+
+function renderGridGenerador() {
+    const cont = document.getElementById('gen-grid');
+    if (!genResultado || !genGradoPreview) { cont.innerHTML = ''; return; }
+
+    const filasGrado = genResultado.filter(f => f.grado_id === genGradoPreview);
+    const porCelda = {};
+    filasGrado.forEach(f => { porCelda[`${f.dia}-${f.periodo}`] = f; });
+
+    let html = '<div class="hg-cell hg-head"></div>' +
+        DIAS_HORARIO.map(d => `<div class="hg-cell hg-head">${d}</div>`).join('');
+
+    BLOQUES_HORARIO.forEach(b => {
+        if (b.tipo !== 'clase') {
+            html += `<div class="hg-cell hg-periodo-label"><span class="hg-periodo-hora">${b.inicio}–${b.fin}</span></div>`;
+            html += `<div class="hg-cell hg-bloqueado" style="grid-column:2 / -1">${b.label}</div>`;
+            return;
+        }
+        html += `<div class="hg-cell hg-periodo-label"><span class="hg-periodo-num">P${b.periodo}</span><span class="hg-periodo-hora">${b.inicio}–${b.fin}</span></div>`;
+        DIAS_HORARIO.forEach(dia => {
+            const f = porCelda[`${dia}-${b.periodo}`];
+            if (f) {
+                const asign = genAsignaciones.find(a => a.id === f.grado_materia_id);
+                html += `
+                <div class="hg-cell hg-ocupada-wrap">
+                    <div class="hg-ocupada" style="background:${colorPorMateria(f.materia_id)}">
+                        <div class="hg-materia">${asign?.materiaNombre || ''}</div>
+                        <div class="hg-docente">${nombreCortoDocente(asign?.docenteNombre)}</div>
+                    </div>
+                </div>`;
+            } else {
+                html += '<div class="hg-cell hg-vacia"></div>';
+            }
+        });
+    });
+
+    cont.innerHTML = html;
+}
+
+window.descartarHorarioGenerado = () => {
+    genResultado = null;
+    document.getElementById('gen-resultado').classList.add('hidden');
+    document.getElementById('gen-sin-solucion').classList.add('hidden');
+    document.getElementById('gen-formulario').classList.remove('hidden');
+};
+
+window.guardarHorarioGenerado = async () => {
+    if (!genResultado || !genResultado.length) return;
+
+    const gradoIds = [...new Set(genResultado.map(f => f.grado_id))];
+    const ok = await mostrarConfirm(
+        `Esto va a REEMPLAZAR el horario actual de ${gradoIds.length} grado(s) por el que acabás de generar. ¿Continuar?`,
+        { textoConfirmar: 'Guardar y reemplazar' }
+    );
+    if (!ok) return;
+
+    const btn = document.getElementById('btn-guardar-horario-generado');
+    setBotonCargando(btn, true, 'Guardando...');
+
+    const { error: eDel } = await supabase.from('horarios').delete().in('grado_id', gradoIds);
+    if (eDel) { setBotonCargando(btn, false); return notificarError(eDel, 'Error limpiando el horario anterior'); }
+
+    const { error: eIns } = await supabase.from('horarios').insert(genResultado);
+    setBotonCargando(btn, false);
+    if (eIns) return notificarError(eIns, 'Error guardando el horario generado');
+
+    mostrarToast('Horario generado guardado correctamente', 'exito');
+    horarioGradoSel = null; // fuerza recargar si el admin va a la vista manual de Horarios
+    window.descartarHorarioGenerado();
+};
+
 // ── ASISTENCIAS ─────────────────────────────
 function fechaHoyISO() {
     const d = new Date();
@@ -1111,6 +1364,185 @@ window.imprimirListaBlancoAsistenciaAdmin = () => {
     const mes = document.getElementById('asis-res-mes')?.value;
     if (!gradoId || !mes) { mostrarToast('Seleccioná un grado y un mes', 'advertencia'); return; }
     window.open(`./asistencia-reporte.html?grado=${gradoId}&mes=${mes}&blanco=1`, '_blank');
+};
+
+// ── EXPEDIENTES DISCIPLINARIOS ───────────────
+function renderVistaExpedientes() {
+    document.getElementById('exp-admin-busqueda').value = '';
+    document.getElementById('exp-admin-resultados').innerHTML = '';
+    document.getElementById('exp-admin-detalle').classList.add('hidden');
+    expAdminAlumnoSel = null;
+}
+
+window.onInputBuscarExpediente = () => {
+    clearTimeout(expBuscarTimeout);
+    expBuscarTimeout = setTimeout(() => window.buscarAlumnoExpediente(), 300);
+};
+
+window.buscarAlumnoExpediente = async () => {
+    const texto = document.getElementById('exp-admin-busqueda').value.trim();
+    const cont = document.getElementById('exp-admin-resultados');
+    if (!texto) { cont.innerHTML = ''; return; }
+
+    cont.innerHTML = '<div class="empty-bubbles">Buscando…</div>';
+    const { data, error } = await supabase
+        .from('alumnos')
+        .select('*, grados(nombre, seccion)')
+        .or(`nombres.ilike.%${texto}%,apellidos.ilike.%${texto}%,nie.ilike.%${texto}%`)
+        .order('apellidos')
+        .limit(20);
+
+    if (error) { notificarError(error, 'Error buscando alumnos'); return; }
+
+    expAdminAlumnos = data || [];
+    if (!expAdminAlumnos.length) { cont.innerHTML = '<div class="empty-bubbles">Sin resultados.</div>'; return; }
+
+    cont.innerHTML = expAdminAlumnos.map(a => `
+        <div class="exp-resultado-item" onclick="seleccionarAlumnoExpedienteAdmin('${a.id}')">
+            <span>${a.apellidos}, ${a.nombres}</span>
+            <span class="text-muted">NIE ${a.nie || '—'} · ${a.grados?.nombre || ''} ${a.grados?.seccion || ''}</span>
+        </div>
+    `).join('');
+};
+
+window.seleccionarAlumnoExpedienteAdmin = (alumnoId) => {
+    expAdminAlumnoSel = alumnoId;
+    const alumno = expAdminAlumnos.find(a => a.id === alumnoId);
+    document.getElementById('exp-admin-resultados').innerHTML = '';
+    document.getElementById('exp-admin-busqueda').value = alumno ? `${alumno.apellidos}, ${alumno.nombres}` : '';
+    document.getElementById('exp-admin-detalle').classList.remove('hidden');
+    document.getElementById('exp-admin-nombre').textContent = alumno ? `${alumno.apellidos}, ${alumno.nombres}` : '';
+    cargarExpedienteAdmin(alumnoId);
+};
+
+async function cargarExpedienteAdmin(alumnoId) {
+    document.getElementById('exp-admin-timeline').innerHTML = '<div class="empty-bubbles">Cargando…</div>';
+    try {
+        const [{ data: anec, error: e1 }, { data: dem, error: e2 }, { data: act, error: e3 }] = await Promise.all([
+            supabase.from('anecdoticos').select('*, usuarios(nombre_completo)').eq('alumno_id', alumnoId),
+            supabase.from('demeritos').select('*, usuarios(nombre_completo)').eq('alumno_id', alumnoId),
+            supabase.from('actas').select('*, usuarios(nombre_completo)').eq('alumno_id', alumnoId),
+        ]);
+
+        const errorDeRed = [e1, e2, e3].find(e => e && esErrorDeRed(e));
+        if (errorDeRed) { mostrarBannerSinConexion(() => cargarExpedienteAdmin(alumnoId)); return; }
+        ocultarBannerSinConexion();
+        if (e1) return notificarError(e1, 'Error cargando anecdóticos');
+        if (e2) return notificarError(e2, 'Error cargando deméritos');
+        if (e3) return notificarError(e3, 'Error cargando actas');
+
+        expAdminTimeline = [
+            ...(anec || []).map(r => ({ ...r, tabla: 'anecdoticos', tipoClave: 'anecdotico', registradoPor: r.usuarios?.nombre_completo || '—' })),
+            ...(dem  || []).map(r => ({ ...r, tabla: 'demeritos',   tipoClave: `demerito_${r.categoria}`, registradoPor: r.usuarios?.nombre_completo || '—' })),
+            ...(act  || []).map(r => ({ ...r, tabla: 'actas',       tipoClave: r.tipo, registradoPor: r.usuarios?.nombre_completo || '—' })),
+        ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+        renderResumenExpedienteAdmin();
+        renderTimelineExpedienteAdmin();
+    } catch (err) {
+        if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => cargarExpedienteAdmin(alumnoId)); return; }
+        notificarError(err, 'Error cargando el expediente');
+    }
+}
+
+function renderResumenExpedienteAdmin() {
+    const cont = document.getElementById('exp-admin-resumen');
+    const contar = (clave) => expAdminTimeline.filter(r => r.tipoClave === clave).length;
+    cont.innerHTML = `
+        <div class="exp-stat"><div class="exp-stat-val" style="color:#d97706">${contar('demerito_leve')}</div><div class="exp-stat-label">Deméritos leves</div></div>
+        <div class="exp-stat"><div class="exp-stat-val" style="color:#ea580c">${contar('demerito_grave')}</div><div class="exp-stat-label">Deméritos graves</div></div>
+        <div class="exp-stat"><div class="exp-stat-val" style="color:#dc2626">${contar('demerito_muy_grave')}</div><div class="exp-stat-label">Muy graves</div></div>
+        <div class="exp-stat"><div class="exp-stat-val" style="color:#991b1b">${contar('suspension')}</div><div class="exp-stat-label">Suspensiones</div></div>
+        <div class="exp-stat"><div class="exp-stat-val" style="color:#059669">${contar('reconocimiento')}</div><div class="exp-stat-label">Reconocimientos</div></div>
+    `;
+}
+
+function renderTimelineExpedienteAdmin() {
+    const cont = document.getElementById('exp-admin-timeline');
+    if (!expAdminTimeline.length) {
+        cont.innerHTML = '<div class="empty-bubbles">Este alumno no tiene registros en su expediente todavía.</div>';
+        return;
+    }
+
+    cont.innerHTML = expAdminTimeline.map(r => {
+        const info = TIPOS_EXPEDIENTE.find(t => t.clave === r.tipoClave) || {};
+        const extra = r.tipoClave === 'suspension' && r.dias_suspension
+            ? `<span class="exp-extra">${r.dias_suspension} día(s) de suspensión</span>` : '';
+        return `
+        <div class="exp-item" style="--exp-color:${info.color || '#64748b'};--exp-bg:${info.bg || '#f1f5f9'}">
+            <div class="exp-item-icono">${info.icono || '•'}</div>
+            <div class="exp-item-cuerpo">
+                <div class="exp-item-cab">
+                    <span class="exp-item-tipo">${info.label || r.tipoClave}</span>
+                    <span class="exp-item-fecha">${new Date(r.fecha + 'T00:00:00').toLocaleDateString('es-SV')}</span>
+                </div>
+                <div class="exp-item-desc">${r.descripcion}</div>
+                ${extra}
+                <div class="exp-item-registro">
+                    Registrado por ${r.registradoPor}
+                    <button type="button" class="exp-item-btn" onclick="editarRegistroExpediente('${r.tabla}', '${r.id}')">Editar</button>
+                    <button type="button" class="exp-item-btn exp-item-btn-del" onclick="eliminarRegistroExpediente('${r.tabla}', '${r.id}')">Eliminar</button>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+window.editarRegistroExpediente = (tabla, id) => {
+    const registro = expAdminTimeline.find(r => r.tabla === tabla && r.id === id);
+    if (!registro) return;
+
+    document.getElementById('exp-edit-tabla').value = tabla;
+    document.getElementById('exp-edit-id').value = id;
+    document.getElementById('exp-edit-descripcion').value = registro.descripcion;
+    document.getElementById('modal-exp-editar-title').textContent =
+        TIPOS_EXPEDIENTE.find(t => t.clave === registro.tipoClave)?.label || 'Editar registro';
+
+    const campoCategoria = document.getElementById('exp-edit-campo-categoria');
+    const campoDias = document.getElementById('exp-edit-campo-dias');
+    const esSuspension = tabla === 'actas' && registro.tipo === 'suspension';
+    campoCategoria.classList.toggle('hidden', tabla !== 'demeritos');
+    campoDias.classList.toggle('hidden', !esSuspension);
+    if (tabla === 'demeritos') document.getElementById('exp-edit-categoria').value = registro.categoria;
+    if (esSuspension) document.getElementById('exp-edit-dias').value = registro.dias_suspension || 1;
+
+    abrirModal('modal-exp-editar');
+};
+
+window.guardarEdicionExpediente = async () => {
+    const tabla = document.getElementById('exp-edit-tabla').value;
+    const id = document.getElementById('exp-edit-id').value;
+    const descripcion = document.getElementById('exp-edit-descripcion').value.trim();
+    if (!descripcion) { mostrarToast('Escribí una descripción', 'advertencia'); return; }
+
+    const payload = { descripcion };
+    if (tabla === 'demeritos') payload.categoria = document.getElementById('exp-edit-categoria').value;
+    if (!document.getElementById('exp-edit-campo-dias').classList.contains('hidden')) {
+        payload.dias_suspension = parseInt(document.getElementById('exp-edit-dias').value, 10) || 0;
+    }
+
+    const btn = document.getElementById('btn-guardar-exp-editar');
+    setBotonCargando(btn, true);
+
+    const { error } = await supabase.from(tabla).update(payload).eq('id', id);
+
+    setBotonCargando(btn, false);
+    if (error) return notificarError(error, 'Error guardando los cambios');
+
+    mostrarToast('Registro actualizado', 'exito');
+    cerrarModal('modal-exp-editar');
+    await cargarExpedienteAdmin(expAdminAlumnoSel);
+};
+
+window.eliminarRegistroExpediente = async (tabla, id) => {
+    const ok = await mostrarConfirm('¿Eliminar este registro del expediente? Esta acción no se puede deshacer.', { textoConfirmar: 'Eliminar' });
+    if (!ok) return;
+
+    const { error } = await supabase.from(tabla).delete().eq('id', id);
+    if (error) return notificarError(error, 'Error eliminando el registro');
+
+    mostrarToast('Registro eliminado', 'exito');
+    await cargarExpedienteAdmin(expAdminAlumnoSel);
 };
 
 // ── CONFIGURACIÓN — PERÍODOS ACADÉMICOS ─────

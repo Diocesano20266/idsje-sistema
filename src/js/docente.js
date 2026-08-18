@@ -2,7 +2,7 @@
 //  IDSJE — Panel Docente
 // ═══════════════════════════════════════════
 import { supabase, verificarSesion, cerrarSesion } from './auth.js';
-import { CONCEPTOS, DIAS_HORARIO, BLOQUES_HORARIO } from './config.js';
+import { CONCEPTOS, DIAS_HORARIO, BLOQUES_HORARIO, ESTADOS_ASISTENCIA } from './config.js';
 import {
     calcularNotaFinal,
     promedioPonderado,
@@ -29,6 +29,14 @@ let alumnosPorGrado = {};  // conteo de alumnos activos por grado_id
 
 // Mi Horario
 let horarioDocenteCache = null; // null = aún no cargado; [] = cargado y vacío
+
+// Asistencias
+let asisGradoId      = null;
+let asisFecha         = null; // 'YYYY-MM-DD'
+let alumnosAsis       = [];
+let asisCache         = {};   // alumnoId -> fila de `asistencias` guardada
+let asisEdit          = {};   // alumnoId -> estado editado localmente (P/A/J/T)
+let asisRegistroInfo  = null; // { nombre, hora } si ya hay asistencia guardada para esa fecha
 
 // Registro de notas
 let notasGradoId      = null;
@@ -120,6 +128,7 @@ const TITULOS = {
     materias: 'Mis Materias',
     notas: 'Registro de Notas',
     horario: 'Mi Horario',
+    asistencias: 'Asistencias',
     competencias: 'Competencias Ciudadanas'
 };
 
@@ -138,6 +147,7 @@ window.mostrarVista = (vista) => {
     if (vista === 'materias')     renderMisMaterias();
     if (vista === 'notas')        initVistaNotas();
     if (vista === 'horario')      initVistaHorario();
+    if (vista === 'asistencias')  initVistaAsistencias();
     if (vista === 'competencias') initVistaCompetencias();
 };
 
@@ -274,6 +284,189 @@ function renderMiHorario() {
 window.imprimirMiHorario = () => {
     if (!usuarioActual) return;
     window.open(`./horario.html?docente=${usuarioActual.id}`, '_blank');
+};
+
+// ── ASISTENCIAS ───────────────────────────────
+function fechaHoyISO() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function mesActualISO() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+// Grados donde el docente puede tomar asistencia: los mismos donde tiene
+// materia asignada o es guía (igual criterio que la RLS de `asistencias`).
+function gradosAsistenciaDocente() {
+    const todos = [...gradoMatCache.map(gm => gm.grados), ...gradosGuiaCache];
+    return [...new Map(todos.map(g => [g.id, g])).values()];
+}
+
+function initVistaAsistencias() {
+    const grados = gradosAsistenciaDocente();
+    const empty = document.getElementById('asis-empty');
+    const panel = document.getElementById('asis-panel');
+
+    if (!grados.length) {
+        empty.classList.remove('hidden');
+        panel.classList.add('hidden');
+        return;
+    }
+    empty.classList.add('hidden');
+    panel.classList.remove('hidden');
+
+    const opciones = grados.map(g => `<option value="${g.id}">${g.nombre} ${g.modalidad} · Sección ${g.seccion}</option>`).join('');
+
+    const selGrado = document.getElementById('asis-grado');
+    selGrado.innerHTML = opciones;
+    if (!asisGradoId || !grados.find(g => g.id === asisGradoId)) asisGradoId = grados[0].id;
+    selGrado.value = asisGradoId;
+
+    if (!asisFecha) asisFecha = fechaHoyISO();
+    document.getElementById('asis-fecha').value = asisFecha;
+
+    const selRepGrado = document.getElementById('asis-rep-grado');
+    selRepGrado.innerHTML = opciones;
+    selRepGrado.value = asisGradoId;
+    const inputMes = document.getElementById('asis-rep-mes');
+    if (!inputMes.value) inputMes.value = mesActualISO();
+
+    cargarAsistenciaDia();
+}
+
+window.cambiarGradoAsistencia = () => {
+    asisGradoId = document.getElementById('asis-grado').value;
+    document.getElementById('asis-rep-grado').value = asisGradoId;
+    cargarAsistenciaDia();
+};
+
+window.cambiarFechaAsistencia = () => {
+    asisFecha = document.getElementById('asis-fecha').value;
+    cargarAsistenciaDia();
+};
+
+async function cargarAsistenciaDia() {
+    if (!asisGradoId || !asisFecha) return;
+    document.getElementById('lista-asistencia').innerHTML = '<div class="empty-state">Cargando…</div>';
+    document.getElementById('asis-banner').classList.add('hidden');
+
+    try {
+        const { data: alumnos, error: eAl } = await supabase
+            .from('alumnos')
+            .select('*')
+            .eq('grado_id', asisGradoId)
+            .eq('activo', true)
+            .order('apellidos');
+
+        if (eAl && esErrorDeRed(eAl)) { mostrarBannerSinConexion(() => cargarAsistenciaDia()); return; }
+        ocultarBannerSinConexion();
+        if (eAl) return notificarError(eAl, 'Error cargando alumnos');
+
+        alumnosAsis = alumnos || [];
+        asisCache = {};
+        asisEdit = {};
+        asisRegistroInfo = null;
+
+        const alumnoIds = alumnosAsis.map(a => a.id);
+        if (alumnoIds.length) {
+            const { data: registros, error: eReg } = await supabase
+                .from('asistencias')
+                .select('*, usuarios(nombre_completo)')
+                .in('alumno_id', alumnoIds)
+                .eq('fecha', asisFecha);
+
+            if (eReg) return notificarError(eReg, 'Error cargando la asistencia');
+
+            (registros || []).forEach(r => { asisCache[r.alumno_id] = r; });
+            const primero = (registros || [])[0];
+            if (primero) asisRegistroInfo = { nombre: primero.usuarios?.nombre_completo || '—', hora: primero.hora_registro };
+        }
+
+        renderBannerAsistencia();
+        renderListaAsistencia();
+    } catch (err) {
+        if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => cargarAsistenciaDia()); return; }
+        notificarError(err, 'Error cargando la asistencia');
+    }
+}
+
+function renderBannerAsistencia() {
+    const el = document.getElementById('asis-banner');
+    if (!asisRegistroInfo) { el.classList.add('hidden'); return; }
+    const hora = asisRegistroInfo.hora
+        ? new Date(asisRegistroInfo.hora).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })
+        : '';
+    el.innerHTML = `Asistencia registrada por <b>${asisRegistroInfo.nombre}</b>${hora ? ` a las ${hora}` : ''}. Podés editarla y volver a guardar.`;
+    el.classList.remove('hidden');
+}
+
+function renderListaAsistencia() {
+    const cont = document.getElementById('lista-asistencia');
+    if (!alumnosAsis.length) {
+        cont.innerHTML = '<div class="empty-state">Este grado no tiene alumnos activos.</div>';
+        return;
+    }
+
+    cont.innerHTML = alumnosAsis.map((al, idx) => {
+        const estado = asisEdit[al.id] || asisCache[al.id]?.estado || 'P';
+        const pills = ESTADOS_ASISTENCIA.map(e => {
+            const simbolo = e.codigo === 'P' ? '✓' : (e.codigo === 'A' ? '✗' : e.codigo);
+            return `<button type="button" class="asis-pill asis-pill-${e.codigo} ${estado === e.codigo ? 'activo' : ''}"
+                onclick="marcarAsistencia('${al.id}', '${e.codigo}')" title="${e.label}">${simbolo}</button>`;
+        }).join('');
+
+        return `
+        <div class="asis-fila">
+            <div class="asis-num">${idx + 1}</div>
+            <div class="asis-nombre">${al.apellidos}, ${al.nombres}</div>
+            <div class="asis-pills">${pills}</div>
+        </div>`;
+    }).join('');
+}
+
+window.marcarAsistencia = (alumnoId, estado) => {
+    asisEdit[alumnoId] = estado;
+    renderListaAsistencia();
+};
+
+window.guardarAsistencia = async () => {
+    if (!asisGradoId || !asisFecha || !alumnosAsis.length) return;
+
+    const btn = document.getElementById('btn-guardar-asistencia');
+    setBotonCargando(btn, true);
+
+    const horaRegistro = new Date().toISOString();
+    const payload = alumnosAsis.map(al => ({
+        alumno_id: al.id,
+        grado_id: asisGradoId,
+        fecha: asisFecha,
+        estado: asisEdit[al.id] || asisCache[al.id]?.estado || 'P',
+        registrado_por: usuarioActual.id,
+        hora_registro: horaRegistro,
+    }));
+
+    const { error } = await supabase.from('asistencias').upsert(payload, { onConflict: 'alumno_id,fecha' });
+
+    setBotonCargando(btn, false);
+    if (error) return notificarError(error, 'Error guardando la asistencia');
+
+    mostrarToast('Asistencia guardada', 'exito');
+    await cargarAsistenciaDia();
+};
+
+window.imprimirReporteAsistencia = () => {
+    const gradoId = document.getElementById('asis-rep-grado').value;
+    const mes = document.getElementById('asis-rep-mes').value;
+    if (!gradoId || !mes) { mostrarToast('Seleccioná grado y mes', 'advertencia'); return; }
+    window.open(`./asistencia-reporte.html?grado=${gradoId}&mes=${mes}`, '_blank');
+};
+
+window.imprimirListaBlancoAsistencia = () => {
+    const gradoId = document.getElementById('asis-rep-grado').value;
+    const mes = document.getElementById('asis-rep-mes').value;
+    if (!gradoId || !mes) { mostrarToast('Seleccioná grado y mes', 'advertencia'); return; }
+    window.open(`./asistencia-reporte.html?grado=${gradoId}&mes=${mes}&blanco=1`, '_blank');
 };
 
 // ── REGISTRO DE NOTAS ────────────────────────

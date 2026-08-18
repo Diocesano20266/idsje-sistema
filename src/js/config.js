@@ -30,3 +30,27 @@ export const MATERIAS_DEFAULT = [
 ];
 
 export const CONCEPTOS = ['E', 'MB', 'B', 'R', 'D'];
+
+// ── Horarios ──────────────────────────────────
+export const DIAS_HORARIO = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+
+// Bloques del día en orden. tipo: 'clase' | 'receso' | 'almuerzo'.
+// Los bloques de clase llevan `periodo` (1–10), que es lo que se guarda
+// en la columna `periodo` de la tabla `horarios`. Los de receso/almuerzo
+// son solo visuales (filas bloqueadas en la grilla) y no se guardan en BD.
+export const BLOQUES_HORARIO = [
+    { tipo: 'clase',    periodo: 1,  inicio: '6:45',  fin: '7:25'  },
+    { tipo: 'clase',    periodo: 2,  inicio: '7:25',  fin: '8:05'  },
+    { tipo: 'receso',   label: 'Receso',   inicio: '8:05',  fin: '8:25'  },
+    { tipo: 'clase',    periodo: 3,  inicio: '8:25',  fin: '9:05'  },
+    { tipo: 'clase',    periodo: 4,  inicio: '9:05',  fin: '9:45'  },
+    { tipo: 'receso',   label: 'Receso',   inicio: '9:45',  fin: '10:00' },
+    { tipo: 'clase',    periodo: 5,  inicio: '10:00', fin: '10:40' },
+    { tipo: 'clase',    periodo: 6,  inicio: '10:40', fin: '11:20' },
+    { tipo: 'clase',    periodo: 7,  inicio: '11:20', fin: '12:00' },
+    { tipo: 'almuerzo', label: 'Almuerzo', inicio: '12:00', fin: '1:00'  },
+    { tipo: 'clase',    periodo: 8,  inicio: '1:00',  fin: '1:40'  },
+    { tipo: 'clase',    periodo: 9,  inicio: '1:40',  fin: '2:20'  },
+    { tipo: 'receso',   label: 'Receso',   inicio: '2:20',  fin: '2:35'  },
+    { tipo: 'clase',    periodo: 10, inicio: '2:35',  fin: '3:15'  },
+];

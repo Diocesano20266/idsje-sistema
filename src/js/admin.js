@@ -35,7 +35,8 @@ let horariosCache    = [];    // filas de `horarios` del grado elegido
 let gradoMatHorario   = [];   // grado_materia del grado elegido (para el selector de materia del modal)
 
 // Generador automático de horarios
-let genAsignaciones  = [];   // [{ id (grado_materia_id), gradoId, gradoNombre, materiaId, materiaNombre, docenteId, docenteNombre, horasPorSemana }]
+let genAsignaciones  = [];   // [{ id (grado_materia_id), gradoId, gradoNombre, materiaId, materiaNombre, docenteId, docenteNombre, horasPorSemana, incluida }]
+let genSinDocenteCount = 0;  // materias sin docente asignado, excluidas del formulario (solo para el aviso)
 let genDocentes      = [];   // [{ id, nombre, disponibilidad: 'completa'|'manana' }]
 let genResultado     = null; // filas generadas (sin guardar), o null si no hay resultado aún / no se encontró solución
 let genSeed          = 1;
@@ -923,7 +924,7 @@ async function renderVistaGenerador() {
         if (error) return notificarError(error, 'Error cargando materias asignadas');
 
         const filas = data || [];
-        const sinDocenteCount = filas.filter(gm => !gm.docente_id).length;
+        genSinDocenteCount = filas.filter(gm => !gm.docente_id).length;
 
         // Conserva las horas/disponibilidad que el admin ya haya tocado si vuelve a esta vista.
         genAsignaciones = filas.filter(gm => gm.docente_id).map(gm => {
@@ -937,6 +938,7 @@ async function renderVistaGenerador() {
                 docenteId: gm.docente_id,
                 docenteNombre: gm.usuarios?.nombre_completo || '',
                 horasPorSemana: anterior ? anterior.horasPorSemana : 4,
+                incluida: anterior ? anterior.incluida : true,
             };
         });
 
@@ -947,16 +949,16 @@ async function renderVistaGenerador() {
             return { id, nombre: asign?.docenteNombre || '', disponibilidad: anterior ? anterior.disponibilidad : 'completa' };
         });
 
-        renderFormularioGenerador(sinDocenteCount);
+        renderFormularioGenerador();
     } catch (err) {
         if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => renderVistaGenerador()); return; }
         notificarError(err, 'Error cargando materias asignadas');
     }
 }
 
-function renderFormularioGenerador(sinDocenteCount) {
-    const avisoSinDocente = sinDocenteCount
-        ? `<div class="info-box">⚠ ${sinDocenteCount} materia(s) sin docente asignado no se incluyen — asignalas primero en Grados → Materias del grado.</div>`
+function renderFormularioGenerador() {
+    const avisoSinDocente = genSinDocenteCount
+        ? `<div class="info-box">⚠ ${genSinDocenteCount} materia(s) sin docente asignado no se incluyen — asignalas primero en Grados → Materias del grado.</div>`
         : '';
 
     if (!genAsignaciones.length) {
@@ -975,9 +977,12 @@ function renderFormularioGenerador(sinDocenteCount) {
         <div class="gen-grado-card">
             <div class="gen-grado-titulo">${g.nombre}</div>
             ${g.materias.map(a => `
-                <div class="gen-materia-row">
-                    <span>${a.materiaNombre} <span class="text-muted">— ${a.docenteNombre}</span></span>
-                    <input type="number" min="1" max="10" value="${a.horasPorSemana}" class="gen-horas-input"
+                <div class="gen-materia-row ${a.incluida ? '' : 'gen-materia-excluida'}">
+                    <label class="gen-materia-check">
+                        <input type="checkbox" ${a.incluida ? 'checked' : ''} onchange="actualizarIncluidaGenerador('${a.id}', this.checked)">
+                        <span>${a.materiaNombre} <span class="text-muted">— ${a.docenteNombre}</span></span>
+                    </label>
+                    <input type="number" min="1" max="10" value="${a.horasPorSemana}" class="gen-horas-input" ${a.incluida ? '' : 'disabled'}
                         onchange="actualizarHorasGenerador('${a.id}', this.value)">
                 </div>
             `).join('')}
@@ -1000,6 +1005,13 @@ window.actualizarHorasGenerador = (asignacionId, valor) => {
     if (a) a.horasPorSemana = Math.max(1, Math.min(10, parseInt(valor, 10) || 1));
 };
 
+window.actualizarIncluidaGenerador = (asignacionId, checked) => {
+    const a = genAsignaciones.find(x => x.id === asignacionId);
+    if (!a) return;
+    a.incluida = checked;
+    renderFormularioGenerador(); // re-pinta para habilitar/deshabilitar el input de horas de esa fila
+};
+
 window.actualizarDisponibilidadGenerador = (docenteId, valor) => {
     const d = genDocentes.find(x => x.id === docenteId);
     if (d) d.disponibilidad = valor;
@@ -1009,7 +1021,7 @@ function construirConfigGenerador() {
     const disponibilidadDocente = {};
     genDocentes.forEach(d => { disponibilidadDocente[d.id] = d.disponibilidad; });
     return {
-        asignaciones: genAsignaciones.map(a => ({
+        asignaciones: genAsignaciones.filter(a => a.incluida).map(a => ({
             id: a.id, gradoId: a.gradoId, materiaId: a.materiaId,
             materiaNombre: a.materiaNombre, docenteId: a.docenteId, horasPorSemana: a.horasPorSemana,
         })),
@@ -1018,7 +1030,7 @@ function construirConfigGenerador() {
 }
 
 window.ejecutarGenerarHorario = () => {
-    if (!genAsignaciones.length) { mostrarToast('No hay materias con docente asignado para programar', 'advertencia'); return; }
+    if (!genAsignaciones.some(a => a.incluida)) { mostrarToast('Marcá al menos una materia para generar el horario', 'advertencia'); return; }
     genSeed = Date.now() % 100000;
     genResultado = generarHorario(construirConfigGenerador(), genSeed);
     mostrarResultadoGenerador();

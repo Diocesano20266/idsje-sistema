@@ -2,7 +2,7 @@
 //  IDSJE — Panel Administrador
 // ═══════════════════════════════════════════
 import { supabase, verificarSesion, cerrarSesion, subirFoto } from './auth.js';
-import { CLOUDINARY_CLOUD, CLOUDINARY_PRESET, MATERIAS_DEFAULT, INSTITUTO, DIAS_HORARIO, BLOQUES_HORARIO } from './config.js';
+import { CLOUDINARY_CLOUD, CLOUDINARY_PRESET, MATERIAS_DEFAULT, INSTITUTO, DIAS_HORARIO, BLOQUES_HORARIO, ESTADOS_ASISTENCIA } from './config.js';
 import {
     mostrarToast,
     mostrarConfirm,
@@ -16,6 +16,8 @@ import {
     renderSkeletonFilas,
     colorPorMateria,
     nombreCortoDocente,
+    diasHabilesDelMes,
+    calcularTotalesAsistencia,
 } from './utils.js';
 
 let usuarioActual = null;
@@ -30,6 +32,14 @@ let dashChart     = null;
 let horarioGradoSel  = null;  // grado_id actualmente elegido en la vista Horarios
 let horariosCache    = [];    // filas de `horarios` del grado elegido
 let gradoMatHorario   = [];   // grado_materia del grado elegido (para el selector de materia del modal)
+
+// Asistencias
+let asisGradoId      = null;
+let asisFecha         = null; // 'YYYY-MM-DD'
+let alumnosAsis       = [];
+let asisCache         = {};   // alumnoId -> fila de `asistencias` guardada
+let asisEdit          = {};   // alumnoId -> estado editado localmente (P/A/J/T)
+let asisRegistroInfo  = null; // { nombre, hora } si ya hay asistencia guardada para esa fecha
 
 // Llama al endpoint serverless que gestiona usuarios con la service key
 async function llamarApiAdmin(action, datos) {
@@ -108,15 +118,17 @@ const TITULOS = {
     docentes: 'Docentes',
     materias: 'Materias',
     horarios: 'Horarios',
+    asistencias: 'Asistencias',
 };
 
 const VISTA_CONFIG = {
-    inicio:   { titulo: 'Inicio',               accion: `<button class="btn-primary" onclick="mostrarVista('grados')">Ver Grados</button>` },
-    grados:   { titulo: 'Grados y Secciones',  accion: `<button class="btn-primary" onclick="abrirModalGrado()">+ Nuevo Grado</button>` },
-    alumnos:  { titulo: 'Alumnos',              accion: `<input type="file" id="excel-alumnos" accept=".xlsx,.xls" class="hidden" onchange="importarAlumnosExcel(event)"><button class="btn-secondary" onclick="document.getElementById('excel-alumnos').click()">📊 Importar Excel</button><button class="btn-primary" onclick="abrirModalAlumno()">+ Nuevo Alumno</button>` },
-    docentes: { titulo: 'Docentes',             accion: `<button class="btn-primary" onclick="abrirModalDocente()">+ Nuevo Docente</button>` },
-    materias: { titulo: 'Materias',             accion: `<button class="btn-secondary" onclick="cargarMateriasDefault()">Cargar IDSJE</button><button class="btn-primary" onclick="abrirModalMateria()">+ Nueva Materia</button>` },
-    horarios: { titulo: 'Horarios',             accion: `<button class="btn-secondary" onclick="imprimirHorarioGrado()">🖨 Imprimir horario</button>` },
+    inicio:      { titulo: 'Inicio',               accion: `<button class="btn-primary" onclick="mostrarVista('grados')">Ver Grados</button>` },
+    grados:      { titulo: 'Grados y Secciones',  accion: `<button class="btn-primary" onclick="abrirModalGrado()">+ Nuevo Grado</button>` },
+    alumnos:     { titulo: 'Alumnos',              accion: `<input type="file" id="excel-alumnos" accept=".xlsx,.xls" class="hidden" onchange="importarAlumnosExcel(event)"><button class="btn-secondary" onclick="document.getElementById('excel-alumnos').click()">📊 Importar Excel</button><button class="btn-primary" onclick="abrirModalAlumno()">+ Nuevo Alumno</button>` },
+    docentes:    { titulo: 'Docentes',             accion: `<button class="btn-primary" onclick="abrirModalDocente()">+ Nuevo Docente</button>` },
+    materias:    { titulo: 'Materias',             accion: `<button class="btn-secondary" onclick="cargarMateriasDefault()">Cargar IDSJE</button><button class="btn-primary" onclick="abrirModalMateria()">+ Nueva Materia</button>` },
+    horarios:    { titulo: 'Horarios',             accion: `<button class="btn-secondary" onclick="imprimirHorarioGrado()">🖨 Imprimir horario</button>` },
+    asistencias: { titulo: 'Asistencias',          accion: `<button class="btn-secondary" onclick="imprimirReporteAsistenciaAdmin()">🖨 Reporte mensual</button><button class="btn-secondary" onclick="imprimirListaBlancoAsistenciaAdmin()">📄 Lista en blanco</button>` },
 };
 
 window.mostrarVista = async (vista) => {
@@ -143,6 +155,7 @@ window.mostrarVista = async (vista) => {
     if (vista === 'docentes') renderDocentes();
     if (vista === 'materias') renderMaterias();
     if (vista === 'horarios') renderVistaHorarios();
+    if (vista === 'asistencias') renderVistaAsistencias();
     if (vista === 'alumnos') {
         // Poblar filtro grado
         const { data, error } = await supabase.from('grados').select('*').order('nombre');
@@ -860,6 +873,234 @@ window.eliminarCeldaHorario = async (id) => {
 window.imprimirHorarioGrado = () => {
     if (!horarioGradoSel) { mostrarToast('Seleccioná un grado primero', 'advertencia'); return; }
     window.open(`./horario.html?grado=${horarioGradoSel}`, '_blank');
+};
+
+// ── ASISTENCIAS ─────────────────────────────
+function fechaHoyISO() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function mesActualISO() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function renderVistaAsistencias() {
+    const opciones = gradosCache.map(g => `<option value="${g.id}">${g.nombre} ${g.modalidad} — Sección ${g.seccion}</option>`).join('');
+
+    const selGrado = document.getElementById('asis-grado');
+    selGrado.innerHTML = opciones;
+    if (!asisGradoId && gradosCache.length) asisGradoId = gradosCache[0].id;
+    if (asisGradoId) selGrado.value = asisGradoId;
+
+    if (!asisFecha) asisFecha = fechaHoyISO();
+    document.getElementById('asis-fecha').value = asisFecha;
+
+    const selResGrado = document.getElementById('asis-res-grado');
+    selResGrado.innerHTML = '<option value="">— Todos los grados —</option>' + opciones;
+    const inputMes = document.getElementById('asis-res-mes');
+    if (!inputMes.value) inputMes.value = mesActualISO();
+
+    if (asisGradoId) cargarAsistenciaDiaAdmin();
+    cargarResumenMensualAdmin();
+}
+
+window.cambiarGradoAsistenciaAdmin = () => {
+    asisGradoId = document.getElementById('asis-grado').value || null;
+    if (asisGradoId) cargarAsistenciaDiaAdmin();
+    else document.getElementById('lista-asistencia').innerHTML = '<div class="empty-bubbles">Seleccioná un grado.</div>';
+};
+
+window.cambiarFechaAsistenciaAdmin = () => {
+    asisFecha = document.getElementById('asis-fecha').value;
+    if (asisGradoId) cargarAsistenciaDiaAdmin();
+};
+
+async function cargarAsistenciaDiaAdmin() {
+    if (!asisGradoId || !asisFecha) return;
+    document.getElementById('lista-asistencia').innerHTML = '<div class="empty-bubbles">Cargando…</div>';
+    document.getElementById('asis-banner').classList.add('hidden');
+
+    try {
+        const { data: alumnos, error: eAl } = await supabase
+            .from('alumnos')
+            .select('*')
+            .eq('grado_id', asisGradoId)
+            .eq('activo', true)
+            .order('apellidos');
+
+        if (eAl && esErrorDeRed(eAl)) { mostrarBannerSinConexion(() => cargarAsistenciaDiaAdmin()); return; }
+        ocultarBannerSinConexion();
+        if (eAl) return notificarError(eAl, 'Error cargando alumnos');
+
+        alumnosAsis = alumnos || [];
+        asisCache = {};
+        asisEdit = {};
+        asisRegistroInfo = null;
+
+        const alumnoIds = alumnosAsis.map(a => a.id);
+        if (alumnoIds.length) {
+            const { data: registros, error: eReg } = await supabase
+                .from('asistencias')
+                .select('*, usuarios(nombre_completo)')
+                .in('alumno_id', alumnoIds)
+                .eq('fecha', asisFecha);
+
+            if (eReg) return notificarError(eReg, 'Error cargando la asistencia');
+
+            (registros || []).forEach(r => { asisCache[r.alumno_id] = r; });
+            const primero = (registros || [])[0];
+            if (primero) asisRegistroInfo = { nombre: primero.usuarios?.nombre_completo || '—', hora: primero.hora_registro };
+        }
+
+        renderBannerAsistenciaAdmin();
+        renderListaAsistenciaAdmin();
+    } catch (err) {
+        if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => cargarAsistenciaDiaAdmin()); return; }
+        notificarError(err, 'Error cargando la asistencia');
+    }
+}
+
+function renderBannerAsistenciaAdmin() {
+    const el = document.getElementById('asis-banner');
+    if (!asisRegistroInfo) { el.classList.add('hidden'); return; }
+    const hora = asisRegistroInfo.hora
+        ? new Date(asisRegistroInfo.hora).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })
+        : '';
+    el.innerHTML = `Asistencia registrada por <b>${asisRegistroInfo.nombre}</b>${hora ? ` a las ${hora}` : ''}. Podés editarla y volver a guardar.`;
+    el.classList.remove('hidden');
+}
+
+function renderListaAsistenciaAdmin() {
+    const cont = document.getElementById('lista-asistencia');
+    if (!alumnosAsis.length) {
+        cont.innerHTML = '<div class="empty-bubbles">Este grado no tiene alumnos activos.</div>';
+        return;
+    }
+
+    cont.innerHTML = alumnosAsis.map((al, idx) => {
+        const estado = asisEdit[al.id] || asisCache[al.id]?.estado || 'P';
+        const pills = ESTADOS_ASISTENCIA.map(e => {
+            const simbolo = e.codigo === 'P' ? '✓' : (e.codigo === 'A' ? '✗' : e.codigo);
+            return `<button type="button" class="asis-pill asis-pill-${e.codigo} ${estado === e.codigo ? 'activo' : ''}"
+                onclick="marcarAsistenciaAdmin('${al.id}', '${e.codigo}')" title="${e.label}">${simbolo}</button>`;
+        }).join('');
+
+        return `
+        <div class="asis-fila">
+            <div class="asis-num">${idx + 1}</div>
+            <div class="asis-nombre">${al.apellidos}, ${al.nombres}</div>
+            <div class="asis-pills">${pills}</div>
+        </div>`;
+    }).join('');
+}
+
+window.marcarAsistenciaAdmin = (alumnoId, estado) => {
+    asisEdit[alumnoId] = estado;
+    renderListaAsistenciaAdmin();
+};
+
+window.guardarAsistenciaAdmin = async () => {
+    if (!asisGradoId || !asisFecha || !alumnosAsis.length) return;
+
+    const btn = document.getElementById('btn-guardar-asistencia');
+    setBotonCargando(btn, true);
+
+    const horaRegistro = new Date().toISOString();
+    const payload = alumnosAsis.map(al => ({
+        alumno_id: al.id,
+        grado_id: asisGradoId,
+        fecha: asisFecha,
+        estado: asisEdit[al.id] || asisCache[al.id]?.estado || 'P',
+        registrado_por: usuarioActual.id,
+        hora_registro: horaRegistro,
+    }));
+
+    const { error } = await supabase.from('asistencias').upsert(payload, { onConflict: 'alumno_id,fecha' });
+
+    setBotonCargando(btn, false);
+    if (error) return notificarError(error, 'Error guardando la asistencia');
+
+    mostrarToast('Asistencia guardada', 'exito');
+    await cargarAsistenciaDiaAdmin();
+    cargarResumenMensualAdmin();
+};
+
+// Tabla de alerta: alumnos con más de 3 ausencias ('A') en el mes elegido,
+// opcionalmente filtrado por grado.
+window.cambiarFiltroResumenAsistencia = () => cargarResumenMensualAdmin();
+
+async function cargarResumenMensualAdmin() {
+    const cont = document.getElementById('asis-resumen');
+    const mes = document.getElementById('asis-res-mes')?.value;
+    const gradoFiltro = document.getElementById('asis-res-grado')?.value || '';
+    if (!mes) return;
+
+    cont.innerHTML = '<div class="empty-bubbles">Cargando resumen…</div>';
+
+    const [anio, mesNum] = mes.split('-').map(Number);
+    const desde = `${mes}-01`;
+    const hasta = `${mes}-${String(new Date(anio, mesNum, 0).getDate()).padStart(2, '0')}`;
+
+    let queryAlumnos = supabase.from('alumnos').select('*, grados(nombre, seccion)').eq('activo', true);
+    if (gradoFiltro) queryAlumnos = queryAlumnos.eq('grado_id', gradoFiltro);
+    const { data: alumnos, error: eAl } = await queryAlumnos;
+    if (eAl) { notificarError(eAl, 'Error cargando alumnos'); return; }
+    if (!alumnos?.length) { cont.innerHTML = '<div class="empty-bubbles">No hay alumnos para este filtro.</div>'; return; }
+
+    const alumnoIds = alumnos.map(a => a.id);
+    const { data: registros, error: eReg } = await supabase
+        .from('asistencias')
+        .select('alumno_id, estado')
+        .in('alumno_id', alumnoIds)
+        .gte('fecha', desde)
+        .lte('fecha', hasta);
+    if (eReg) { notificarError(eReg, 'Error cargando asistencia'); return; }
+
+    const porAlumno = {};
+    (registros || []).forEach(r => {
+        if (!porAlumno[r.alumno_id]) porAlumno[r.alumno_id] = [];
+        porAlumno[r.alumno_id].push(r);
+    });
+
+    const alerta = alumnos
+        .map(al => ({ alumno: al, totales: calcularTotalesAsistencia(porAlumno[al.id] || []) }))
+        .filter(x => x.totales.A > 3)
+        .sort((a, b) => b.totales.A - a.totales.A);
+
+    if (!alerta.length) {
+        cont.innerHTML = '<div class="empty-bubbles">Ningún alumno supera las 3 ausencias este mes. ✅</div>';
+        return;
+    }
+
+    cont.innerHTML = `
+    <table>
+        <thead><tr><th>Alumno</th><th>Grado</th><th>Ausencias</th><th>Justificadas</th><th>Tardanzas</th></tr></thead>
+        <tbody>
+            ${alerta.map(({ alumno: al, totales: t }) => `
+                <tr>
+                    <td class="td-bold">${al.apellidos}, ${al.nombres}</td>
+                    <td>${al.grados?.nombre || ''} ${al.grados?.seccion || ''}</td>
+                    <td><span class="badge" style="background:#fde8e8;color:#b52828">${t.A}</span></td>
+                    <td>${t.J}</td>
+                    <td>${t.T}</td>
+                </tr>`).join('')}
+        </tbody>
+    </table>`;
+}
+
+window.imprimirReporteAsistenciaAdmin = () => {
+    const gradoId = document.getElementById('asis-res-grado')?.value || asisGradoId;
+    const mes = document.getElementById('asis-res-mes')?.value;
+    if (!gradoId || !mes) { mostrarToast('Seleccioná un grado y un mes', 'advertencia'); return; }
+    window.open(`./asistencia-reporte.html?grado=${gradoId}&mes=${mes}`, '_blank');
+};
+
+window.imprimirListaBlancoAsistenciaAdmin = () => {
+    const gradoId = document.getElementById('asis-res-grado')?.value || asisGradoId;
+    const mes = document.getElementById('asis-res-mes')?.value;
+    if (!gradoId || !mes) { mostrarToast('Seleccioná un grado y un mes', 'advertencia'); return; }
+    window.open(`./asistencia-reporte.html?grado=${gradoId}&mes=${mes}&blanco=1`, '_blank');
 };
 
 // ── ALUMNOS ─────────────────────────────────

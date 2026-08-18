@@ -2,7 +2,7 @@
 //  IDSJE — Panel Docente
 // ═══════════════════════════════════════════
 import { supabase, verificarSesion, cerrarSesion } from './auth.js';
-import { CONCEPTOS, DIAS_HORARIO, BLOQUES_HORARIO, ESTADOS_ASISTENCIA } from './config.js';
+import { CONCEPTOS, DIAS_HORARIO, BLOQUES_HORARIO, ESTADOS_ASISTENCIA, TIPOS_EXPEDIENTE } from './config.js';
 import {
     calcularNotaFinal,
     promedioPonderado,
@@ -29,6 +29,12 @@ let alumnosPorGrado = {};  // conteo de alumnos activos por grado_id
 
 // Mi Horario
 let horarioDocenteCache = null; // null = aún no cargado; [] = cargado y vacío
+
+// Expediente disciplinario
+let expAlumnos       = [];   // alumnos de los grados asignados al docente (materia o guía)
+let expAlumnoSel     = null; // alumno_id elegido
+let expEsGuia        = false; // ¿el docente es guía del grado de expAlumnoSel?
+let expTimeline      = [];   // solo si expEsGuia — registros combinados y ordenados por fecha
 
 // Asistencias
 let asisGradoId      = null;
@@ -130,6 +136,7 @@ const TITULOS = {
     horario: 'Mi Horario',
     asistencias: 'Asistencias',
     reportes: 'Reportes',
+    expediente: 'Expediente',
     competencias: 'Competencias Ciudadanas'
 };
 
@@ -150,6 +157,7 @@ window.mostrarVista = (vista) => {
     if (vista === 'horario')      initVistaHorario();
     if (vista === 'asistencias')  initVistaAsistencias();
     if (vista === 'reportes')     initVistaReportes();
+    if (vista === 'expediente')   initVistaExpediente();
     if (vista === 'competencias') initVistaCompetencias();
 };
 
@@ -511,6 +519,170 @@ window.imprimirListaActividadesDocente = () => {
     const examenes = document.getElementById('rep-act-examenes').value || 0;
     if (!gradoId || !materiaId) { mostrarToast('Seleccioná grado y materia', 'advertencia'); return; }
     window.open(`./reporte-lista-actividades.html?grado=${gradoId}&materia=${materiaId}&periodo=${periodo}&cotidianas=${cotidianas}&integradoras=${integradoras}&examenes=${examenes}`, '_blank');
+};
+
+// ── EXPEDIENTE DISCIPLINARIO ──────────────────
+// Selector de alumno: los mismos grados que Asistencias (materia asignada o guía).
+async function initVistaExpediente() {
+    const grados = gradosAsistenciaDocente();
+    const empty = document.getElementById('exp-empty');
+    const panel = document.getElementById('exp-panel');
+
+    if (!grados.length) {
+        empty.classList.remove('hidden');
+        panel.classList.add('hidden');
+        return;
+    }
+    empty.classList.add('hidden');
+    panel.classList.remove('hidden');
+
+    try {
+        const gradoIds = grados.map(g => g.id);
+        const { data, error } = await supabase
+            .from('alumnos')
+            .select('*')
+            .in('grado_id', gradoIds)
+            .eq('activo', true)
+            .order('apellidos');
+
+        if (error && esErrorDeRed(error)) { mostrarBannerSinConexion(() => initVistaExpediente()); return; }
+        ocultarBannerSinConexion();
+        if (error) return notificarError(error, 'Error cargando alumnos');
+
+        expAlumnos = data || [];
+        const sel = document.getElementById('exp-alumno');
+        sel.innerHTML = '<option value="">— Seleccioná un alumno —</option>' +
+            expAlumnos.map(a => `<option value="${a.id}">${a.apellidos}, ${a.nombres}</option>`).join('');
+
+        if (expAlumnoSel && expAlumnos.find(a => a.id === expAlumnoSel)) {
+            sel.value = expAlumnoSel;
+            window.cambiarAlumnoExpediente();
+        } else {
+            expAlumnoSel = null;
+            document.getElementById('exp-detalle').classList.add('hidden');
+        }
+    } catch (err) {
+        if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => initVistaExpediente()); return; }
+        notificarError(err, 'Error cargando alumnos');
+    }
+}
+
+window.cambiarAlumnoExpediente = () => {
+    expAlumnoSel = document.getElementById('exp-alumno').value;
+    if (!expAlumnoSel) {
+        document.getElementById('exp-detalle').classList.add('hidden');
+        return;
+    }
+
+    const alumno = expAlumnos.find(a => a.id === expAlumnoSel);
+    expEsGuia = gradosGuiaCache.some(g => g.id === alumno?.grado_id);
+
+    document.getElementById('exp-detalle').classList.remove('hidden');
+    document.getElementById('exp-timeline-wrap').classList.toggle('hidden', !expEsGuia);
+    document.getElementById('exp-solo-registro-aviso').classList.toggle('hidden', expEsGuia);
+
+    limpiarFormularioExpediente();
+    if (expEsGuia) cargarTimelineExpediente(expAlumnoSel);
+};
+
+async function cargarTimelineExpediente(alumnoId) {
+    document.getElementById('exp-timeline').innerHTML = '<div class="empty-state">Cargando…</div>';
+    try {
+        const [{ data: anec, error: e1 }, { data: dem, error: e2 }, { data: act, error: e3 }] = await Promise.all([
+            supabase.from('anecdoticos').select('*, usuarios(nombre_completo)').eq('alumno_id', alumnoId),
+            supabase.from('demeritos').select('*, usuarios(nombre_completo)').eq('alumno_id', alumnoId),
+            supabase.from('actas').select('*, usuarios(nombre_completo)').eq('alumno_id', alumnoId),
+        ]);
+
+        const errorDeRed = [e1, e2, e3].find(e => e && esErrorDeRed(e));
+        if (errorDeRed) { mostrarBannerSinConexion(() => cargarTimelineExpediente(alumnoId)); return; }
+        ocultarBannerSinConexion();
+        if (e1) return notificarError(e1, 'Error cargando anecdóticos');
+        if (e2) return notificarError(e2, 'Error cargando deméritos');
+        if (e3) return notificarError(e3, 'Error cargando actas');
+
+        expTimeline = [
+            ...(anec || []).map(r => ({ ...r, tipoClave: 'anecdotico', registradoPor: r.usuarios?.nombre_completo || '—' })),
+            ...(dem  || []).map(r => ({ ...r, tipoClave: `demerito_${r.categoria}`, registradoPor: r.usuarios?.nombre_completo || '—' })),
+            ...(act  || []).map(r => ({ ...r, tipoClave: r.tipo, registradoPor: r.usuarios?.nombre_completo || '—' })),
+        ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+        renderTimelineExpediente();
+    } catch (err) {
+        if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => cargarTimelineExpediente(alumnoId)); return; }
+        notificarError(err, 'Error cargando el expediente');
+    }
+}
+
+function renderTimelineExpediente() {
+    const cont = document.getElementById('exp-timeline');
+    if (!expTimeline.length) {
+        cont.innerHTML = '<div class="empty-state">Este alumno no tiene registros en su expediente todavía.</div>';
+        return;
+    }
+
+    cont.innerHTML = expTimeline.map(r => {
+        const info = TIPOS_EXPEDIENTE.find(t => t.clave === r.tipoClave) || {};
+        const extra = r.tipoClave === 'suspension' && r.dias_suspension
+            ? `<span class="exp-extra">${r.dias_suspension} día(s) de suspensión</span>` : '';
+        return `
+        <div class="exp-item" style="--exp-color:${info.color || '#64748b'};--exp-bg:${info.bg || '#f1f5f9'}">
+            <div class="exp-item-icono">${info.icono || '•'}</div>
+            <div class="exp-item-cuerpo">
+                <div class="exp-item-cab">
+                    <span class="exp-item-tipo">${info.label || r.tipoClave}</span>
+                    <span class="exp-item-fecha">${new Date(r.fecha + 'T00:00:00').toLocaleDateString('es-SV')}</span>
+                </div>
+                <div class="exp-item-desc">${r.descripcion}</div>
+                ${extra}
+                <div class="exp-item-registro">Registrado por ${r.registradoPor}</div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+window.cambiarTipoExpediente = () => {
+    const tipo = document.getElementById('exp-tipo').value;
+    document.getElementById('exp-campo-categoria').classList.toggle('hidden', tipo !== 'demerito');
+    document.getElementById('exp-campo-dias').classList.toggle('hidden', tipo !== 'suspension');
+};
+
+function limpiarFormularioExpediente() {
+    document.getElementById('exp-tipo').value = 'anecdotico';
+    document.getElementById('exp-categoria').value = 'leve';
+    document.getElementById('exp-dias').value = 1;
+    document.getElementById('exp-descripcion').value = '';
+    window.cambiarTipoExpediente();
+}
+
+window.guardarRegistroExpediente = async () => {
+    if (!expAlumnoSel) { mostrarToast('Seleccioná un alumno primero', 'advertencia'); return; }
+
+    const tipo = document.getElementById('exp-tipo').value;
+    const descripcion = document.getElementById('exp-descripcion').value.trim();
+    if (!descripcion) { mostrarToast('Escribí una descripción', 'advertencia'); return; }
+
+    const btn = document.getElementById('btn-guardar-expediente');
+    setBotonCargando(btn, true);
+
+    let error;
+    if (tipo === 'anecdotico') {
+        ({ error } = await supabase.from('anecdoticos').insert([{ alumno_id: expAlumnoSel, docente_id: usuarioActual.id, descripcion }]));
+    } else if (tipo === 'demerito') {
+        const categoria = document.getElementById('exp-categoria').value;
+        ({ error } = await supabase.from('demeritos').insert([{ alumno_id: expAlumnoSel, docente_id: usuarioActual.id, categoria, descripcion }]));
+    } else {
+        // acta | suspension | reconocimiento
+        const dias = tipo === 'suspension' ? (parseInt(document.getElementById('exp-dias').value, 10) || 0) : 0;
+        ({ error } = await supabase.from('actas').insert([{ alumno_id: expAlumnoSel, registrado_por: usuarioActual.id, tipo, dias_suspension: dias, descripcion }]));
+    }
+
+    setBotonCargando(btn, false);
+    if (error) return notificarError(error, 'Error guardando el registro');
+
+    mostrarToast('Registro guardado', 'exito');
+    limpiarFormularioExpediente();
+    if (expEsGuia) await cargarTimelineExpediente(expAlumnoSel);
 };
 
 // ── REGISTRO DE NOTAS ────────────────────────

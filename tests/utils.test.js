@@ -370,6 +370,117 @@ describe('generarHorario', () => {
 
         expect(verificarConflictos(resultado).ok).toBe(true);
     });
+
+    // ── Escala realista ──
+    test('escenario realista (10 grados × 10 materias, docentes repartidos entre grados) encuentra solución', () => {
+        const GRADOS = Array.from({ length: 10 }, (_, i) => `G${i + 1}`);
+        const MATERIAS = [
+            { nombre: 'Matemática',              horas: 5, docentes: ['DM1', 'DM2'] },
+            { nombre: 'Lenguaje',                 horas: 5, docentes: ['DL1', 'DL2'] },
+            { nombre: 'Ciencias Naturales',       horas: 4, docentes: ['DC1', 'DC2'] },
+            { nombre: 'Estudios Sociales',        horas: 4, docentes: ['DS1', 'DS2'] },
+            { nombre: 'Idioma Extranjero',        horas: 3, docentes: ['DI1'] },
+            { nombre: 'Informática',              horas: 2, docentes: ['DIN1'] },
+            { nombre: 'Educación Física',         horas: 2, docentes: ['DEF1', 'DEF2'] },
+            { nombre: 'Educación en la Fe',       horas: 2, docentes: ['DR1'] },
+            { nombre: 'Orientación para la Vida', horas: 2, docentes: ['DO1'] },
+            { nombre: 'Módulo',                   horas: 3, docentes: ['DMO1', 'DMO2'] },
+        ];
+
+        const asignaciones = [];
+        let contador = 0;
+        GRADOS.forEach((gradoId, gi) => {
+            MATERIAS.forEach(m => {
+                // Reparte los grados entre los docentes de esa materia (como en una escuela real,
+                // donde no es UN solo profesor de Matemática dando clase en los 10 grados).
+                const docenteId = m.docentes[gi % m.docentes.length];
+                asignaciones.push({
+                    id: `asig-${contador++}`,
+                    gradoId,
+                    materiaId: m.nombre,
+                    materiaNombre: m.nombre,
+                    docenteId,
+                    horasPorSemana: m.horas,
+                });
+            });
+        });
+
+        const resultado = generarHorario({ asignaciones }, 2024);
+
+        expect(resultado).not.toBeNull();
+        expect(verificarConflictos(resultado).ok).toBe(true);
+
+        asignaciones.forEach(a => {
+            const horas = resultado.filter(f => f.grado_materia_id === a.id).length;
+            expect(horas).toBe(a.horasPorSemana);
+        });
+
+        const grupos = {};
+        resultado.forEach(f => {
+            const key = `${f.grado_id}|${f.dia}`;
+            (grupos[key] = grupos[key] || []).push(f.periodo);
+        });
+        Object.values(grupos).forEach(periodos => {
+            const ordenados = [...periodos].sort((a, b) => a - b);
+            ordenados.forEach((p, i) => expect(p).toBe(i + 1));
+        });
+    });
+
+    test('escenario realista (5 grados, 8 materias de 4 horas semanales, docentes compartidos entre grados) encuentra solución sin conflictos', () => {
+        // Mismo caso que reportó el admin en producción: 5 grados, ~10 materias
+        // por grado, 4 horas semanales cada una, con varios docentes (Ciencias
+        // Naturales, Estudios Sociales, Idioma, Ed. en la Fe, Informática) dando
+        // la MISMA materia en LOS 5 grados — el caso límite exacto del palomar
+        // (5 grados = 5 días), que ahora debe resolverse gracias al orden
+        // ponderado (no determinista) y al bloque de 2 como preferencia blanda.
+        const GRADOS = Array.from({ length: 5 }, (_, i) => `G${i + 1}`);
+        const MATERIAS = [
+            { nombre: 'Matemática', docentes: ['DM1', 'DM2'] },
+            { nombre: 'Lenguaje', docentes: ['DL1', 'DL2'] },
+            { nombre: 'Ciencias Naturales', docentes: ['DC1'] },
+            { nombre: 'Estudios Sociales', docentes: ['DS1'] },
+            { nombre: 'Idioma Extranjero', docentes: ['DI1'] },
+            { nombre: 'Educación Física', docentes: ['DEF1', 'DEF2'] },
+            { nombre: 'Educación en la Fe', docentes: ['DR1'] },
+            { nombre: 'Informática', docentes: ['DIN1'] },
+        ];
+
+        const asignaciones = [];
+        let contador = 0;
+        GRADOS.forEach((gradoId, gi) => {
+            MATERIAS.forEach(m => {
+                const docenteId = m.docentes[gi % m.docentes.length];
+                asignaciones.push({
+                    id: `asig-${contador++}`,
+                    gradoId,
+                    materiaId: m.nombre,
+                    materiaNombre: m.nombre,
+                    docenteId,
+                    horasPorSemana: 4,
+                });
+            });
+        });
+
+        const resultado = generarHorario({ asignaciones }, 777);
+
+        expect(resultado).not.toBeNull();
+        expect(verificarConflictos(resultado).ok).toBe(true);
+
+        asignaciones.forEach(a => {
+            const horas = resultado.filter(f => f.grado_materia_id === a.id).length;
+            expect(horas).toBe(4);
+        });
+
+        const grupos = {};
+        resultado.forEach(f => {
+            const key = `${f.grado_id}|${f.dia}`;
+            (grupos[key] = grupos[key] || []).push(f.periodo);
+        });
+        Object.values(grupos).forEach(periodos => {
+            const ordenados = [...periodos].sort((a, b) => a - b);
+            ordenados.forEach((p, i) => expect(p).toBe(i + 1));
+        });
+    });
 });
 
 describe('verificarConflictos', () => {

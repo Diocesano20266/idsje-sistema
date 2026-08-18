@@ -283,6 +283,11 @@
                 <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5" fill="#d4af37" opacity=".25"/><path d="M5 5h6M5 8h6M5 11h3" stroke="#d4af37" stroke-width="1.2"/></svg>
                 <span class="nav-txt">Generar Boletas</span>
             </div>
+            <div class="nav-group-label" style="margin-top:14px">Sistema</div>
+            <div class="nav-item" data-vista="configuracion" onclick="mostrarVista('configuracion')">
+                <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M8 1.5v2M8 12.5v2M14.5 8h-2M3.5 8h-2M12.4 3.6l-1.4 1.4M5 9.6l-1.4 1.4M12.4 12.4l-1.4-1.4M5 6.4L3.6 5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" stroke-linecap="round"/></svg>
+                <span class="nav-txt">Configuración</span>
+            </div>
         </div>
         <div class="sb-foot">
             <div class="user-pill">
@@ -466,6 +471,20 @@
                         </div>
                     </div>
                     <div id="asis-resumen" style="padding:4px 0"></div>
+                </div>
+            </div>
+
+            <!-- CONFIGURACIÓN -->
+            <div id="vista-configuracion" class="hidden">
+                <div class="tabla-wrap">
+                    <div class="tabla-header">
+                        <div class="tabla-title">📅 Períodos Académicos</div>
+                        <div class="filtros" style="margin-bottom:0">
+                            <label style="font-size:12px;color:#64748b;font-weight:600">Año</label>
+                            <input type="number" id="config-anio" onchange="cambiarAnioConfiguracion()" style="width:100px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px">
+                        </div>
+                    </div>
+                    <div id="periodos-academicos-tabla" style="padding:20px"></div>
                 </div>
             </div>
 

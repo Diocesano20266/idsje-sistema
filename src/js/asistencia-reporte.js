@@ -92,10 +92,12 @@ function generarHTML(titulo, alumnos, anio, mesNum, dias, porAlumno, blanco) {
             return `<td>${estado}</td>`;
         }).join('');
 
-        const totales = blanco ? '<td></td>' : `<td class="td-totales">${(() => {
-            const t = calcularTotalesAsistencia(registrosAlumno);
-            return `P${t.P} A${t.A} J${t.J} T${t.T}`;
-        })()}</td>`;
+        const totales = blanco
+            ? ESTADOS_ASISTENCIA.map(e => `<td class="td-tot td-tot-${e.codigo}"></td>`).join('')
+            : (() => {
+                const t = calcularTotalesAsistencia(registrosAlumno);
+                return ESTADOS_ASISTENCIA.map(e => `<td class="td-tot td-tot-${e.codigo}">${t[e.codigo]}</td>`).join('');
+            })();
 
         return `
         <tr>
@@ -106,7 +108,8 @@ function generarHTML(titulo, alumnos, anio, mesNum, dias, porAlumno, blanco) {
         </tr>`;
     }).join('');
 
-    const headerDias = dias.map(d => `<th>${d}</th>`).join('');
+    const headerDias = dias.map(d => `<th rowspan="2">${d}</th>`).join('');
+    const headerTotalesSub = ESTADOS_ASISTENCIA.map(e => `<th class="th-tot th-tot-${e.codigo}">${e.codigo}</th>`).join('');
     const leyenda = blanco ? '' : `<div class="leyenda-asis">${ESTADOS_ASISTENCIA.map(e => `<b>${e.codigo}</b> ${e.label}`).join('&nbsp;&nbsp;·&nbsp;&nbsp;')}</div>`;
 
     return `
@@ -135,10 +138,13 @@ function generarHTML(titulo, alumnos, anio, mesNum, dias, porAlumno, blanco) {
         <table class="tabla-asistencia">
             <thead>
                 <tr>
-                    <th class="th-num">No</th>
-                    <th class="th-nombre">Alumno</th>
+                    <th class="th-num" rowspan="2">No</th>
+                    <th class="th-nombre" rowspan="2">Alumno</th>
                     ${headerDias}
-                    <th>Totales</th>
+                    <th colspan="4">Totales</th>
+                </tr>
+                <tr>
+                    ${headerTotalesSub}
                 </tr>
             </thead>
             <tbody>${filasAlumnos}</tbody>

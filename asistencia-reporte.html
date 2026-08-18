@@ -47,6 +47,15 @@
 
         .tabla-asistencia tbody tr:nth-child(even) td{background:#f8fafc}
 
+        /* Celdas de días — mismo color que su estado, no solo la letra sola.
+           Repite tbody/tr para empatar y ganar (por ir después) la especificidad
+           de la regla de zebra-striping de arriba. */
+        .tabla-asistencia tbody tr td.td-dia{font-weight:700}
+        .tabla-asistencia tbody tr td.td-dia-P{background:#d1fae5;color:#059669}
+        .tabla-asistencia tbody tr td.td-dia-A{background:#fee2e2;color:#dc2626}
+        .tabla-asistencia tbody tr td.td-dia-J{background:#dbeafe;color:#2563eb}
+        .tabla-asistencia tbody tr td.td-dia-T{background:#fef3c7;color:#a16207}
+
         /* Totales — cada estado en su propio cuadrito de color (encabezado P/A/J/T),
            y abajo solo el número correspondiente en cada columna. Los selectores
            repiten tbody/tr a propósito para empatar (y ganar, por ir después) la

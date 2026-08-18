@@ -1247,9 +1247,11 @@ window.imprimirListaActividadesAdmin = () => {
     const gradoId = document.getElementById('rep-act-grado').value;
     const materiaId = document.getElementById('rep-act-materia').value;
     const periodo = document.getElementById('rep-act-periodo').value;
-    const columnas = document.getElementById('rep-act-columnas').value || 5;
+    const cotidianas = document.getElementById('rep-act-cotidianas').value || 0;
+    const integradoras = document.getElementById('rep-act-integradoras').value || 0;
+    const examenes = document.getElementById('rep-act-examenes').value || 0;
     if (!gradoId || !materiaId) { mostrarToast('Seleccioná grado y materia', 'advertencia'); return; }
-    window.open(`./reporte-lista-actividades.html?grado=${gradoId}&materia=${materiaId}&periodo=${periodo}&columnas=${columnas}`, '_blank');
+    window.open(`./reporte-lista-actividades.html?grado=${gradoId}&materia=${materiaId}&periodo=${periodo}&cotidianas=${cotidianas}&integradoras=${integradoras}&examenes=${examenes}`, '_blank');
 };
 
 // ── ALUMNOS ─────────────────────────────────

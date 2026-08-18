@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDSJE — Reporte de Asistencia</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./src/css/ui.css">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'DM Sans',sans-serif;background:#f0f4f8;color:#1e293b}
+
+        .boleta-page{
+            background:#fff;
+            max-width:1100px;
+            margin:24px auto;
+            padding:14px 24px 24px;
+            box-shadow:0 2px 12px rgba(0,0,0,.1);
+            border-radius:8px;
+            position:relative;
+            font-size:10px;
+            font-family:'Times New Roman', Times, serif;
+        }
+
+        /* Encabezado — mismo patrón que boleta.html / horario.html */
+        .boleta-header{display:flex;align-items:center;gap:12px;border-bottom:2px solid #1B3A6B;padding-bottom:8px;margin-bottom:10px;font-family:'DM Sans',sans-serif}
+        .header-logos{flex-shrink:0}
+        .logo-img{height:70px;width:70px;object-fit:cover;border-radius:8px;display:block}
+        .logo-mined-img{height:52px !important;width:auto !important;object-fit:contain}
+        .header-info{flex:1;text-align:center}
+        .inst-nombre{font-family:'Times New Roman', Times, serif;font-weight:700;font-size:16px;color:#1B3A6B}
+        .inst-dir{font-family:'Times New Roman', Times, serif;font-size:10px;color:#64748b;margin-top:2px}
+
+        .boleta-titulo{text-align:center;font-family:'Times New Roman', Times, serif;font-weight:700;font-size:13px;margin:8px 0 6px;text-transform:uppercase}
+        .leyenda-asis{text-align:center;font-size:10px;color:#475569;margin-bottom:12px}
+        .leyenda-asis b{color:#0a1628}
+
+        /* Tabla — filas = alumnos, columnas = días hábiles del mes */
+        .tabla-asistencia{width:100%;border-collapse:collapse;font-size:9px}
+        .tabla-asistencia th{background:#1B3A6B;color:#fff;padding:4px 3px;text-align:center;font-weight:700}
+        .tabla-asistencia td{border:1px solid #e2e8f0;padding:4px 3px;text-align:center;vertical-align:middle}
+        .th-num{width:22px}
+        .th-nombre{text-align:left!important;min-width:150px}
+        .td-num{color:#94a3b8}
+        .td-nombre{text-align:left;font-weight:600;white-space:nowrap}
+        .td-totales{font-weight:700;color:#1B3A6B;white-space:nowrap;background:#f8fafc}
+        .tabla-asistencia tbody tr:nth-child(even) td{background:#f8fafc}
+        .tabla-asistencia tbody tr:nth-child(even) .td-totales{background:#eef2fb}
+
+        /* Botón de impresión */
+        .boleta-toolbar{text-align:right;margin-bottom:10px}
+        .btn-imprimir-boleta{background:#1B3A6B;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-weight:600;font-size:11px;cursor:pointer;transition:background .2s}
+        .btn-imprimir-boleta:hover{background:#2E5FAC}
+
+        @media print {
+            @page { size: landscape; }
+            .no-print{display:none!important}
+            body{background:white}
+            .boleta-page{box-shadow:none;margin:0;padding:14px 16px;border-radius:0;max-width:100%}
+        }
+    </style>
+</head>
+<body>
+    <div id="contenedor-asistencia">
+        <p style="padding:40px;text-align:center;color:#94a3b8">Cargando…</p>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module" src="./src/js/asistencia-reporte.js"></script>
+</body>
+</html>

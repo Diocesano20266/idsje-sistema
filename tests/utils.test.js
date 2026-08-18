@@ -270,6 +270,106 @@ describe('generarHorario', () => {
         };
         expect(generarHorario(configImposible, 1)).toBeNull();
     });
+
+    // ── Bloques de 2 períodos consecutivos ──
+    function agruparPeriodosPorGradoDia(filas) {
+        const grupos = {};
+        filas.forEach(f => {
+            const key = `${f.grado_id}|${f.dia}`;
+            if (!grupos[key]) grupos[key] = [];
+            grupos[key].push(f.periodo);
+        });
+        return grupos;
+    }
+
+    test('una materia con horas pares queda en un único bloque de 2 períodos consecutivos', () => {
+        // gm2 (Educación Física, D2, 2 horas) — con solo 2 horas, tiene que salir
+        // como UN bloque de 2 períodos seguidos en un mismo día, no dos días sueltos.
+        const resultado = generarHorario(configFactible, 42);
+        const filasGm2 = resultado.filter(f => f.grado_materia_id === 'gm2');
+
+        expect(filasGm2).toHaveLength(2);
+        const dias = new Set(filasGm2.map(f => f.dia));
+        expect(dias.size).toBe(1); // las 2 horas caen el mismo día
+
+        const periodos = filasGm2.map(f => f.periodo).sort((a, b) => a - b);
+        expect(periodos[1] - periodos[0]).toBe(1); // períodos consecutivos
+    });
+
+    test('una materia con horas impares deja exactamente un bloque suelto de 1 período y el resto en pares de 2', () => {
+        const config = {
+            asignaciones: [
+                { id: 'x1', gradoId: 'G1', materiaId: 'M9', materiaNombre: 'Test', docenteId: 'D9', horasPorSemana: 5 },
+            ],
+        };
+        const resultado = generarHorario(config, 5);
+        expect(resultado).not.toBeNull();
+
+        const porDia = {};
+        resultado.forEach(f => { (porDia[f.dia] = porDia[f.dia] || []).push(f.periodo); });
+        const tamanosDeBloque = Object.values(porDia).map(periodos => periodos.length).sort((a, b) => a - b);
+
+        // 5 horas = 2 bloques de 2 + 1 bloque suelto de 1 → tamaños [1,2,2]
+        expect(tamanosDeBloque).toEqual([1, 2, 2]);
+
+        // Los bloques de tamaño 2 deben ser períodos consecutivos
+        Object.values(porDia).filter(p => p.length === 2).forEach(periodos => {
+            const [a, b] = [...periodos].sort((x, y) => x - y);
+            expect(b - a).toBe(1);
+        });
+    });
+
+    // ── Sin huecos dentro del día de un grado ──
+    test('el horario de cada grado nunca deja huecos: los períodos ocupados en un día son siempre un prefijo 1..k', () => {
+        const resultado = generarHorario(configFactible, 42);
+        const grupos = agruparPeriodosPorGradoDia(resultado);
+
+        Object.values(grupos).forEach(periodos => {
+            const ordenados = [...periodos].sort((a, b) => a - b);
+            ordenados.forEach((periodo, i) => expect(periodo).toBe(i + 1));
+        });
+    });
+
+    test('sigue sin huecos incluso con varias materias compitiendo por el mismo grado', () => {
+        // 3 materias de 2 horas cada una en el mismo grado → como mucho 6 períodos
+        // ocupados ese día, pero SIEMPRE deben empezar en P1 y no dejar saltos.
+        const config = {
+            asignaciones: [
+                { id: 'm1', gradoId: 'G1', materiaId: 'A', materiaNombre: 'A', docenteId: 'D1', horasPorSemana: 2 },
+                { id: 'm2', gradoId: 'G1', materiaId: 'B', materiaNombre: 'B', docenteId: 'D2', horasPorSemana: 2 },
+                { id: 'm3', gradoId: 'G1', materiaId: 'C', materiaNombre: 'C', docenteId: 'D3', horasPorSemana: 2 },
+            ],
+        };
+        const resultado = generarHorario(config, 11);
+        expect(resultado).not.toBeNull();
+
+        const grupos = agruparPeriodosPorGradoDia(resultado);
+        Object.values(grupos).forEach(periodos => {
+            const ordenados = [...periodos].sort((a, b) => a - b);
+            ordenados.forEach((periodo, i) => expect(periodo).toBe(i + 1));
+        });
+    });
+
+    // ── Todos los grados resueltos en una sola corrida ──
+    test('resuelve varios grados en una sola corrida sin que un docente compartido choque entre ellos', () => {
+        const config = {
+            asignaciones: [
+                { id: 'g1a', gradoId: 'G1', materiaId: 'M1', materiaNombre: 'X', docenteId: 'D1', horasPorSemana: 2 },
+                { id: 'g2a', gradoId: 'G2', materiaId: 'M1', materiaNombre: 'X', docenteId: 'D1', horasPorSemana: 2 },
+                { id: 'g3a', gradoId: 'G3', materiaId: 'M1', materiaNombre: 'X', docenteId: 'D1', horasPorSemana: 2 },
+                { id: 'g4a', gradoId: 'G4', materiaId: 'M1', materiaNombre: 'X', docenteId: 'D1', horasPorSemana: 2 },
+            ],
+        };
+        const resultado = generarHorario(config, 3);
+
+        expect(resultado).not.toBeNull();
+        expect(resultado).toHaveLength(8); // 4 grados × 2 horas cada uno
+
+        const gradosResueltos = new Set(resultado.map(f => f.grado_id));
+        expect(gradosResueltos.size).toBe(4); // los 4 grados quedaron programados en la misma corrida
+
+        expect(verificarConflictos(resultado).ok).toBe(true);
+    });
 });
 
 describe('verificarConflictos', () => {

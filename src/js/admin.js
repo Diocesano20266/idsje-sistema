@@ -2,7 +2,7 @@
 //  IDSJE — Panel Administrador
 // ═══════════════════════════════════════════
 import { supabase, verificarSesion, cerrarSesion, subirFoto } from './auth.js';
-import { CLOUDINARY_CLOUD, CLOUDINARY_PRESET, MATERIAS_DEFAULT, INSTITUTO } from './config.js';
+import { CLOUDINARY_CLOUD, CLOUDINARY_PRESET, MATERIAS_DEFAULT, INSTITUTO, DIAS_HORARIO, BLOQUES_HORARIO } from './config.js';
 import {
     mostrarToast,
     mostrarConfirm,
@@ -14,6 +14,8 @@ import {
     mostrarErrorCampo,
     limpiarErroresFormulario,
     renderSkeletonFilas,
+    colorPorMateria,
+    nombreCortoDocente,
 } from './utils.js';
 
 let usuarioActual = null;
@@ -23,6 +25,11 @@ let usuariosCache = [];
 let materiasCache = [];
 let vistaActual   = 'inicio';
 let dashChart     = null;
+
+// Horarios
+let horarioGradoSel  = null;  // grado_id actualmente elegido en la vista Horarios
+let horariosCache    = [];    // filas de `horarios` del grado elegido
+let gradoMatHorario   = [];   // grado_materia del grado elegido (para el selector de materia del modal)
 
 // Llama al endpoint serverless que gestiona usuarios con la service key
 async function llamarApiAdmin(action, datos) {
@@ -99,7 +106,8 @@ const TITULOS = {
     grados: 'Grados y Secciones',
     alumnos: 'Alumnos',
     docentes: 'Docentes',
-    materias: 'Materias'
+    materias: 'Materias',
+    horarios: 'Horarios',
 };
 
 const VISTA_CONFIG = {
@@ -108,6 +116,7 @@ const VISTA_CONFIG = {
     alumnos:  { titulo: 'Alumnos',              accion: `<input type="file" id="excel-alumnos" accept=".xlsx,.xls" class="hidden" onchange="importarAlumnosExcel(event)"><button class="btn-secondary" onclick="document.getElementById('excel-alumnos').click()">📊 Importar Excel</button><button class="btn-primary" onclick="abrirModalAlumno()">+ Nuevo Alumno</button>` },
     docentes: { titulo: 'Docentes',             accion: `<button class="btn-primary" onclick="abrirModalDocente()">+ Nuevo Docente</button>` },
     materias: { titulo: 'Materias',             accion: `<button class="btn-secondary" onclick="cargarMateriasDefault()">Cargar IDSJE</button><button class="btn-primary" onclick="abrirModalMateria()">+ Nueva Materia</button>` },
+    horarios: { titulo: 'Horarios',             accion: `<button class="btn-secondary" onclick="imprimirHorarioGrado()">🖨 Imprimir horario</button>` },
 };
 
 window.mostrarVista = async (vista) => {
@@ -133,6 +142,7 @@ window.mostrarVista = async (vista) => {
     if (vista === 'grados')   renderGrados();
     if (vista === 'docentes') renderDocentes();
     if (vista === 'materias') renderMaterias();
+    if (vista === 'horarios') renderVistaHorarios();
     if (vista === 'alumnos') {
         // Poblar filtro grado
         const { data, error } = await supabase.from('grados').select('*').order('nombre');
@@ -685,6 +695,171 @@ window.cargarMateriasDefault = async () => {
     await cargarTodo();
     renderMaterias();
     mostrarToast(`${nuevas.length} materia(s) agregada(s)`, 'exito');
+};
+
+// ── HORARIOS ────────────────────────────────
+async function renderVistaHorarios() {
+    const sel = document.getElementById('horario-grado');
+    if (sel && !sel.dataset.poblado) {
+        sel.innerHTML = '<option value="">— Seleccioná un grado —</option>' +
+            gradosCache.map(g => `<option value="${g.id}">${g.nombre} ${g.modalidad} — Sección ${g.seccion}</option>`).join('');
+        sel.dataset.poblado = '1';
+    }
+    if (horarioGradoSel) {
+        sel.value = horarioGradoSel;
+        await cargarHorarioGrado(horarioGradoSel);
+    } else {
+        document.getElementById('horario-grid').innerHTML = '<div class="empty-bubbles">Seleccioná un grado para ver o editar su horario.</div>';
+    }
+}
+
+window.cambiarGradoHorario = async () => {
+    const gradoId = document.getElementById('horario-grado').value;
+    horarioGradoSel = gradoId || null;
+    if (!horarioGradoSel) {
+        document.getElementById('horario-grid').innerHTML = '<div class="empty-bubbles">Seleccioná un grado para ver o editar su horario.</div>';
+        return;
+    }
+    await cargarHorarioGrado(horarioGradoSel);
+};
+
+async function cargarHorarioGrado(gradoId) {
+    document.getElementById('horario-grid').innerHTML = '<div class="empty-bubbles">Cargando horario…</div>';
+    try {
+        const [{ data: horarios, error: eHor }, { data: gm, error: eGm }] = await Promise.all([
+            supabase.from('horarios').select('*, materias(id, nombre), usuarios(id, nombre_completo)').eq('grado_id', gradoId),
+            supabase.from('grado_materia').select('*, materias(id, nombre)').eq('grado_id', gradoId),
+        ]);
+
+        const errorDeRed = [eHor, eGm].find(e => e && esErrorDeRed(e));
+        if (errorDeRed) {
+            mostrarBannerSinConexion(() => cargarHorarioGrado(gradoId));
+            return;
+        }
+        ocultarBannerSinConexion();
+        if (eHor) return notificarError(eHor, 'Error cargando el horario');
+        if (eGm)  return notificarError(eGm, 'Error cargando materias del grado');
+
+        horariosCache   = horarios || [];
+        gradoMatHorario = gm || [];
+        renderGridHorario();
+    } catch (err) {
+        if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => cargarHorarioGrado(gradoId)); return; }
+        notificarError(err, 'Error cargando el horario');
+    }
+}
+
+function renderGridHorario() {
+    const cont = document.getElementById('horario-grid');
+    const porCelda = {};
+    horariosCache.forEach(h => { porCelda[`${h.dia}-${h.periodo}`] = h; });
+
+    let html = '<div class="hg-cell hg-head"></div>' +
+        DIAS_HORARIO.map(d => `<div class="hg-cell hg-head">${d}</div>`).join('');
+
+    BLOQUES_HORARIO.forEach(b => {
+        if (b.tipo !== 'clase') {
+            html += `<div class="hg-cell hg-periodo-label"><span class="hg-periodo-hora">${b.inicio}–${b.fin}</span></div>`;
+            html += `<div class="hg-cell hg-bloqueado" style="grid-column:2 / -1">${b.label}</div>`;
+            return;
+        }
+        html += `<div class="hg-cell hg-periodo-label"><span class="hg-periodo-num">P${b.periodo}</span><span class="hg-periodo-hora">${b.inicio}–${b.fin}</span></div>`;
+        DIAS_HORARIO.forEach(dia => {
+            const h = porCelda[`${dia}-${b.periodo}`];
+            if (h) {
+                html += `
+                <div class="hg-cell hg-ocupada-wrap">
+                    <div class="hg-ocupada" style="background:${colorPorMateria(h.materia_id)}">
+                        <button type="button" class="hg-del-btn" onclick="eliminarCeldaHorario('${h.id}')" title="Quitar">✕</button>
+                        <div class="hg-materia">${h.materias?.nombre || ''}</div>
+                        <div class="hg-docente">${nombreCortoDocente(h.usuarios?.nombre_completo)}</div>
+                    </div>
+                </div>`;
+            } else {
+                html += `
+                <div class="hg-cell hg-vacia">
+                    <button type="button" class="hg-add-btn" onclick="abrirModalCeldaHorario('${dia}', ${b.periodo})" title="Asignar">+</button>
+                </div>`;
+            }
+        });
+    });
+
+    cont.innerHTML = html;
+}
+
+window.abrirModalCeldaHorario = (dia, periodo) => {
+    if (!horarioGradoSel) return;
+    if (!gradoMatHorario.length) {
+        mostrarToast('Este grado no tiene materias asignadas todavía', 'advertencia');
+        return;
+    }
+    const bloque = BLOQUES_HORARIO.find(b => b.tipo === 'clase' && b.periodo === periodo);
+
+    document.getElementById('modal-celda-horario-title').textContent = `${dia} — Período ${periodo} (${bloque.inicio}–${bloque.fin})`;
+    document.getElementById('hcelda-grado-id').value     = horarioGradoSel;
+    document.getElementById('hcelda-dia').value          = dia;
+    document.getElementById('hcelda-periodo').value      = periodo;
+    document.getElementById('hcelda-hora-inicio').value  = bloque.inicio;
+    document.getElementById('hcelda-hora-fin').value     = bloque.fin;
+    document.getElementById('hcelda-docente-id').value   = '';
+    document.getElementById('hcelda-docente-nombre').textContent = '—';
+
+    const selMat = document.getElementById('hcelda-materia');
+    selMat.innerHTML = '<option value="">— Seleccioná una materia —</option>' +
+        gradoMatHorario.map(gm => `<option value="${gm.materia_id}" data-docente="${gm.docente_id || ''}">${gm.materias?.nombre || ''}</option>`).join('');
+    selMat.value = '';
+
+    abrirModal('modal-celda-horario');
+};
+
+window.materiaCeldaHorarioCambio = () => {
+    const selMat    = document.getElementById('hcelda-materia');
+    const docenteId = selMat.options[selMat.selectedIndex]?.dataset.docente || '';
+    const docente   = usuariosCache.find(u => u.id === docenteId);
+    document.getElementById('hcelda-docente-id').value = docenteId;
+    document.getElementById('hcelda-docente-nombre').textContent =
+        docente ? docente.nombre_completo : (selMat.value ? 'Sin docente asignado en este grado' : '—');
+};
+
+window.guardarCeldaHorario = async () => {
+    const gradoId    = document.getElementById('hcelda-grado-id').value;
+    const dia        = document.getElementById('hcelda-dia').value;
+    const periodo    = parseInt(document.getElementById('hcelda-periodo').value, 10);
+    const horaInicio = document.getElementById('hcelda-hora-inicio').value;
+    const horaFin    = document.getElementById('hcelda-hora-fin').value;
+    const materiaId  = document.getElementById('hcelda-materia').value;
+    const docenteId  = document.getElementById('hcelda-docente-id').value || null;
+
+    if (!materiaId) { mostrarToast('Seleccioná una materia', 'advertencia'); return; }
+
+    const btn = document.getElementById('btn-guardar-celda-horario');
+    setBotonCargando(btn, true);
+
+    const { error } = await supabase.from('horarios').upsert(
+        [{ grado_id: gradoId, materia_id: materiaId, docente_id: docenteId, dia, periodo, hora_inicio: horaInicio, hora_fin: horaFin }],
+        { onConflict: 'grado_id,dia,periodo' }
+    );
+
+    setBotonCargando(btn, false);
+    if (error) return notificarError(error, 'Error guardando el horario');
+
+    mostrarToast('Horario actualizado', 'exito');
+    cerrarModal('modal-celda-horario');
+    await cargarHorarioGrado(gradoId);
+};
+
+window.eliminarCeldaHorario = async (id) => {
+    const ok = await mostrarConfirm('¿Quitar esta clase del horario?', { textoConfirmar: 'Quitar' });
+    if (!ok) return;
+    const { error } = await supabase.from('horarios').delete().eq('id', id);
+    if (error) return notificarError(error, 'Error quitando la clase');
+    mostrarToast('Clase quitada del horario', 'exito');
+    await cargarHorarioGrado(horarioGradoSel);
+};
+
+window.imprimirHorarioGrado = () => {
+    if (!horarioGradoSel) { mostrarToast('Seleccioná un grado primero', 'advertencia'); return; }
+    window.open(`./horario.html?grado=${horarioGradoSel}`, '_blank');
 };
 
 // ── ALUMNOS ─────────────────────────────────

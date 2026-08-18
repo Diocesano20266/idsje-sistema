@@ -62,3 +62,18 @@ export const ESTADOS_ASISTENCIA = [
     { codigo: 'J', label: 'Justificado', color: '#2563eb', bg: '#dbeafe' },
     { codigo: 'T', label: 'Tardanza',    color: '#a16207', bg: '#fef3c7' },
 ];
+
+// ── Expediente disciplinario ──────────────────
+// `clave` es lo que arma el timeline en admin.js/docente.js a partir de la
+// tabla de origen: 'anecdotico' (tabla anecdoticos), 'demerito_leve' |
+// 'demerito_grave' | 'demerito_muy_grave' (tabla demeritos + su categoria),
+// y 'acta' | 'suspension' | 'reconocimiento' (tabla actas + su tipo).
+export const TIPOS_EXPEDIENTE = [
+    { clave: 'anecdotico',         label: 'Anecdótico',        icono: '📝', color: '#2563eb', bg: '#dbeafe' },
+    { clave: 'demerito_leve',      label: 'Demérito leve',      icono: '⚠️', color: '#d97706', bg: '#fef3c7' },
+    { clave: 'demerito_grave',     label: 'Demérito grave',     icono: '🔶', color: '#ea580c', bg: '#ffedd5' },
+    { clave: 'demerito_muy_grave', label: 'Demérito muy grave', icono: '🔴', color: '#dc2626', bg: '#fee2e2' },
+    { clave: 'acta',               label: 'Acta',                icono: '📋', color: '#7c3aed', bg: '#ede9fe' },
+    { clave: 'suspension',         label: 'Suspensión',         icono: '🚫', color: '#991b1b', bg: '#fee2e2' },
+    { clave: 'reconocimiento',     label: 'Reconocimiento',     icono: '⭐', color: '#059669', bg: '#d1fae5' },
+];

@@ -175,6 +175,11 @@
             .horario-grid{grid-template-columns:80px repeat(5,minmax(90px,1fr));overflow-x:auto}
         }
 
+        /* ── OTROS REPORTES ── */
+        .reportes-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+        @media(max-width:1100px){.reportes-grid{grid-template-columns:repeat(2,1fr)}}
+        @media(max-width:700px){.reportes-grid{grid-template-columns:1fr}}
+
         /* ── ASISTENCIAS ── */
         .asis-banner{background:#fef9e7;border:1px solid #fde68a;border-radius:9px;padding:10px 14px;font-size:12px;color:#92400e;margin-bottom:14px}
         .asis-lista{background:#fff;border-radius:12px 12px 0 0;border:1px solid #e2e8f0;overflow:hidden}
@@ -282,6 +287,10 @@
             <div class="nav-item gold" onclick="window.location.href='./boleta.html'">
                 <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5" fill="#d4af37" opacity=".25"/><path d="M5 5h6M5 8h6M5 11h3" stroke="#d4af37" stroke-width="1.2"/></svg>
                 <span class="nav-txt">Generar Boletas</span>
+            </div>
+            <div class="nav-item" data-vista="reportes" onclick="mostrarVista('reportes')">
+                <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M5 5h6M5 8h4M5 11h5" stroke="rgba(255,255,255,.6)" stroke-width="1.2"/></svg>
+                <span class="nav-txt">Otros Reportes</span>
             </div>
             <div class="nav-group-label" style="margin-top:14px">Sistema</div>
             <div class="nav-item" data-vista="configuracion" onclick="mostrarVista('configuracion')">
@@ -471,6 +480,41 @@
                         </div>
                     </div>
                     <div id="asis-resumen" style="padding:4px 0"></div>
+                </div>
+            </div>
+
+            <!-- OTROS REPORTES -->
+            <div id="vista-reportes" class="hidden">
+                <div class="reportes-grid">
+                    <div class="dash-card">
+                        <div class="dash-card-header"><div class="dash-card-title"><span class="gs-dot"></span>Reporte de Matrícula</div></div>
+                        <div class="dash-card-body">
+                            <div class="field"><label>Grado</label><select id="rep-matricula-grado"></select></div>
+                            <button class="btn-primary" style="width:100%;justify-content:center;margin-top:8px" onclick="imprimirMatriculaDesdeReportes()">🖨 Imprimir</button>
+                        </div>
+                    </div>
+                    <div class="dash-card">
+                        <div class="dash-card-header"><div class="dash-card-title"><span class="gs-dot"></span>Notas Finales</div></div>
+                        <div class="dash-card-body">
+                            <div class="field"><label>Grado</label><select id="rep-notas-grado"></select></div>
+                            <div class="field"><label>Período</label>
+                                <select id="rep-notas-periodo"><option value="1">Período 1</option><option value="2">Período 2</option><option value="3">Período 3</option><option value="4">Período 4</option></select>
+                            </div>
+                            <button class="btn-primary" style="width:100%;justify-content:center;margin-top:8px" onclick="imprimirReporteNotasAdmin()">🖨 Imprimir</button>
+                        </div>
+                    </div>
+                    <div class="dash-card">
+                        <div class="dash-card-header"><div class="dash-card-title"><span class="gs-dot"></span>Lista de Actividades</div></div>
+                        <div class="dash-card-body">
+                            <div class="field"><label>Grado</label><select id="rep-act-grado" onchange="cambiarGradoActividadesAdmin()"></select></div>
+                            <div class="field"><label>Materia</label><select id="rep-act-materia"><option value="">— Elegí un grado primero —</option></select></div>
+                            <div class="field"><label>Período</label>
+                                <select id="rep-act-periodo"><option value="1">Período 1</option><option value="2">Período 2</option><option value="3">Período 3</option><option value="4">Período 4</option></select>
+                            </div>
+                            <div class="field"><label>Cantidad de columnas (máx. 10)</label><input type="number" id="rep-act-columnas" value="5" min="1" max="10"></div>
+                            <button class="btn-primary" style="width:100%;justify-content:center;margin-top:8px" onclick="imprimirListaActividadesAdmin()">🖨 Imprimir</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 

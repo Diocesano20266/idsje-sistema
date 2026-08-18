@@ -124,17 +124,19 @@ const TITULOS = {
     horarios: 'Horarios',
     asistencias: 'Asistencias',
     configuracion: 'Configuración',
+    reportes: 'Reportes',
 };
 
 const VISTA_CONFIG = {
     inicio:      { titulo: 'Inicio',               accion: `<button class="btn-primary" onclick="mostrarVista('grados')">Ver Grados</button>` },
     grados:      { titulo: 'Grados y Secciones',  accion: `<button class="btn-primary" onclick="abrirModalGrado()">+ Nuevo Grado</button>` },
-    alumnos:     { titulo: 'Alumnos',              accion: `<input type="file" id="excel-alumnos" accept=".xlsx,.xls" class="hidden" onchange="importarAlumnosExcel(event)"><button class="btn-secondary" onclick="document.getElementById('excel-alumnos').click()">📊 Importar Excel</button><button class="btn-primary" onclick="abrirModalAlumno()">+ Nuevo Alumno</button>` },
+    alumnos:     { titulo: 'Alumnos',              accion: `<input type="file" id="excel-alumnos" accept=".xlsx,.xls" class="hidden" onchange="importarAlumnosExcel(event)"><button class="btn-secondary" onclick="document.getElementById('excel-alumnos').click()">📊 Importar Excel</button><button class="btn-secondary" onclick="imprimirMatriculaAdmin()">🖨 Reporte de matrícula</button><button class="btn-primary" onclick="abrirModalAlumno()">+ Nuevo Alumno</button>` },
     docentes:    { titulo: 'Docentes',             accion: `<button class="btn-primary" onclick="abrirModalDocente()">+ Nuevo Docente</button>` },
     materias:    { titulo: 'Materias',             accion: `<button class="btn-secondary" onclick="cargarMateriasDefault()">Cargar IDSJE</button><button class="btn-primary" onclick="abrirModalMateria()">+ Nueva Materia</button>` },
     horarios:    { titulo: 'Horarios',             accion: `<button class="btn-secondary" onclick="imprimirHorarioGrado()">🖨 Imprimir horario</button>` },
     asistencias: { titulo: 'Asistencias',          accion: `<button class="btn-secondary" onclick="imprimirReporteAsistenciaAdmin()">🖨 Reporte mensual</button><button class="btn-secondary" onclick="imprimirListaBlancoAsistenciaAdmin()">📄 Lista en blanco</button>` },
     configuracion: { titulo: 'Configuración',      accion: '' },
+    reportes:    { titulo: 'Reportes',             accion: '' },
 };
 
 window.mostrarVista = async (vista) => {
@@ -163,6 +165,7 @@ window.mostrarVista = async (vista) => {
     if (vista === 'horarios') renderVistaHorarios();
     if (vista === 'asistencias') renderVistaAsistencias();
     if (vista === 'configuracion') renderVistaConfiguracion();
+    if (vista === 'reportes') renderVistaReportes();
     if (vista === 'alumnos') {
         // Poblar filtro grado
         const { data, error } = await supabase.from('grados').select('*').order('nombre');
@@ -1195,6 +1198,58 @@ window.guardarPeriodosAcademicos = async () => {
 
     mostrarToast('Períodos académicos guardados', 'exito');
     await cargarPeriodosAcademicos();
+};
+
+// ── OTROS REPORTES ───────────────────────────
+window.imprimirMatriculaAdmin = () => {
+    const gradoId = document.getElementById('filtro-grado')?.value;
+    if (!gradoId) { mostrarToast('Seleccioná un grado en el filtro de Alumnos primero', 'advertencia'); return; }
+    window.open(`./reporte-matricula.html?grado=${gradoId}`, '_blank');
+};
+
+function renderVistaReportes() {
+    const opciones = '<option value="">— Seleccioná un grado —</option>' +
+        gradosCache.map(g => `<option value="${g.id}">${g.nombre} ${g.modalidad} — Sección ${g.seccion}</option>`).join('');
+
+    document.getElementById('rep-matricula-grado').innerHTML = opciones;
+    document.getElementById('rep-notas-grado').innerHTML = opciones;
+    document.getElementById('rep-act-grado').innerHTML = opciones;
+    document.getElementById('rep-act-materia').innerHTML = '<option value="">— Elegí un grado primero —</option>';
+}
+
+window.imprimirMatriculaDesdeReportes = () => {
+    const gradoId = document.getElementById('rep-matricula-grado').value;
+    if (!gradoId) { mostrarToast('Seleccioná un grado', 'advertencia'); return; }
+    window.open(`./reporte-matricula.html?grado=${gradoId}`, '_blank');
+};
+
+window.imprimirReporteNotasAdmin = () => {
+    const gradoId = document.getElementById('rep-notas-grado').value;
+    const periodo = document.getElementById('rep-notas-periodo').value;
+    if (!gradoId) { mostrarToast('Seleccioná un grado', 'advertencia'); return; }
+    window.open(`./reporte-notas.html?grado=${gradoId}&periodo=${periodo}`, '_blank');
+};
+
+window.cambiarGradoActividadesAdmin = async () => {
+    const gradoId = document.getElementById('rep-act-grado').value;
+    const selMateria = document.getElementById('rep-act-materia');
+    if (!gradoId) { selMateria.innerHTML = '<option value="">— Elegí un grado primero —</option>'; return; }
+
+    selMateria.innerHTML = '<option value="">Cargando…</option>';
+    const { data, error } = await supabase.from('grado_materia').select('*, materias(id, nombre)').eq('grado_id', gradoId);
+    if (error) { notificarError(error, 'Error cargando materias del grado'); return; }
+
+    selMateria.innerHTML = '<option value="">— Seleccioná una materia —</option>' +
+        (data || []).map(gm => `<option value="${gm.id}">${gm.materias?.nombre || ''}</option>`).join('');
+};
+
+window.imprimirListaActividadesAdmin = () => {
+    const gradoId = document.getElementById('rep-act-grado').value;
+    const materiaId = document.getElementById('rep-act-materia').value;
+    const periodo = document.getElementById('rep-act-periodo').value;
+    const columnas = document.getElementById('rep-act-columnas').value || 5;
+    if (!gradoId || !materiaId) { mostrarToast('Seleccioná grado y materia', 'advertencia'); return; }
+    window.open(`./reporte-lista-actividades.html?grado=${gradoId}&materia=${materiaId}&periodo=${periodo}&columnas=${columnas}`, '_blank');
 };
 
 // ── ALUMNOS ─────────────────────────────────

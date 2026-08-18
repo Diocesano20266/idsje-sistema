@@ -129,6 +129,7 @@ const TITULOS = {
     notas: 'Registro de Notas',
     horario: 'Mi Horario',
     asistencias: 'Asistencias',
+    reportes: 'Reportes',
     competencias: 'Competencias Ciudadanas'
 };
 
@@ -148,6 +149,7 @@ window.mostrarVista = (vista) => {
     if (vista === 'notas')        initVistaNotas();
     if (vista === 'horario')      initVistaHorario();
     if (vista === 'asistencias')  initVistaAsistencias();
+    if (vista === 'reportes')     initVistaReportes();
     if (vista === 'competencias') initVistaCompetencias();
 };
 
@@ -467,6 +469,46 @@ window.imprimirListaBlancoAsistencia = () => {
     const mes = document.getElementById('asis-rep-mes').value;
     if (!gradoId || !mes) { mostrarToast('Seleccioná grado y mes', 'advertencia'); return; }
     window.open(`./asistencia-reporte.html?grado=${gradoId}&mes=${mes}&blanco=1`, '_blank');
+};
+
+// ── OTROS REPORTES ────────────────────────────
+// El Reporte de Notas Finales muestra TODAS las materias del grado, pero la RLS
+// de `notas` solo deja leer las del propio docente — las demás columnas salen en blanco.
+function initVistaReportes() {
+    const grados = gradosUnicosDocente();
+    const opciones = '<option value="">— Seleccioná un grado —</option>' +
+        grados.map(g => `<option value="${g.id}">${g.nombre} ${g.modalidad} · Sección ${g.seccion}</option>`).join('');
+
+    document.getElementById('rep-notas-grado').innerHTML = opciones;
+    document.getElementById('rep-act-grado').innerHTML = opciones;
+    document.getElementById('rep-act-materia').innerHTML = '<option value="">— Elegí un grado primero —</option>';
+}
+
+window.imprimirReporteNotasDocente = () => {
+    const gradoId = document.getElementById('rep-notas-grado').value;
+    const periodo = document.getElementById('rep-notas-periodo').value;
+    if (!gradoId) { mostrarToast('Seleccioná un grado', 'advertencia'); return; }
+    window.open(`./reporte-notas.html?grado=${gradoId}&periodo=${periodo}`, '_blank');
+};
+
+window.cambiarGradoActividadesDocente = () => {
+    const gradoId = document.getElementById('rep-act-grado').value;
+    const selMateria = document.getElementById('rep-act-materia');
+    if (!gradoId) { selMateria.innerHTML = '<option value="">— Elegí un grado primero —</option>'; return; }
+
+    const materias = gradoMatCache.filter(gm => gm.grado_id === gradoId);
+    selMateria.innerHTML = materias.length
+        ? '<option value="">— Seleccioná una materia —</option>' + materias.map(gm => `<option value="${gm.id}">${gm.materias.nombre}</option>`).join('')
+        : '<option value="">No tenés materias en este grado</option>';
+};
+
+window.imprimirListaActividadesDocente = () => {
+    const gradoId = document.getElementById('rep-act-grado').value;
+    const materiaId = document.getElementById('rep-act-materia').value;
+    const periodo = document.getElementById('rep-act-periodo').value;
+    const columnas = document.getElementById('rep-act-columnas').value || 5;
+    if (!gradoId || !materiaId) { mostrarToast('Seleccioná grado y materia', 'advertencia'); return; }
+    window.open(`./reporte-lista-actividades.html?grado=${gradoId}&materia=${materiaId}&periodo=${periodo}&columnas=${columnas}`, '_blank');
 };
 
 // ── REGISTRO DE NOTAS ────────────────────────

@@ -62,14 +62,3 @@ export const ESTADOS_ASISTENCIA = [
     { codigo: 'J', label: 'Justificado', color: '#2563eb', bg: '#dbeafe' },
     { codigo: 'T', label: 'Tardanza',    color: '#a16207', bg: '#fef3c7' },
 ];
-
-// Rango de fechas de cada período académico — son un valor por defecto
-// (trimestres aproximados del año lectivo) y HAY QUE AJUSTARLOS al
-// calendario escolar real del IDSJE. Se usan para contar inasistencias
-// por período automáticamente en las boletas (src/js/boleta.js).
-export const PERIODOS_FECHAS = {
-    1: { desde: `${INSTITUTO.anio}-01-01`, hasta: `${INSTITUTO.anio}-03-31` },
-    2: { desde: `${INSTITUTO.anio}-04-01`, hasta: `${INSTITUTO.anio}-06-15` },
-    3: { desde: `${INSTITUTO.anio}-06-16`, hasta: `${INSTITUTO.anio}-09-15` },
-    4: { desde: `${INSTITUTO.anio}-09-16`, hasta: `${INSTITUTO.anio}-11-30` },
-};

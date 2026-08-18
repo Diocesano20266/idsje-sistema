@@ -2,7 +2,7 @@
 //  IDSJE — Generador de Boletas
 // ═══════════════════════════════════════════
 import { supabase, verificarSesion } from './auth.js';
-import { INSTITUTO } from './config.js';
+import { INSTITUTO, PERIODOS_FECHAS } from './config.js';
 import { mostrarToast, notificarError, esErrorDeRed, mostrarBannerSinConexion, ocultarBannerSinConexion, setBotonCargando } from './utils.js';
 
 let gradosCache = [];
@@ -106,6 +106,23 @@ window.generarBoletas = async () => {
         .eq('grado_id', gradoId)
         .eq('periodo', periodoSel);
 
+    // Inasistencias: se cuentan automáticamente desde `asistencias` (estado 'A' o 'T')
+    // dentro del rango de fechas del período seleccionado (ver PERIODOS_FECHAS en config.js).
+    const inasistenciasPorAlumno = {};
+    const rangoPeriodo = PERIODOS_FECHAS[periodoSel];
+    if (rangoPeriodo) {
+        const { data: registrosAsis } = await supabase
+            .from('asistencias')
+            .select('alumno_id, estado')
+            .in('alumno_id', alumnoIds)
+            .in('estado', ['A', 'T'])
+            .gte('fecha', rangoPeriodo.desde)
+            .lte('fecha', rangoPeriodo.hasta);
+        (registrosAsis || []).forEach(r => {
+            inasistenciasPorAlumno[r.alumno_id] = (inasistenciasPorAlumno[r.alumno_id] || 0) + 1;
+        });
+    }
+
     // Generar boletas
     const contenedor = document.getElementById('contenedor-boletas');
     let html = '';
@@ -128,7 +145,8 @@ window.generarBoletas = async () => {
         }).length;
 
         const promedio = calcularPromedio(gradoMaterias, notasAlumno);
-        html += generarHTMLBoleta(al, gradoMaterias, notasAlumno, compAlumno, reprobadas, promedio, idx + 1, alumnos.length);
+        const inasistencias = inasistenciasPorAlumno[al.id] || 0;
+        html += generarHTMLBoleta(al, gradoMaterias, notasAlumno, compAlumno, reprobadas, promedio, idx + 1, alumnos.length, inasistencias);
     });
 
     document.getElementById('loading-boletas').classList.add('hidden');
@@ -147,7 +165,7 @@ function calcularPromedio(materias, notas) {
     return (nfs.reduce((a, b) => a + b, 0) / nfs.length).toFixed(2);
 }
 
-function generarHTMLBoleta(al, materias, notas, comp, reprobadas, promedio, num, total) {
+function generarHTMLBoleta(al, materias, notas, comp, reprobadas, promedio, num, total, inasistencias) {
     const nombreCompleto = `${al.nombres} ${al.apellidos}`;
     const gradoNombre = `${gradoSel.nombre} ${gradoSel.modalidad} SECCION "${gradoSel.seccion}"`;
     const docGuia = gradoSel.usuarios?.nombre_completo || 'Docente Guía';
@@ -296,7 +314,7 @@ function generarHTMLBoleta(al, materias, notas, comp, reprobadas, promedio, num,
             </tr>
             <tr>
                 <td class="td-obs-label">INASISTENCIA</td>
-                <td class="td-obs-val">${comp.inasistencias || ''}</td>
+                <td class="td-obs-val">${inasistencias}</td>
             </tr>
             <tr>
                 <td class="td-obs-label">PROMEDIO GENERAL</td>

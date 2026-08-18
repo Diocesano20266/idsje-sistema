@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDSJE — Reporte de Matrícula</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./src/css/ui.css">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'DM Sans',sans-serif;background:#f0f4f8;color:#1e293b}
+
+        .boleta-page{
+            background:#fff;
+            max-width:760px;
+            margin:24px auto;
+            padding:14px 28px 24px;
+            box-shadow:0 2px 12px rgba(0,0,0,.1);
+            border-radius:8px;
+            position:relative;
+            font-size:11px;
+            font-family:'Times New Roman', Times, serif;
+        }
+
+        /* Encabezado — mismo patrón que boleta.html */
+        .boleta-header{display:flex;align-items:center;gap:12px;border-bottom:2px solid #1B3A6B;padding-bottom:8px;margin-bottom:10px;font-family:'DM Sans',sans-serif}
+        .header-logos{flex-shrink:0}
+        .logo-img{height:80px;width:80px;object-fit:cover;border-radius:8px;display:block}
+        .logo-mined-img{height:60px !important;width:auto !important;object-fit:contain}
+        .header-info{flex:1;text-align:center}
+        .inst-nombre{font-family:'Times New Roman', Times, serif;font-weight:700;font-size:18px;color:#1B3A6B}
+        .inst-dir{font-family:'Times New Roman', Times, serif;font-size:11px;color:#64748b;margin-top:2px}
+
+        .boleta-titulo{text-align:center;font-family:'Times New Roman', Times, serif;font-weight:700;font-size:15px;margin:8px 0 4px;text-transform:uppercase}
+        .boleta-subtitulo{text-align:center;font-size:11px;font-weight:600;color:#64748b;margin-bottom:14px}
+
+        /* Tabla de matrícula */
+        .tabla-matricula{width:100%;border-collapse:collapse;font-size:11px}
+        .tabla-matricula th{background:#1B3A6B;color:#fff;padding:7px 8px;text-align:left;font-weight:700;font-size:11px}
+        .tabla-matricula td{border:1px solid #e2e8f0;padding:6px 8px;vertical-align:middle}
+        .tabla-matricula tbody tr:nth-child(even) td{background:#f8fafc}
+        .th-num,.td-num{width:32px;text-align:center;color:#94a3b8}
+        .th-foto,.td-foto{width:44px;text-align:center}
+        .foto-mini{width:32px;height:32px;border-radius:50%;object-fit:cover;border:1px solid #e2e8f0}
+        .foto-mini-vacia{width:32px;height:32px;border-radius:50%;background:#f1f5f9;display:inline-block}
+        .td-nie{white-space:nowrap;color:#475569}
+        .td-apellidos{font-weight:700}
+
+        .total-matricula{text-align:right;font-weight:700;color:#1B3A6B;margin-top:14px;font-size:12px}
+
+        /* Botón de impresión */
+        .boleta-toolbar{text-align:right;margin-bottom:10px}
+        .btn-imprimir-boleta{background:#1B3A6B;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-weight:600;font-size:11px;cursor:pointer;transition:background .2s}
+        .btn-imprimir-boleta:hover{background:#2E5FAC}
+
+        @media print {
+            .no-print{display:none!important}
+            body{background:white}
+            .boleta-page{box-shadow:none;margin:0;padding:16px 20px;border-radius:0;max-width:100%}
+        }
+    </style>
+</head>
+<body>
+    <div id="contenedor-matricula">
+        <p style="padding:40px;text-align:center;color:#94a3b8">Cargando…</p>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module" src="./src/js/reporte-matricula.js"></script>
+</body>
+</html>

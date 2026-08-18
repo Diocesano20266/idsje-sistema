@@ -153,6 +153,28 @@
         .btn-danger{background:#fde8e8;color:#b52828;border:1px solid #fecaca;padding:8px 14px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s}
         .btn-danger:hover{background:#fecaca}
 
+        /* ── HORARIOS ── */
+        .horario-grid{display:grid;grid-template-columns:110px repeat(5,1fr);gap:1px;background:#e2e8f0;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden}
+        .horario-grid .empty-bubbles{grid-column:1/-1}
+        .hg-cell{background:#fff;min-height:64px}
+        .hg-head{background:#1B3A6B;color:#fff;font-weight:700;text-align:center;display:flex;align-items:center;justify-content:center;padding:10px;font-size:12px;text-transform:uppercase;letter-spacing:.6px;min-height:auto}
+        .hg-periodo-label{background:#f8fafc;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:2px;padding:6px}
+        .hg-periodo-num{font-size:12px;font-weight:700;color:#1B3A6B}
+        .hg-periodo-hora{font-size:10px;color:#94a3b8;font-weight:500}
+        .hg-bloqueado{background:#eef1f6;color:#94a3b8;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:11px;text-transform:uppercase;letter-spacing:1.5px}
+        .hg-vacia{display:flex;align-items:center;justify-content:center}
+        .hg-add-btn{width:26px;height:26px;border-radius:7px;border:1.5px dashed #cbd5e1;background:#fff;color:#94a3b8;font-size:16px;line-height:1;cursor:pointer;transition:all .2s}
+        .hg-add-btn:hover{border-color:#1B3A6B;color:#1B3A6B;background:#eef2fb}
+        .hg-ocupada-wrap{padding:4px}
+        .hg-ocupada{position:relative;height:100%;border-radius:8px;padding:8px 20px 8px 8px}
+        .hg-materia{font-size:11px;font-weight:700;color:#0a1628;line-height:1.3;margin-bottom:2px}
+        .hg-docente{font-size:10px;color:#475569}
+        .hg-del-btn{position:absolute;top:4px;right:4px;width:17px;height:17px;border:none;border-radius:5px;background:rgba(255,255,255,.7);color:#b52828;font-size:10px;line-height:1;cursor:pointer}
+        .hg-del-btn:hover{background:#fff}
+        @media(max-width:900px){
+            .horario-grid{grid-template-columns:80px repeat(5,minmax(90px,1fr));overflow-x:auto}
+        }
+
         /* ── MATERIAS ASIGNADAS ── */
         .materia-asignada{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#f8fafc;border-radius:8px;margin-bottom:6px;font-size:12px;border:1px solid #f1f5fb}
         .materia-asignada span:first-child{flex:1;font-weight:500}
@@ -232,6 +254,10 @@
             <div class="nav-item" data-vista="materias" onclick="mostrarVista('materias')">
                 <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M8 2L9.5 6.5H14L10.3 9l1.5 4.5L8 11 4.2 13.5l1.5-4.5L2 6.5h4.5L8 2z" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/></svg>
                 <span class="nav-txt">Materias</span>
+            </div>
+            <div class="nav-item" data-vista="horarios" onclick="mostrarVista('horarios')">
+                <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="rgba(255,255,255,.6)" stroke-width="1.3" fill="none"/><path d="M8 5v3l2 1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.3" stroke-linecap="round"/></svg>
+                <span class="nav-txt">Horarios</span>
             </div>
             <div class="nav-group-label" style="margin-top:14px">Reportes</div>
             <div class="nav-item gold" onclick="window.location.href='./boleta.html'">
@@ -388,6 +414,18 @@
                 </div>
             </div>
 
+            <!-- HORARIOS -->
+            <div id="vista-horarios" class="hidden">
+                <div class="filtros">
+                    <select id="horario-grado" onchange="cambiarGradoHorario()">
+                        <option value="">— Seleccioná un grado —</option>
+                    </select>
+                </div>
+                <div class="horario-grid" id="horario-grid">
+                    <div class="empty-bubbles">Seleccioná un grado para ver o editar su horario.</div>
+                </div>
+            </div>
+
         </div>
     </div>
 
@@ -453,6 +491,31 @@
             <div class="modal-actions">
                 <button class="btn-primary" id="btn-guardar-materia" onclick="guardarMateria()">Guardar</button>
                 <button class="btn-secondary" onclick="cerrarModal('modal-materia')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CELDA DE HORARIO -->
+    <div class="modal-overlay" id="modal-celda-horario">
+        <div class="modal">
+            <div class="modal-title" id="modal-celda-horario-title">Asignar clase</div>
+            <input type="hidden" id="hcelda-grado-id">
+            <input type="hidden" id="hcelda-dia">
+            <input type="hidden" id="hcelda-periodo">
+            <input type="hidden" id="hcelda-hora-inicio">
+            <input type="hidden" id="hcelda-hora-fin">
+            <input type="hidden" id="hcelda-docente-id">
+            <div class="field">
+                <label>Materia</label>
+                <select id="hcelda-materia" onchange="materiaCeldaHorarioCambio()"></select>
+            </div>
+            <div class="field">
+                <label>Docente</label>
+                <div class="materia-asignada"><span id="hcelda-docente-nombre">—</span></div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-primary" id="btn-guardar-celda-horario" onclick="guardarCeldaHorario()">Guardar</button>
+                <button class="btn-secondary" onclick="cerrarModal('modal-celda-horario')">Cancelar</button>
             </div>
         </div>
     </div>

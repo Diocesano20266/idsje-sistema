@@ -175,6 +175,18 @@
             .horario-grid{grid-template-columns:80px repeat(5,minmax(90px,1fr));overflow-x:auto}
         }
 
+        /* ── GENERADOR DE HORARIOS ── */
+        .gen-grado-card{background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:14px 18px;margin-bottom:12px}
+        .gen-grado-titulo{font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:#0a1628;margin-bottom:8px}
+        .gen-materia-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #f7f9fc;font-size:13px}
+        .gen-materia-row:last-child{border-bottom:none}
+        .gen-horas-input{width:56px;padding:6px 8px;border:1.5px solid #e2e8f0;border-radius:7px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;text-align:center;outline:none}
+        .gen-horas-input:focus{border-color:#1B3A6B}
+        .gen-docente-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #f7f9fc;font-size:13px}
+        .gen-docente-row:last-child{border-bottom:none}
+        .gen-docente-row select{padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;outline:none;background:#fff}
+        .gen-docente-row select:focus{border-color:#1B3A6B}
+
         /* ── OTROS REPORTES ── */
         .reportes-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
         @media(max-width:1100px){.reportes-grid{grid-template-columns:repeat(2,1fr)}}
@@ -194,6 +206,33 @@
         .asis-pill-A.activo{background:#dc2626;border-color:#dc2626;color:#fff}
         .asis-pill-J.activo{background:#2563eb;border-color:#2563eb;color:#fff}
         .asis-pill-T.activo{background:#d97706;border-color:#d97706;color:#fff}
+
+        /* ── EXPEDIENTES DISCIPLINARIOS ── */
+        .exp-resultados{margin-top:8px;background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden}
+        .exp-resultados:empty{border:none}
+        .exp-resultado-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #f7f9fc;font-size:13px;cursor:pointer;transition:background .15s}
+        .exp-resultado-item:last-child{border-bottom:none}
+        .exp-resultado-item:hover{background:#f8fafc}
+        .exp-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+        .exp-stat{background:#fff;border-radius:10px;border:1px solid #e2e8f0;padding:14px;text-align:center}
+        .exp-stat-val{font-family:'Playfair Display',serif;font-size:22px;font-weight:700}
+        .exp-stat-label{font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-top:2px}
+        @media(max-width:900px){.exp-stats{grid-template-columns:repeat(2,1fr)}}
+
+        .exp-timeline{display:flex;flex-direction:column;gap:14px}
+        .exp-item{display:flex;gap:12px;padding-left:2px}
+        .exp-item-icono{width:34px;height:34px;border-radius:50%;background:var(--exp-bg,#f1f5f9);color:var(--exp-color,#64748b);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;border:1.5px solid var(--exp-color,#e2e8f0)}
+        .exp-item-cuerpo{flex:1;padding-bottom:14px;border-bottom:1px solid #f7f9fc}
+        .exp-item:last-child .exp-item-cuerpo{border-bottom:none;padding-bottom:0}
+        .exp-item-cab{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:4px}
+        .exp-item-tipo{font-size:12px;font-weight:700;color:var(--exp-color,#0a1628)}
+        .exp-item-fecha{font-size:11px;color:#94a3b8;white-space:nowrap}
+        .exp-item-desc{font-size:13px;color:#1e293b;line-height:1.5}
+        .exp-extra{display:inline-block;margin-top:4px;font-size:11px;font-weight:600;color:var(--exp-color,#64748b);background:var(--exp-bg,#f1f5f9);padding:2px 8px;border-radius:100px}
+        .exp-item-registro{font-size:10.5px;color:#94a3b8;margin-top:6px;display:flex;align-items:center;gap:10px}
+        .exp-item-btn{border:none;background:none;font-size:10.5px;font-weight:700;cursor:pointer;color:#1a5f9a;padding:0}
+        .exp-item-btn:hover{text-decoration:underline}
+        .exp-item-btn-del{color:#b52828}
 
         /* ── MATERIAS ASIGNADAS ── */
         .materia-asignada{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#f8fafc;border-radius:8px;margin-bottom:6px;font-size:12px;border:1px solid #f1f5fb}
@@ -279,9 +318,17 @@
                 <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="rgba(255,255,255,.6)" stroke-width="1.3" fill="none"/><path d="M8 5v3l2 1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.3" stroke-linecap="round"/></svg>
                 <span class="nav-txt">Horarios</span>
             </div>
+            <div class="nav-item" data-vista="generador" onclick="mostrarVista('generador')">
+                <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M2 8a6 6 0 0 1 10.2-4.2M14 8a6 6 0 0 1-10.2 4.2" stroke="rgba(255,255,255,.6)" stroke-width="1.2" stroke-linecap="round"/><path d="M12.2 2.5v2.3h-2.3M3.8 13.5v-2.3h2.3" stroke="rgba(255,255,255,.6)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="nav-txt">Generar Horario</span>
+            </div>
             <div class="nav-item" data-vista="asistencias" onclick="mostrarVista('asistencias')">
                 <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M5.5 8.5l2 2 3.5-4" stroke="rgba(255,255,255,.6)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="1.5" y="2.5" width="13" height="11.5" rx="1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/></svg>
                 <span class="nav-txt">Asistencias</span>
+            </div>
+            <div class="nav-item" data-vista="expedientes" onclick="mostrarVista('expedientes')">
+                <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M4 1.5h6l3 3V14a.5.5 0 0 1-.5.5h-9A.5.5 0 0 1 3 14V2a.5.5 0 0 1 .5-.5H4z" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M5.5 7.5h5M5.5 10h3.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" stroke-linecap="round"/></svg>
+                <span class="nav-txt">Expedientes</span>
             </div>
             <div class="nav-group-label" style="margin-top:14px">Reportes</div>
             <div class="nav-item gold" onclick="window.location.href='./boleta.html'">
@@ -459,6 +506,42 @@
                 </div>
             </div>
 
+            <!-- GENERADOR AUTOMÁTICO DE HORARIOS -->
+            <div id="vista-generador" class="hidden">
+                <div id="gen-formulario">
+                    <div class="info-box" style="background:#e8f4fd;border-color:#c3ddf5;color:#1a5f9a">
+                        Definí las horas semanales de cada materia y la disponibilidad de cada docente, y el sistema arma un horario sin choques automáticamente. Podés generar varias opciones antes de guardar.
+                    </div>
+                    <div id="gen-materias-lista"></div>
+
+                    <div class="tabla-wrap" style="margin-top:20px">
+                        <div class="tabla-header"><div class="tabla-title">👩‍🏫 Disponibilidad de docentes</div></div>
+                        <div id="gen-docentes-lista" style="padding:16px 20px"></div>
+                    </div>
+
+                    <div style="text-align:right;margin-top:20px">
+                        <button class="btn-primary" onclick="ejecutarGenerarHorario()">⚙ Generar Horario</button>
+                    </div>
+                </div>
+
+                <div id="gen-sin-solucion" class="hidden info-box" style="background:#fde8e8;border-color:#fecaca;color:#b52828;margin-top:16px">
+                    No fue posible generar un horario sin conflictos. Revisá las restricciones (por ejemplo, un docente de media jornada con demasiadas horas asignadas entre varios grados).
+                    <div style="margin-top:10px"><button class="btn-secondary" onclick="descartarHorarioGenerado()">← Volver al formulario</button></div>
+                </div>
+
+                <div id="gen-resultado" class="hidden">
+                    <div class="filtros">
+                        <select id="gen-grado-preview" onchange="cambiarPreviewGenerador()"></select>
+                    </div>
+                    <div class="horario-grid" id="gen-grid"></div>
+                    <div class="tabla-header" style="border-radius:0 0 12px 12px;border:1px solid #e2e8f0;border-top:none;justify-content:flex-end;gap:8px">
+                        <button class="btn-secondary" onclick="generarOtroHorario()">🔄 Generar otro</button>
+                        <button class="btn-secondary" onclick="descartarHorarioGenerado()">❌ Descartar</button>
+                        <button class="btn-primary" id="btn-guardar-horario-generado" onclick="guardarHorarioGenerado()">✅ Guardar horario</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- ASISTENCIAS -->
             <div id="vista-asistencias" class="hidden">
                 <div class="filtros">
@@ -480,6 +563,27 @@
                         </div>
                     </div>
                     <div id="asis-resumen" style="padding:4px 0"></div>
+                </div>
+            </div>
+
+            <!-- EXPEDIENTES DISCIPLINARIOS -->
+            <div id="vista-expedientes" class="hidden">
+                <div class="filtros">
+                    <input type="text" id="exp-admin-busqueda" placeholder="Buscar alumno por nombre o NIE…" oninput="onInputBuscarExpediente()" style="flex:1;min-width:260px;padding:11px 14px;border:1px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;outline:none">
+                </div>
+                <div id="exp-admin-resultados" class="exp-resultados"></div>
+
+                <div id="exp-admin-detalle" class="hidden" style="margin-top:20px">
+                    <div class="tabla-title" style="margin-bottom:12px" id="exp-admin-nombre"></div>
+
+                    <div class="exp-stats" id="exp-admin-resumen"></div>
+
+                    <div class="dash-card" style="margin-top:16px">
+                        <div class="dash-card-header"><div class="dash-card-title"><span class="gs-dot"></span>Historial del expediente</div></div>
+                        <div class="dash-card-body">
+                            <div class="exp-timeline" id="exp-admin-timeline"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -624,6 +728,35 @@
             <div class="modal-actions">
                 <button class="btn-primary" id="btn-guardar-celda-horario" onclick="guardarCeldaHorario()">Guardar</button>
                 <button class="btn-secondary" onclick="cerrarModal('modal-celda-horario')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: EDITAR REGISTRO DE EXPEDIENTE -->
+    <div class="modal-overlay" id="modal-exp-editar">
+        <div class="modal">
+            <div class="modal-title" id="modal-exp-editar-title">Editar registro</div>
+            <input type="hidden" id="exp-edit-tabla">
+            <input type="hidden" id="exp-edit-id">
+            <div class="field hidden" id="exp-edit-campo-categoria">
+                <label>Categoría</label>
+                <select id="exp-edit-categoria">
+                    <option value="leve">Leve</option>
+                    <option value="grave">Grave</option>
+                    <option value="muy_grave">Muy grave</option>
+                </select>
+            </div>
+            <div class="field hidden" id="exp-edit-campo-dias">
+                <label>Días de suspensión</label>
+                <input type="number" id="exp-edit-dias" min="1" max="30">
+            </div>
+            <div class="field">
+                <label>Descripción</label>
+                <textarea id="exp-edit-descripcion" rows="4" style="width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:9px;font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;outline:none;resize:vertical"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-primary" id="btn-guardar-exp-editar" onclick="guardarEdicionExpediente()">Guardar</button>
+                <button class="btn-secondary" onclick="cerrarModal('modal-exp-editar')">Cancelar</button>
             </div>
         </div>
     </div>

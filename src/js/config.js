@@ -54,3 +54,22 @@ export const BLOQUES_HORARIO = [
     { tipo: 'receso',   label: 'Receso',   inicio: '2:20',  fin: '2:35'  },
     { tipo: 'clase',    periodo: 10, inicio: '2:35',  fin: '3:15'  },
 ];
+
+// ── Asistencias ───────────────────────────────
+export const ESTADOS_ASISTENCIA = [
+    { codigo: 'P', label: 'Presente',    color: '#059669', bg: '#d1fae5' },
+    { codigo: 'A', label: 'Ausente',     color: '#dc2626', bg: '#fee2e2' },
+    { codigo: 'J', label: 'Justificado', color: '#2563eb', bg: '#dbeafe' },
+    { codigo: 'T', label: 'Tardanza',    color: '#a16207', bg: '#fef3c7' },
+];
+
+// Rango de fechas de cada período académico — son un valor por defecto
+// (trimestres aproximados del año lectivo) y HAY QUE AJUSTARLOS al
+// calendario escolar real del IDSJE. Se usan para contar inasistencias
+// por período automáticamente en las boletas (src/js/boleta.js).
+export const PERIODOS_FECHAS = {
+    1: { desde: `${INSTITUTO.anio}-01-01`, hasta: `${INSTITUTO.anio}-03-31` },
+    2: { desde: `${INSTITUTO.anio}-04-01`, hasta: `${INSTITUTO.anio}-06-15` },
+    3: { desde: `${INSTITUTO.anio}-06-16`, hasta: `${INSTITUTO.anio}-09-15` },
+    4: { desde: `${INSTITUTO.anio}-09-16`, hasta: `${INSTITUTO.anio}-11-30` },
+};

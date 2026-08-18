@@ -175,6 +175,21 @@
             .horario-grid{grid-template-columns:80px repeat(5,minmax(90px,1fr));overflow-x:auto}
         }
 
+        /* ── ASISTENCIAS ── */
+        .asis-banner{background:#fef9e7;border:1px solid #fde68a;border-radius:9px;padding:10px 14px;font-size:12px;color:#92400e;margin-bottom:14px}
+        .asis-lista{background:#fff;border-radius:12px 12px 0 0;border:1px solid #e2e8f0;overflow:hidden}
+        .asis-fila{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #f7f9fc}
+        .asis-fila:last-child{border-bottom:none}
+        .asis-num{width:22px;color:#94a3b8;font-size:11px;text-align:center;flex-shrink:0}
+        .asis-nombre{flex:1;font-size:13px;font-weight:600;color:#0a1628}
+        .asis-pills{display:flex;gap:6px}
+        .asis-pill{width:32px;height:32px;border-radius:50%;border:1.5px solid #e2e8f0;background:#fff;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;color:#94a3b8}
+        .asis-pill:hover{border-color:#cbd5e1}
+        .asis-pill-P.activo{background:#059669;border-color:#059669;color:#fff}
+        .asis-pill-A.activo{background:#dc2626;border-color:#dc2626;color:#fff}
+        .asis-pill-J.activo{background:#2563eb;border-color:#2563eb;color:#fff}
+        .asis-pill-T.activo{background:#d97706;border-color:#d97706;color:#fff}
+
         /* ── MATERIAS ASIGNADAS ── */
         .materia-asignada{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#f8fafc;border-radius:8px;margin-bottom:6px;font-size:12px;border:1px solid #f1f5fb}
         .materia-asignada span:first-child{flex:1;font-weight:500}
@@ -258,6 +273,10 @@
             <div class="nav-item" data-vista="horarios" onclick="mostrarVista('horarios')">
                 <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="rgba(255,255,255,.6)" stroke-width="1.3" fill="none"/><path d="M8 5v3l2 1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.3" stroke-linecap="round"/></svg>
                 <span class="nav-txt">Horarios</span>
+            </div>
+            <div class="nav-item" data-vista="asistencias" onclick="mostrarVista('asistencias')">
+                <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M5.5 8.5l2 2 3.5-4" stroke="rgba(255,255,255,.6)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="1.5" y="2.5" width="13" height="11.5" rx="1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/></svg>
+                <span class="nav-txt">Asistencias</span>
             </div>
             <div class="nav-group-label" style="margin-top:14px">Reportes</div>
             <div class="nav-item gold" onclick="window.location.href='./boleta.html'">
@@ -423,6 +442,30 @@
                 </div>
                 <div class="horario-grid" id="horario-grid">
                     <div class="empty-bubbles">Seleccioná un grado para ver o editar su horario.</div>
+                </div>
+            </div>
+
+            <!-- ASISTENCIAS -->
+            <div id="vista-asistencias" class="hidden">
+                <div class="filtros">
+                    <select id="asis-grado" onchange="cambiarGradoAsistenciaAdmin()"></select>
+                    <input type="date" id="asis-fecha" onchange="cambiarFechaAsistenciaAdmin()">
+                </div>
+                <div id="asis-banner" class="asis-banner hidden"></div>
+                <div class="asis-lista" id="lista-asistencia"></div>
+                <div class="tabla-header" style="border-radius:0 0 12px 12px;border:1px solid #e2e8f0;border-top:none;justify-content:flex-end">
+                    <button class="btn-primary" id="btn-guardar-asistencia" onclick="guardarAsistenciaAdmin()">Guardar asistencia</button>
+                </div>
+
+                <div class="tabla-wrap" style="margin-top:24px">
+                    <div class="tabla-header">
+                        <div class="tabla-title">⚠ Alumnos con más de 3 ausencias en el mes</div>
+                        <div class="filtros" style="margin-bottom:0">
+                            <select id="asis-res-grado" onchange="cambiarFiltroResumenAsistencia()"></select>
+                            <input type="month" id="asis-res-mes" onchange="cambiarFiltroResumenAsistencia()">
+                        </div>
+                    </div>
+                    <div id="asis-resumen" style="padding:4px 0"></div>
                 </div>
             </div>
 

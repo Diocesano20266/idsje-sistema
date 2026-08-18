@@ -89,7 +89,7 @@ function generarHTML(titulo, alumnos, anio, mesNum, dias, porAlumno, blanco) {
             if (blanco) return '<td></td>';
             const estado = porAlumno[al.id]?.[fechaISO(anio, mesNum, d)] || '';
             if (estado) registrosAlumno.push({ estado });
-            return `<td>${estado}</td>`;
+            return estado ? `<td class="td-dia td-dia-${estado}">${estado}</td>` : '<td></td>';
         }).join('');
 
         const totales = blanco

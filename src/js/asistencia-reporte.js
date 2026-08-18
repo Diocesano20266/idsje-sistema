@@ -1,72 +1,149 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IDSJE — Reporte de Asistencia</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./src/css/ui.css">
-    <style>
-        *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'DM Sans',sans-serif;background:#f0f4f8;color:#1e293b}
+// ═══════════════════════════════════════════
+//  IDSJE — Reporte de Asistencia (mensual / lista en blanco)
+//  Uso: asistencia-reporte.html?grado=<id>&mes=YYYY-MM[&blanco=1]
+// ═══════════════════════════════════════════
+import { supabase, verificarSesion } from './auth.js';
+import { INSTITUTO, ESTADOS_ASISTENCIA } from './config.js';
+import { diasHabilesDelMes, calcularTotalesAsistencia, notificarError, esErrorDeRed, mostrarBannerSinConexion, ocultarBannerSinConexion } from './utils.js';
 
-        .boleta-page{
-            background:#fff;
-            max-width:1100px;
-            margin:24px auto;
-            padding:14px 24px 24px;
-            box-shadow:0 2px 12px rgba(0,0,0,.1);
-            border-radius:8px;
-            position:relative;
-            font-size:10px;
-            font-family:'Times New Roman', Times, serif;
+const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+async function init() {
+    const params  = new URLSearchParams(location.search);
+    const gradoId = params.get('grado');
+    const mes     = params.get('mes'); // YYYY-MM
+    const blanco  = params.get('blanco') === '1';
+    const cont = document.getElementById('contenedor-asistencia');
+
+    if (!gradoId || !mes) {
+        cont.innerHTML = '<p style="padding:40px;text-align:center;color:#94a3b8">Falta indicar un grado y un mes en la URL.</p>';
+        return;
+    }
+
+    const res = await verificarSesion();
+    if (!res) return;
+
+    await renderReporte(gradoId, mes, blanco);
+}
+
+async function renderReporte(gradoId, mes, blanco) {
+    const cont = document.getElementById('contenedor-asistencia');
+    const [anio, mesNum] = mes.split('-').map(Number);
+    const dias = diasHabilesDelMes(anio, mesNum);
+
+    try {
+        const { data: grado, error: eG } = await supabase.from('grados').select('*').eq('id', gradoId).single();
+        const { data: alumnos, error: eAl } = await supabase
+            .from('alumnos')
+            .select('*')
+            .eq('grado_id', gradoId)
+            .eq('activo', true)
+            .order('apellidos');
+
+        const errorDeRed = [eG, eAl].find(e => e && esErrorDeRed(e));
+        if (errorDeRed) { mostrarBannerSinConexion(() => renderReporte(gradoId, mes, blanco)); return; }
+        ocultarBannerSinConexion();
+        if (eG) return notificarError(eG, 'Error cargando el grado');
+        if (eAl) return notificarError(eAl, 'Error cargando alumnos');
+
+        let porAlumno = {};
+        if (!blanco && alumnos?.length) {
+            const desde = `${mes}-01`;
+            const hasta = `${mes}-${String(new Date(anio, mesNum, 0).getDate()).padStart(2, '0')}`;
+            const { data: registros, error: eR } = await supabase
+                .from('asistencias')
+                .select('alumno_id, fecha, estado')
+                .in('alumno_id', alumnos.map(a => a.id))
+                .gte('fecha', desde)
+                .lte('fecha', hasta);
+
+            if (eR && esErrorDeRed(eR)) { mostrarBannerSinConexion(() => renderReporte(gradoId, mes, blanco)); return; }
+            if (eR) return notificarError(eR, 'Error cargando la asistencia');
+
+            (registros || []).forEach(r => {
+                if (!porAlumno[r.alumno_id]) porAlumno[r.alumno_id] = {};
+                porAlumno[r.alumno_id][r.fecha] = r.estado;
+            });
         }
 
-        /* Encabezado — mismo patrón que boleta.html / horario.html */
-        .boleta-header{display:flex;align-items:center;gap:12px;border-bottom:2px solid #1B3A6B;padding-bottom:8px;margin-bottom:10px;font-family:'DM Sans',sans-serif}
-        .header-logos{flex-shrink:0}
-        .logo-img{height:70px;width:70px;object-fit:cover;border-radius:8px;display:block}
-        .logo-mined-img{height:52px !important;width:auto !important;object-fit:contain}
-        .header-info{flex:1;text-align:center}
-        .inst-nombre{font-family:'Times New Roman', Times, serif;font-weight:700;font-size:16px;color:#1B3A6B}
-        .inst-dir{font-family:'Times New Roman', Times, serif;font-size:10px;color:#64748b;margin-top:2px}
+        const encabezado = `${grado.nombre} ${grado.modalidad} SECCIÓN "${grado.seccion}"`;
+        const titulo = blanco
+            ? `LISTA DE ASISTENCIA EN BLANCO — ${encabezado} — ${MESES[mesNum - 1]} ${anio}`
+            : `REPORTE DE ASISTENCIA — ${encabezado} — ${MESES[mesNum - 1]} ${anio}`;
 
-        .boleta-titulo{text-align:center;font-family:'Times New Roman', Times, serif;font-weight:700;font-size:13px;margin:8px 0 6px;text-transform:uppercase}
-        .leyenda-asis{text-align:center;font-size:10px;color:#475569;margin-bottom:12px}
-        .leyenda-asis b{color:#0a1628}
+        cont.innerHTML = generarHTML(titulo, alumnos || [], anio, mesNum, dias, porAlumno, blanco);
+    } catch (err) {
+        if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => renderReporte(gradoId, mes, blanco)); return; }
+        notificarError(err, 'Error cargando el reporte');
+    }
+}
 
-        /* Tabla — filas = alumnos, columnas = días hábiles del mes */
-        .tabla-asistencia{width:100%;border-collapse:collapse;font-size:9px}
-        .tabla-asistencia th{background:#1B3A6B;color:#fff;padding:4px 3px;text-align:center;font-weight:700}
-        .tabla-asistencia td{border:1px solid #e2e8f0;padding:4px 3px;text-align:center;vertical-align:middle}
-        .th-num{width:22px}
-        .th-nombre{text-align:left!important;min-width:150px}
-        .td-num{color:#94a3b8}
-        .td-nombre{text-align:left;font-weight:600;white-space:nowrap}
-        .td-totales{font-weight:700;color:#1B3A6B;white-space:nowrap;background:#f8fafc}
-        .tabla-asistencia tbody tr:nth-child(even) td{background:#f8fafc}
-        .tabla-asistencia tbody tr:nth-child(even) .td-totales{background:#eef2fb}
+function fechaISO(anio, mes, dia) {
+    return `${anio}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+}
 
-        /* Botón de impresión */
-        .boleta-toolbar{text-align:right;margin-bottom:10px}
-        .btn-imprimir-boleta{background:#1B3A6B;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-weight:600;font-size:11px;cursor:pointer;transition:background .2s}
-        .btn-imprimir-boleta:hover{background:#2E5FAC}
+function generarHTML(titulo, alumnos, anio, mesNum, dias, porAlumno, blanco) {
+    const filasAlumnos = alumnos.map((al, idx) => {
+        const registrosAlumno = [];
+        const celdas = dias.map(d => {
+            if (blanco) return '<td></td>';
+            const estado = porAlumno[al.id]?.[fechaISO(anio, mesNum, d)] || '';
+            if (estado) registrosAlumno.push({ estado });
+            return `<td>${estado}</td>`;
+        }).join('');
 
-        @media print {
-            @page { size: landscape; }
-            .no-print{display:none!important}
-            body{background:white}
-            .boleta-page{box-shadow:none;margin:0;padding:14px 16px;border-radius:0;max-width:100%}
-        }
-    </style>
-</head>
-<body>
-    <div id="contenedor-asistencia">
-        <p style="padding:40px;text-align:center;color:#94a3b8">Cargando…</p>
-    </div>
+        const totales = blanco ? '<td></td>' : `<td class="td-totales">${(() => {
+            const t = calcularTotalesAsistencia(registrosAlumno);
+            return `P${t.P} A${t.A} J${t.J} T${t.T}`;
+        })()}</td>`;
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script type="module" src="./src/js/asistencia-reporte.js"></script>
-</body>
-</html>
+        return `
+        <tr>
+            <td class="td-num">${idx + 1}</td>
+            <td class="td-nombre">${al.apellidos}, ${al.nombres}</td>
+            ${celdas}
+            ${totales}
+        </tr>`;
+    }).join('');
+
+    const headerDias = dias.map(d => `<th>${d}</th>`).join('');
+    const leyenda = blanco ? '' : `<div class="leyenda-asis">${ESTADOS_ASISTENCIA.map(e => `<b>${e.codigo}</b> ${e.label}`).join('&nbsp;&nbsp;·&nbsp;&nbsp;')}</div>`;
+
+    return `
+    <div class="boleta-page">
+        <div class="boleta-toolbar no-print">
+            <button type="button" class="btn-imprimir-boleta" onclick="window.print()">🖨 Imprimir</button>
+        </div>
+
+        <div class="boleta-header">
+            <div class="header-logos">
+                <img src="https://raw.githubusercontent.com/Diocesano20266/idsje-sistema/main/logo-idsje.png" alt="Logo IDSJE" class="logo-img">
+            </div>
+            <div class="header-info">
+                <div class="inst-nombre">${INSTITUTO.nombre}</div>
+                <div class="inst-dir">${INSTITUTO.direccion}</div>
+                <div class="inst-dir">Teléfono: ${INSTITUTO.telefono} | ${INSTITUTO.correo}</div>
+            </div>
+            <div class="header-logos">
+                <img src="https://raw.githubusercontent.com/Diocesano20266/idsje-sistema/main/logo-mineducyt.png" alt="Logo MINED" class="logo-img logo-mined-img" onerror="this.onerror=null;this.src='https://www.mined.gob.sv/images/logo-mined.png'">
+            </div>
+        </div>
+
+        <div class="boleta-titulo">${titulo}</div>
+        ${leyenda}
+
+        <table class="tabla-asistencia">
+            <thead>
+                <tr>
+                    <th class="th-num">No</th>
+                    <th class="th-nombre">Alumno</th>
+                    ${headerDias}
+                    <th>Totales</th>
+                </tr>
+            </thead>
+            <tbody>${filasAlumnos}</tbody>
+        </table>
+    </div>`;
+}
+
+init();

@@ -124,6 +124,19 @@
         .asis-pill-T.activo{background:#d97706;border-color:#d97706;color:#fff}
         .asis-reporte-card{background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:18px;margin-top:20px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
 
+        /* ── EXPEDIENTE DISCIPLINARIO ── */
+        .exp-timeline{display:flex;flex-direction:column;gap:14px}
+        .exp-item{display:flex;gap:12px;padding-left:2px}
+        .exp-item-icono{width:34px;height:34px;border-radius:50%;background:var(--exp-bg,#f1f5f9);color:var(--exp-color,#64748b);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;border:1.5px solid var(--exp-color,#e2e8f0)}
+        .exp-item-cuerpo{flex:1;padding-bottom:14px;border-bottom:1px solid #f7f9fc}
+        .exp-item:last-child .exp-item-cuerpo{border-bottom:none;padding-bottom:0}
+        .exp-item-cab{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:4px}
+        .exp-item-tipo{font-size:12px;font-weight:700;color:var(--exp-color,#0a1628)}
+        .exp-item-fecha{font-size:11px;color:#94a3b8;white-space:nowrap}
+        .exp-item-desc{font-size:13px;color:#1e293b;line-height:1.5}
+        .exp-extra{display:inline-block;margin-top:4px;font-size:11px;font-weight:600;color:var(--exp-color,#64748b);background:var(--exp-bg,#f1f5f9);padding:2px 8px;border-radius:100px}
+        .exp-item-registro{font-size:10.5px;color:#94a3b8;margin-top:6px}
+
         .periodos{display:flex;justify-content:flex-end;gap:6px;background:#0a1628;border-radius:12px;padding:10px 14px;margin-bottom:16px}
         .periodo-btn{padding:9px 20px;border-radius:8px;border:none;background:rgba(255,255,255,.06);font-weight:700;font-size:11px;cursor:pointer;color:rgba(255,255,255,.5);transition:all .2s;font-family:'Plus Jakarta Sans',sans-serif}
         .periodo-btn:hover:not(.active){background:rgba(255,255,255,.14);color:rgba(255,255,255,.8)}
@@ -265,6 +278,10 @@
             <div class="nav-item" data-vista="reportes" onclick="mostrarVista('reportes')">
                 <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M5 5h6M5 8h4M5 11h5" stroke="rgba(255,255,255,.6)" stroke-width="1.2"/></svg>
                 <span class="nav-txt">Reportes</span>
+            </div>
+            <div class="nav-item" data-vista="expediente" onclick="mostrarVista('expediente')">
+                <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M4 1.5h6l3 3V14a.5.5 0 0 1-.5.5h-9A.5.5 0 0 1 3 14V2a.5.5 0 0 1 .5-.5H4z" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M5.5 7.5h5M5.5 10h3.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" stroke-linecap="round"/></svg>
+                <span class="nav-txt">Expediente</span>
             </div>
             <div class="nav-item hidden" id="nav-competencias" data-vista="competencias" onclick="mostrarVista('competencias')">
                 <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5.5" r="3" stroke="rgba(255,255,255,.6)" stroke-width="1.3" fill="none"/><path d="M2 14c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" stroke="rgba(255,255,255,.6)" stroke-width="1.3" stroke-linecap="round" fill="none"/></svg>
@@ -496,6 +513,63 @@
                             <div class="field"><label>Integradoras (máx. 5)</label><input type="number" id="rep-act-integradoras" value="2" min="0" max="5"></div>
                             <div class="field"><label>Exámenes (máx. 3)</label><input type="number" id="rep-act-examenes" value="1" min="0" max="3"></div>
                             <button class="btn-primary" style="width:100%;justify-content:center;margin-top:8px" onclick="imprimirListaActividadesDocente()">🖨 Imprimir</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EXPEDIENTE DISCIPLINARIO -->
+            <div id="vista-expediente" class="hidden">
+                <div id="exp-empty" class="empty-state hidden">No tenés grados asignados todavía. Contactá al administrador.</div>
+                <div id="exp-panel">
+                    <div class="filtros">
+                        <select id="exp-alumno" onchange="cambiarAlumnoExpediente()">
+                            <option value="">— Seleccioná un alumno —</option>
+                        </select>
+                    </div>
+
+                    <div id="exp-detalle" class="hidden">
+                        <div id="exp-solo-registro-aviso" class="asis-banner hidden">
+                            Solo podés <b>registrar</b> en el expediente de este alumno — el historial completo lo ve únicamente su docente guía.
+                        </div>
+
+                        <div class="dash-card" id="exp-timeline-wrap">
+                            <div class="dash-card-header"><div class="dash-card-title"><span class="gs-dot"></span>Historial del expediente</div></div>
+                            <div class="dash-card-body">
+                                <div class="exp-timeline" id="exp-timeline"></div>
+                            </div>
+                        </div>
+
+                        <div class="dash-card" style="margin-top:16px">
+                            <div class="dash-card-header"><div class="dash-card-title"><span class="gs-dot"></span>Registrar nuevo</div></div>
+                            <div class="dash-card-body">
+                                <div class="field"><label>Tipo</label>
+                                    <select id="exp-tipo" onchange="cambiarTipoExpediente()">
+                                        <option value="anecdotico">Anecdótico</option>
+                                        <option value="demerito">Demérito</option>
+                                        <option value="acta">Acta</option>
+                                        <option value="suspension">Suspensión</option>
+                                        <option value="reconocimiento">Reconocimiento</option>
+                                    </select>
+                                </div>
+                                <div class="field" id="exp-campo-categoria">
+                                    <label>Categoría</label>
+                                    <select id="exp-categoria">
+                                        <option value="leve">Leve</option>
+                                        <option value="grave">Grave</option>
+                                        <option value="muy_grave">Muy grave</option>
+                                    </select>
+                                </div>
+                                <div class="field hidden" id="exp-campo-dias">
+                                    <label>Días de suspensión</label>
+                                    <input type="number" id="exp-dias" value="1" min="1" max="30">
+                                </div>
+                                <div class="field">
+                                    <label>Descripción</label>
+                                    <textarea id="exp-descripcion" rows="3" placeholder="Describí lo sucedido..." style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;outline:none;resize:vertical"></textarea>
+                                </div>
+                                <button class="btn-primary" id="btn-guardar-expediente" onclick="guardarRegistroExpediente()">Guardar registro</button>
+                            </div>
                         </div>
                     </div>
                 </div>

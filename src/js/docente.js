@@ -2,7 +2,7 @@
 //  IDSJE — Panel Docente
 // ═══════════════════════════════════════════
 import { supabase, verificarSesion, cerrarSesion } from './auth.js';
-import { CONCEPTOS } from './config.js';
+import { CONCEPTOS, DIAS_HORARIO, BLOQUES_HORARIO } from './config.js';
 import {
     calcularNotaFinal,
     promedioPonderado,
@@ -19,12 +19,16 @@ import {
     ocultarBannerSinConexion,
     setBotonCargando,
     renderSkeletonFilas,
+    colorPorMateria,
 } from './utils.js';
 
 let usuarioActual   = null;
 let gradoMatCache   = [];  // grado_materia asignadas al docente (con grados y materias embebidos)
 let gradosGuiaCache = [];  // grados donde el docente es guía (docente_guia_id)
 let alumnosPorGrado = {};  // conteo de alumnos activos por grado_id
+
+// Mi Horario
+let horarioDocenteCache = null; // null = aún no cargado; [] = cargado y vacío
 
 // Registro de notas
 let notasGradoId      = null;
@@ -115,6 +119,7 @@ const TITULOS = {
     inicio: 'Inicio',
     materias: 'Mis Materias',
     notas: 'Registro de Notas',
+    horario: 'Mi Horario',
     competencias: 'Competencias Ciudadanas'
 };
 
@@ -132,6 +137,7 @@ window.mostrarVista = (vista) => {
     if (vista === 'inicio')       renderDashboard();
     if (vista === 'materias')     renderMisMaterias();
     if (vista === 'notas')        initVistaNotas();
+    if (vista === 'horario')      initVistaHorario();
     if (vista === 'competencias') initVistaCompetencias();
 };
 
@@ -191,6 +197,83 @@ window.irARegistrarNotas = (gradoId, gradoMateriaId) => {
     notasGradoId   = gradoId;
     notasMateriaId = gradoMateriaId;
     mostrarVista('notas');
+};
+
+// ── MI HORARIO (solo lectura) ────────────────
+async function initVistaHorario() {
+    if (horarioDocenteCache === null) {
+        await cargarHorarioDocente();
+    } else {
+        renderMiHorario();
+    }
+}
+
+async function cargarHorarioDocente() {
+    document.getElementById('mi-horario-grid').innerHTML = '<div class="empty-state">Cargando tu horario…</div>';
+    try {
+        const { data, error } = await supabase
+            .from('horarios')
+            .select('*, grados(id, nombre, seccion, modalidad), materias(id, nombre)')
+            .eq('docente_id', usuarioActual.id);
+
+        if (error && esErrorDeRed(error)) {
+            mostrarBannerSinConexion(() => cargarHorarioDocente());
+            return;
+        }
+        ocultarBannerSinConexion();
+        if (error) return notificarError(error, 'Error cargando tu horario');
+
+        horarioDocenteCache = data || [];
+        renderMiHorario();
+    } catch (err) {
+        if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => cargarHorarioDocente()); return; }
+        notificarError(err, 'Error cargando tu horario');
+    }
+}
+
+function renderMiHorario() {
+    const cont = document.getElementById('mi-horario-grid');
+
+    if (!horarioDocenteCache.length) {
+        cont.innerHTML = '<div class="empty-state">Todavía no tenés clases asignadas en el horario. Contactá al administrador.</div>';
+        return;
+    }
+
+    const porCelda = {};
+    horarioDocenteCache.forEach(h => { porCelda[`${h.dia}-${h.periodo}`] = h; });
+
+    let html = '<div class="hg-cell hg-head"></div>' +
+        DIAS_HORARIO.map(d => `<div class="hg-cell hg-head">${d}</div>`).join('');
+
+    BLOQUES_HORARIO.forEach(b => {
+        if (b.tipo !== 'clase') {
+            html += `<div class="hg-cell hg-periodo-label"><span class="hg-periodo-hora">${b.inicio}–${b.fin}</span></div>`;
+            html += `<div class="hg-cell hg-bloqueado" style="grid-column:2 / -1">${b.label}</div>`;
+            return;
+        }
+        html += `<div class="hg-cell hg-periodo-label"><span class="hg-periodo-num">P${b.periodo}</span><span class="hg-periodo-hora">${b.inicio}–${b.fin}</span></div>`;
+        DIAS_HORARIO.forEach(dia => {
+            const h = porCelda[`${dia}-${b.periodo}`];
+            if (h) {
+                html += `
+                <div class="hg-cell hg-ocupada-wrap">
+                    <div class="hg-ocupada" style="background:${colorPorMateria(h.materia_id)}">
+                        <div class="hg-materia">${h.materias?.nombre || ''}</div>
+                        <div class="hg-grado">${h.grados?.nombre || ''} ${h.grados?.modalidad || ''} · Sección ${h.grados?.seccion || ''}</div>
+                    </div>
+                </div>`;
+            } else {
+                html += '<div class="hg-cell hg-vacia"></div>';
+            }
+        });
+    });
+
+    cont.innerHTML = html;
+}
+
+window.imprimirMiHorario = () => {
+    if (!usuarioActual) return;
+    window.open(`./horario.html?docente=${usuarioActual.id}`, '_blank');
 };
 
 // ── REGISTRO DE NOTAS ────────────────────────

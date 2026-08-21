@@ -905,10 +905,17 @@ window.guardarMateria = async () => {
 };
 
 window.eliminarMateria = async (id) => {
-    const ok = await mostrarConfirm('¿Eliminar esta materia?', { textoConfirmar: 'Eliminar' });
+    const ok = await mostrarConfirm('¿Eliminar esta materia? Se quitará de todos los grados donde está asignada.', { textoConfirmar: 'Eliminar' });
     if (!ok) return;
+
+    // Primero quitar de todos los grados (si no, el FK de grado_materia hacia
+    // materias impediría borrar la materia mientras siga asignada en algún grado).
+    const { error: errorGm } = await supabase.from('grado_materia').delete().eq('materia_id', id);
+    if (errorGm) return notificarError(errorGm, 'Error quitando la materia de los grados');
+
     const { error } = await supabase.from('materias').delete().eq('id', id);
     if (error) return notificarError(error, 'Error eliminando la materia');
+
     mostrarToast('Materia eliminada', 'exito');
     await cargarTodo();
     renderMaterias();

@@ -2,7 +2,7 @@
 //  IDSJE — Panel Administrador
 // ═══════════════════════════════════════════
 import { supabase, verificarSesion, cerrarSesion, subirFoto } from './auth.js';
-import { CLOUDINARY_CLOUD, CLOUDINARY_PRESET, MATERIAS_DEFAULT, INSTITUTO, DIAS_HORARIO, BLOQUES_HORARIO, ESTADOS_ASISTENCIA, TIPOS_EXPEDIENTE } from './config.js';
+import { CLOUDINARY_CLOUD, CLOUDINARY_PRESET, INSTITUTO, DIAS_HORARIO, BLOQUES_HORARIO, ESTADOS_ASISTENCIA, TIPOS_EXPEDIENTE } from './config.js';
 import { generarHorario, verificarConflictos } from './generador-horarios.js';
 import {
     mostrarToast,
@@ -149,7 +149,7 @@ const VISTA_CONFIG = {
     grados:      { titulo: 'Grados y Secciones',  accion: `<button class="btn-primary" onclick="abrirModalGrado()">+ Nuevo Grado</button>` },
     alumnos:     { titulo: 'Alumnos',              accion: `<input type="file" id="excel-alumnos" accept=".xlsx,.xls" class="hidden" onchange="importarAlumnosExcel(event)"><button class="btn-secondary" onclick="document.getElementById('excel-alumnos').click()">📊 Importar Excel</button><button class="btn-secondary" onclick="imprimirMatriculaAdmin()">🖨 Reporte de matrícula</button><button class="btn-primary" onclick="abrirModalAlumno()">+ Nuevo Alumno</button>` },
     docentes:    { titulo: 'Docentes',             accion: `<button class="btn-primary" onclick="abrirModalDocente()">+ Nuevo Docente</button>` },
-    materias:    { titulo: 'Materias',             accion: `<button class="btn-secondary" onclick="cargarMateriasDefault()">Cargar IDSJE</button><button class="btn-primary" onclick="abrirModalMateria()">+ Nueva Materia</button>` },
+    materias:    { titulo: 'Materias',             accion: `<button class="btn-primary" onclick="abrirModalMateria()">+ Nueva Materia</button>` },
     horarios:    { titulo: 'Horarios',             accion: `<button class="btn-secondary" onclick="imprimirHorarioGrado()">🖨 Imprimir horario</button>` },
     generador:   { titulo: 'Generar Horario',      accion: '' },
     asistencias: { titulo: 'Asistencias',          accion: `<button class="btn-secondary" onclick="imprimirReporteAsistenciaAdmin()">🖨 Reporte mensual</button><button class="btn-secondary" onclick="imprimirListaBlancoAsistenciaAdmin()">📄 Lista en blanco</button>` },
@@ -343,7 +343,18 @@ async function renderDashboard() {
 }
 
 // ── GRADOS ──────────────────────────────────
-function renderGrados() {
+function badgeMod(m) {
+    if (m === 'Técnico') return 'mod-tec';
+    if (m === 'Vocacional') return 'mod-voc';
+    return 'mod-gen';
+}
+function labelMod(m) {
+    if (m === 'Técnico') return 'TEC';
+    if (m === 'Vocacional') return 'VOC';
+    return 'GEN';
+}
+
+async function renderGrados() {
     const body = document.getElementById('grados-bubbles-body');
     if (!body) return;
     if (!gradosCache.length) {
@@ -351,52 +362,223 @@ function renderGrados() {
         return;
     }
 
-    // Agrupar por nombre de grado
-    const grupos = {};
-    gradosCache.forEach(g => {
-        const key = g.nombre;
-        if (!grupos[key]) grupos[key] = [];
-        grupos[key].push(g);
-    });
+    body.innerHTML = '<div class="empty-bubbles">Cargando…</div>';
 
-    function badgeMod(m) {
-        if (m === 'Técnico') return 'mod-tec';
-        if (m === 'Vocacional') return 'mod-voc';
-        return 'mod-gen';
-    }
-    function labelMod(m) {
-        if (m === 'Técnico') return 'TEC';
-        if (m === 'Vocacional') return 'VOC';
-        return 'GEN';
-    }
+    const { data: alumnos } = await supabase.from('alumnos').select('grado_id');
+    const conteoPorGrado = {};
+    (alumnos || []).forEach(a => { if (a.grado_id) conteoPorGrado[a.grado_id] = (conteoPorGrado[a.grado_id] || 0) + 1; });
 
-    body.innerHTML = Object.entries(grupos).map(([nombre, grados]) => `
-        <div class="grados-group">
-            <div class="group-label">${nombre}</div>
-            <div class="bubbles">
-                ${grados.map(g => `
-                    <div class="grado-bubble">
-                        <div class="bubble-circle">
-                            <span class="badge-mod ${badgeMod(g.modalidad)}">${labelMod(g.modalidad)}</span>
-                            <span class="bubble-code">${codigoGrado(g)}</span>
-                            <span class="bubble-sub">Secc. ${g.seccion}</span>
-                        </div>
-                        <span class="bubble-label">${usuariosCache.find(u=>u.id===g.docente_guia_id)?.nombre_completo?.split(' ')[0] || 'Sin guía'}</span>
-                        <div class="bubble-actions">
-                            <button class="ba-btn ba-edit" onclick="editarGrado('${g.id}')">Editar</button>
-                            <button class="ba-btn ba-mat" onclick="gestionarMateriaGrado('${g.id}')">Materias</button>
-                            <button class="ba-btn ba-del" onclick="eliminarGrado('${g.id}')">Eliminar</button>
-                        </div>
-                    </div>
-                `).join('')}
+    const gradosOrdenados = [...gradosCache].sort((a, b) =>
+        a.nombre.localeCompare(b.nombre) || a.seccion.localeCompare(b.seccion));
+
+    body.innerHTML = gradosOrdenados.map(g => {
+        const guia = usuariosCache.find(u => u.id === g.docente_guia_id);
+        return `
+        <div class="grado-row-card" onclick="abrirDrawerGrado('${g.id}')">
+            <div class="grc-nombre-wrap">
+                <div class="grc-nombre">${g.nombre} <span class="badge-mod ${badgeMod(g.modalidad)}">${labelMod(g.modalidad)}</span></div>
+                <div class="grc-seccion">Sección ${g.seccion}</div>
             </div>
-        </div>
-    `).join('');
+            <div class="grc-guia">
+                <span class="grc-guia-ico">${(guia?.nombre_completo || '?').charAt(0).toUpperCase()}</span>
+                ${guia?.nombre_completo || 'Sin docente guía'}
+            </div>
+            <div class="grc-alumnos">
+                <div class="grc-alumnos-val">${conteoPorGrado[g.id] || 0}</div>
+                <div class="grc-alumnos-lbl">Alumnos</div>
+            </div>
+            <div class="grc-chevron">›</div>
+        </div>`;
+    }).join('');
 
-    // Actualizar stats
     const sg = document.getElementById('stat-grados');
     if (sg) sg.textContent = gradosCache.length;
 }
+
+// ── DRAWER DE DETALLE DE GRADO ───────────────
+let gradoDrawerId  = null;
+let gradoDrawerTab = 'general';
+
+window.abrirDrawerGrado = async (id) => {
+    gradoDrawerId = id;
+    gradoDrawerTab = 'general';
+    renderHeaderDrawerGrado();
+    document.querySelectorAll('.gd-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'general'));
+    document.getElementById('grado-drawer-overlay').classList.add('open');
+    await renderTabDrawerGrado('general');
+};
+
+window.cerrarDrawerGrado = () => {
+    document.getElementById('grado-drawer-overlay').classList.remove('open');
+    gradoDrawerId = null;
+};
+
+window.cambiarTabDrawerGrado = async (tab) => {
+    gradoDrawerTab = tab;
+    document.querySelectorAll('.gd-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    await renderTabDrawerGrado(tab);
+};
+
+function renderHeaderDrawerGrado() {
+    const g = gradosCache.find(x => x.id === gradoDrawerId);
+    if (!g) return;
+    document.getElementById('gd-nombre').innerHTML =
+        `${g.nombre} <span class="badge-mod ${badgeMod(g.modalidad)}">${labelMod(g.modalidad)}</span>`;
+    document.getElementById('gd-seccion').textContent = `Sección ${g.seccion} · Año ${g.anio}`;
+}
+
+// Nombre del docente de una fila de grado_materia: el propio, o si no tiene,
+// el docente por defecto de la materia (mismo criterio que docenteEfectivoGradoMateria).
+function nombreDocenteMateriaGrado(gm) {
+    return docenteEfectivoGradoMateria(gm)?.nombre || '';
+}
+
+function renderMiniGridHorario(horarios) {
+    if (!horarios.length) return '<div class="empty-bubbles">Este grado no tiene horario generado todavía.</div>';
+
+    const porCelda = {};
+    horarios.forEach(h => { porCelda[`${h.dia}-${h.periodo}`] = h; });
+
+    let html = '<div class="gd-mini-grid">';
+    html += '<div class="gd-mini-cell gd-mini-head"></div>' +
+        DIAS_HORARIO.map(d => `<div class="gd-mini-cell gd-mini-head">${d.slice(0, 3)}</div>`).join('');
+
+    BLOQUES_HORARIO.forEach(b => {
+        if (b.tipo !== 'clase') return; // vista compacta: solo períodos de clase
+        html += `<div class="gd-mini-cell gd-mini-periodo">P${b.periodo}</div>`;
+        DIAS_HORARIO.forEach(dia => {
+            const h = porCelda[`${dia}-${b.periodo}`];
+            html += h
+                ? `<div class="gd-mini-cell gd-mini-ocupada" style="background:${colorPorMateria(h.materia_id)}">
+                       <div class="gd-mini-materia">${(h.materias?.nombre || '').slice(0, 12)}</div>
+                       <div class="gd-mini-docente">${nombreCortoDocente(h.usuarios?.nombre_completo)}</div>
+                   </div>`
+                : '<div class="gd-mini-cell"></div>';
+        });
+    });
+
+    html += '</div>';
+    return html;
+}
+
+async function renderTabDrawerGrado(tab) {
+    const cont = document.getElementById('gd-tab-content');
+    const g = gradosCache.find(x => x.id === gradoDrawerId);
+    if (!cont || !g) return;
+    cont.innerHTML = '<div class="empty-bubbles">Cargando…</div>';
+
+    if (tab === 'general') {
+        const guia = usuariosCache.find(u => u.id === g.docente_guia_id);
+        cont.innerHTML = `
+            <div class="gd-field">
+                <div class="gd-field-label">Docente guía</div>
+                <div class="gd-field-val">${guia?.nombre_completo || 'Sin asignar'}</div>
+            </div>
+            <div class="gd-field">
+                <div class="gd-field-label">Año</div>
+                <div class="gd-field-val">${g.anio}</div>
+            </div>
+            <div class="gd-field">
+                <div class="gd-field-label">Modalidad</div>
+                <div class="gd-field-val">${g.modalidad}</div>
+            </div>`;
+        return;
+    }
+
+    if (tab === 'alumnos') {
+        const { data, error } = await supabase.from('alumnos').select('*').eq('grado_id', g.id).order('apellidos');
+        if (error) { cont.innerHTML = '<div class="empty-bubbles">Error cargando alumnos</div>'; return; }
+        const alumnos = data || [];
+        cont.innerHTML =
+            (alumnos.length
+                ? alumnos.map(a => `
+                    <div class="gd-alumno-row">
+                        ${a.foto_url
+                            ? `<img src="${a.foto_url}" class="foto-mini" alt="${a.apellidos}">`
+                            : '<div class="foto-mini foto-placeholder">?</div>'}
+                        <div>
+                            <div class="gd-alumno-nombre">${a.apellidos}, ${a.nombres}</div>
+                            <div class="gd-alumno-nie">NIE ${a.nie || '—'}</div>
+                        </div>
+                    </div>`).join('')
+                : '<div class="empty-bubbles">Este grado no tiene alumnos todavía.</div>')
+            + `<button class="gd-ver-todos" onclick="verAlumnosDeGrado('${g.id}')">Ver todos en Alumnos →</button>`;
+        return;
+    }
+
+    if (tab === 'materias') {
+        const { data, error } = await supabase
+            .from('grado_materia')
+            .select('*, materias(id, nombre, docente_id)')
+            .eq('grado_id', g.id);
+        if (error) { cont.innerHTML = '<div class="empty-bubbles">Error cargando materias</div>'; return; }
+        const filas = data || [];
+        cont.innerHTML =
+            (filas.length
+                ? filas.map(gm => `
+                    <div class="gd-materia-row">
+                        <div>
+                            <div class="gd-materia-nombre">${gm.materias?.nombre || ''}</div>
+                            <div class="gd-materia-docente">${nombreDocenteMateriaGrado(gm) || 'Sin asignar'}</div>
+                        </div>
+                        <button class="gd-materia-quitar" onclick="quitarMateriaDrawerGrado('${gm.id}')" title="Quitar">✕</button>
+                    </div>`).join('')
+                : '<div class="empty-bubbles">Sin materias asignadas.</div>')
+            + `<button class="gd-add-materia" onclick="gestionarMateriaGrado('${g.id}')">+ Agregar / quitar materias</button>`;
+        return;
+    }
+
+    if (tab === 'horario') {
+        const { data, error } = await supabase
+            .from('horarios')
+            .select('*, materias(id, nombre), usuarios(id, nombre_completo)')
+            .eq('grado_id', g.id);
+        if (error) { cont.innerHTML = '<div class="empty-bubbles">Error cargando horario</div>'; return; }
+        cont.innerHTML = renderMiniGridHorario(data || [])
+            + `<button class="gd-editar-horario" onclick="irAHorarioCompleto('${g.id}')">Editar horario completo →</button>`;
+        return;
+    }
+}
+
+window.quitarMateriaDrawerGrado = async (grado_materia_id) => {
+    const ok = await mostrarConfirm('¿Quitar esta materia del grado?', { textoConfirmar: 'Quitar' });
+    if (!ok) return;
+    const { error } = await supabase.from('grado_materia').delete().eq('id', grado_materia_id);
+    if (error) return notificarError(error, 'Error quitando la materia');
+    mostrarToast('Materia quitada del grado', 'exito');
+    await renderTabDrawerGrado('materias');
+};
+
+window.verAlumnosDeGrado = async (gradoId) => {
+    cerrarDrawerGrado();
+    await mostrarVista('alumnos');
+    const sel = document.getElementById('filtro-grado');
+    if (sel) { sel.value = gradoId; await renderAlumnos(); }
+};
+
+window.irAHorarioCompleto = async (gradoId) => {
+    cerrarDrawerGrado();
+    horarioGradoSel = gradoId;
+    await mostrarVista('horarios');
+};
+
+window.editarGradoDesdeDrawer = () => {
+    const id = gradoDrawerId;
+    cerrarDrawerGrado();
+    window.abrirModalGrado(id);
+};
+
+window.eliminarGradoDesdeDrawer = async () => {
+    const id = gradoDrawerId;
+    const ok = await mostrarConfirm('¿Eliminar este grado y todos sus datos?', { textoConfirmar: 'Eliminar' });
+    if (!ok) return;
+    const { error } = await supabase.from('grados').delete().eq('id', id);
+    if (error) return notificarError(error, 'Error eliminando el grado');
+    mostrarToast('Grado eliminado', 'exito');
+    cerrarDrawerGrado();
+    await cargarTodo();
+    renderGrados();
+};
 
 const CAMPOS_GRADO = ['grado-nombre', 'grado-seccion'];
 
@@ -547,6 +729,7 @@ window.guardarMateriasGrado = async () => {
     setBotonCargando(btn, false);
     mostrarToast('Materias del grado actualizadas', 'exito');
     cerrarModal('modal-grado-materias');
+    if (gradoDrawerId === gradoId && gradoDrawerTab === 'materias') await renderTabDrawerGrado('materias');
 };
 
 // ── DOCENTES ────────────────────────────────
@@ -693,6 +876,11 @@ window.guardarMateria = async () => {
 
     if (!nombre) { mostrarErrorCampo('materia-nombre', 'El nombre es obligatorio'); return; }
 
+    // Si el docente de la materia cambió, ese cambio se propaga a todos los grado_materia
+    // de esta materia (más abajo) — se compara contra el valor previo a guardar.
+    const materiaAnterior = id ? materiasCache.find(m => m.id === id) : null;
+    const docenteCambio = !!materiaAnterior && materiaAnterior.docente_id !== docenteId;
+
     const btn = document.getElementById('btn-guardar-materia');
     setBotonCargando(btn, true);
 
@@ -700,9 +888,16 @@ window.guardarMateria = async () => {
         ? await supabase.from('materias').update({ nombre, codigo, docente_id: docenteId }).eq('id', id)
         : await supabase.from('materias').insert([{ nombre, codigo, docente_id: docenteId }]);
 
-    setBotonCargando(btn, false);
-    if (error) return notificarError(error, 'Error guardando la materia');
+    if (error) { setBotonCargando(btn, false); return notificarError(error, 'Error guardando la materia'); }
 
+    if (docenteCambio) {
+        const { error: errorProp } = await supabase.from('grado_materia')
+            .update({ docente_id: docenteId })
+            .eq('materia_id', id);
+        if (errorProp) notificarError(errorProp, 'La materia se guardó, pero no se pudo propagar el docente a los grados que ya la tenían asignada');
+    }
+
+    setBotonCargando(btn, false);
     mostrarToast(id ? 'Materia actualizada' : 'Materia creada', 'exito');
     cerrarModal('modal-materia');
     await cargarTodo();
@@ -717,28 +912,6 @@ window.eliminarMateria = async (id) => {
     mostrarToast('Materia eliminada', 'exito');
     await cargarTodo();
     renderMaterias();
-};
-
-window.cargarMateriasDefault = async () => {
-    const ok = await mostrarConfirm('¿Cargar las 10 materias del IDSJE? Solo agrega las que no existen.', {
-        textoConfirmar: 'Cargar',
-        peligroso: false,
-    });
-    if (!ok) return;
-
-    const existentes = materiasCache.map(m => m.nombre.toLowerCase());
-    const nuevas = MATERIAS_DEFAULT
-        .filter(n => !existentes.includes(n.toLowerCase()))
-        .map(n => ({ nombre: n }));
-
-    if (nuevas.length === 0) { mostrarToast('Todas las materias ya existen', 'info'); return; }
-
-    const { error } = await supabase.from('materias').insert(nuevas);
-    if (error) return notificarError(error, 'Error cargando materias');
-
-    await cargarTodo();
-    renderMaterias();
-    mostrarToast(`${nuevas.length} materia(s) agregada(s)`, 'exito');
 };
 
 // ── HORARIOS ────────────────────────────────
@@ -907,6 +1080,17 @@ window.imprimirHorarioGrado = () => {
 };
 
 // ── GENERADOR AUTOMÁTICO DE HORARIOS ─────────
+// Docente "efectivo" de una fila de grado_materia: el asignado directamente en
+// grado_materia.docente_id, y si esa columna viene null, el docente por defecto
+// de la materia (materias.docente_id) como fallback. Sin esto, una materia cuyo
+// docente solo se configuró desde la sección Materias (no por-grado) aparecía
+// como "Sin asignar" en el generador aunque en la práctica sí tuviera profesor.
+function docenteEfectivoGradoMateria(gm) {
+    const id = gm.docente_id || gm.materias?.docente_id || null;
+    if (!id) return null;
+    return { id, nombre: usuariosCache.find(u => u.id === id)?.nombre_completo || '' };
+}
+
 async function renderVistaGenerador() {
     document.getElementById('gen-formulario').classList.remove('hidden');
     document.getElementById('gen-resultado').classList.add('hidden');
@@ -914,9 +1098,14 @@ async function renderVistaGenerador() {
     document.getElementById('gen-materias-lista').innerHTML = '<div class="empty-bubbles">Cargando…</div>';
 
     try {
+        // Datos frescos cada vez que se abre esta vista: recarga grados/usuarios/materias
+        // (usuariosCache se usa para resolver el nombre del docente de fallback) y luego
+        // las asignaciones de grado_materia.
+        await cargarTodo();
+
         const { data, error } = await supabase
             .from('grado_materia')
-            .select('*, grados(id, nombre, seccion, modalidad), materias(id, nombre), usuarios(id, nombre_completo)')
+            .select('*, grados(id, nombre, seccion, modalidad), materias(id, nombre, docente_id)')
             .order('grado_id');
 
         if (error && esErrorDeRed(error)) { mostrarBannerSinConexion(() => renderVistaGenerador()); return; }
@@ -924,10 +1113,11 @@ async function renderVistaGenerador() {
         if (error) return notificarError(error, 'Error cargando materias asignadas');
 
         const filas = data || [];
-        genSinDocenteCount = filas.filter(gm => !gm.docente_id).length;
+        genSinDocenteCount = filas.filter(gm => !docenteEfectivoGradoMateria(gm)).length;
 
         // Conserva las horas/disponibilidad que el admin ya haya tocado si vuelve a esta vista.
-        genAsignaciones = filas.filter(gm => gm.docente_id).map(gm => {
+        genAsignaciones = filas.filter(gm => docenteEfectivoGradoMateria(gm)).map(gm => {
+            const doc = docenteEfectivoGradoMateria(gm);
             const anterior = genAsignaciones.find(a => a.id === gm.id);
             return {
                 id: gm.id,
@@ -935,8 +1125,8 @@ async function renderVistaGenerador() {
                 gradoNombre: `${gm.grados?.nombre || ''} ${gm.grados?.modalidad || ''} — Sección ${gm.grados?.seccion || ''}`,
                 materiaId: gm.materia_id,
                 materiaNombre: gm.materias?.nombre || '',
-                docenteId: gm.docente_id,
-                docenteNombre: gm.usuarios?.nombre_completo || '',
+                docenteId: doc.id,
+                docenteNombre: doc.nombre,
                 horasPorSemana: anterior ? anterior.horasPorSemana : 4,
                 incluida: anterior ? anterior.incluida : true,
             };

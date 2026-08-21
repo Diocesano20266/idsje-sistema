@@ -16,19 +16,6 @@ export const INSTITUTO = {
     anio:      2026,
 };
 
-export const MATERIAS_DEFAULT = [
-    'Lenguaje y Literatura',
-    'Matemática',
-    'Ciencias Naturales',
-    'Estudios Sociales y Cívica',
-    'Idioma Extranjero',
-    'Informática',
-    'Orientación para la Vida',
-    'Educación en la Fe',
-    'Educación Física',
-    'Módulo',
-];
-
 export const CONCEPTOS = ['E', 'MB', 'B', 'R', 'D'];
 
 // ── Horarios ──────────────────────────────────

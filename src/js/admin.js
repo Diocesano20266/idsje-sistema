@@ -689,7 +689,16 @@ window.gestionarMateriaGrado = async (gradoId) => {
 window.toggleMgmRow = (materiaId) => {
     const chk = document.querySelector(`.mgm-checkbox[data-materia-id="${materiaId}"]`);
     const sel = document.getElementById(`mgm-docente-${materiaId}`);
-    if (sel) sel.disabled = !chk.checked;
+    if (!sel) return;
+    sel.disabled = !chk.checked;
+
+    // Al seleccionar (marcar) la materia, autocompletar el docente con el docente_id
+    // por defecto de la materia. El admin igual puede cambiarlo manualmente después
+    // para ese grado en particular.
+    if (chk.checked) {
+        const m = materiasCache.find(x => x.id === materiaId);
+        sel.value = m?.docente_id || '';
+    }
 };
 
 window.guardarMateriasGrado = async () => {

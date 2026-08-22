@@ -3,7 +3,7 @@
 //  Uso: reporte-matricula.html?grado=<id>
 // ═══════════════════════════════════════════
 import { supabase, verificarSesion } from './auth.js';
-import { INSTITUTO } from './config.js';
+import { INSTITUTO, getAñoActivo } from './config.js';
 import { notificarError, esErrorDeRed, mostrarBannerSinConexion, ocultarBannerSinConexion } from './utils.js';
 
 async function init() {
@@ -25,9 +25,12 @@ async function init() {
 async function renderReporte(gradoId) {
     const cont = document.getElementById('contenedor-matricula');
     try {
-        const [{ data: grado, error: eG }, { data: alumnos, error: eAl }] = await Promise.all([
+        const anioActivo = await getAñoActivo(supabase);
+        const [{ data: grado, error: eG }, { data: matriculas, error: eAl }] = await Promise.all([
             supabase.from('grados').select('*').eq('id', gradoId).single(),
-            supabase.from('alumnos').select('*').eq('grado_id', gradoId).eq('activo', true).order('apellidos'),
+            anioActivo
+                ? supabase.from('matriculas').select('*, alumnos(*)').eq('grado_id', gradoId).eq('año_academico_id', anioActivo.id).eq('activo', true)
+                : Promise.resolve({ data: [], error: null }),
         ]);
 
         const errorDeRed = [eG, eAl].find(e => e && esErrorDeRed(e));
@@ -35,8 +38,10 @@ async function renderReporte(gradoId) {
         ocultarBannerSinConexion();
         if (eG) return notificarError(eG, 'Error cargando el grado');
         if (eAl) return notificarError(eAl, 'Error cargando alumnos');
+        if (!anioActivo) return notificarError({ message: 'No hay un año académico activo configurado' }, 'Error');
 
-        cont.innerHTML = generarHTML(grado, alumnos || []);
+        const alumnos = (matriculas || []).map(m => m.alumnos).filter(Boolean).sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || ''));
+        cont.innerHTML = generarHTML(grado, alumnos);
     } catch (err) {
         if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => renderReporte(gradoId)); return; }
         notificarError(err, 'Error cargando el reporte');

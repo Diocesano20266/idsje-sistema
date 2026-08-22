@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Instituto Diocesano San Juan Evangelista</title>
+<meta name="description" content="Instituto Diocesano San Juan Evangelista — San Juan Opico, La Libertad, El Salvador. Dios, Ciencia, Educación.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --navy: #0a1628;
+        --navy-light: #13233d;
+        --navy-lighter: #1c3454;
+        --gold: #d4af37;
+        --gold-light: #e8cc6d;
+        --white: #ffffff;
+        --off-white: #f8f9fc;
+        --text-muted: #64748b;
+        --border: #e2e8f0;
+        --shadow: 0 10px 30px rgba(10,22,40,.08);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        color: var(--navy);
+        background: var(--white);
+        overflow-x: hidden;
+    }
+
+    h1, h2, h3, .font-display {
+        font-family: 'Playfair Display', serif;
+    }
+
+    img { max-width: 100%; display: block; }
+
+    a { text-decoration: none; color: inherit; }
+
+    ul { list-style: none; }
+
+    .container {
+        max-width: 1160px;
+        margin: 0 auto;
+        padding: 0 24px;
+    }
+
+    .eyebrow {
+        display: inline-block;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--gold);
+        margin-bottom: 14px;
+    }
+
+    /* ── Reveal on scroll ── */
+    .reveal {
+        opacity: 0;
+        transform: translateY(28px);
+        transition: opacity .7s ease, transform .7s ease;
+    }
+    .reveal.visible {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    .reveal-stagger.visible .stagger-item {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    .stagger-item {
+        opacity: 0;
+        transform: translateY(20px);
+        transition: opacity .6s ease, transform .6s ease;
+    }
+    .stagger-item:nth-child(1) { transition-delay: .05s; }
+    .stagger-item:nth-child(2) { transition-delay: .15s; }
+    .stagger-item:nth-child(3) { transition-delay: .25s; }
+    .stagger-item:nth-child(4) { transition-delay: .35s; }
+
+    /* ── Navbar ── */
+    .navbar {
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        z-index: 1000;
+        background: rgba(10,22,40,.0);
+        backdrop-filter: blur(0px);
+        transition: background .35s ease, backdrop-filter .35s ease, box-shadow .35s ease, padding .35s ease;
+        padding: 22px 0;
+    }
+    .navbar.scrolled {
+        background: rgba(10,22,40,.92);
+        backdrop-filter: blur(10px);
+        box-shadow: 0 4px 24px rgba(0,0,0,.18);
+        padding: 14px 0;
+    }
+    .nav-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+    }
+    .nav-brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: var(--white);
+    }
+    .nav-logo-img {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid var(--gold);
+        background: var(--navy-light);
+    }
+    .nav-logo-fallback {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        border: 2px solid var(--gold);
+        background: var(--navy-light);
+        color: var(--gold);
+        font-family: 'Playfair Display', serif;
+        font-weight: 700;
+        font-size: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .nav-brand-text {
+        line-height: 1.15;
+    }
+    .nav-brand-name {
+        font-weight: 700;
+        font-size: 14.5px;
+        letter-spacing: .2px;
+    }
+    .nav-brand-sub {
+        font-size: 10.5px;
+        color: var(--gold-light);
+        letter-spacing: 1.4px;
+        text-transform: uppercase;
+    }
+    .nav-links {
+        display: flex;
+        gap: 34px;
+    }
+    .nav-links a {
+        color: rgba(255,255,255,.85);
+        font-size: 14px;
+        font-weight: 600;
+        position: relative;
+        padding: 4px 0;
+        transition: color .2s ease;
+    }
+    .nav-links a::after {
+        content: '';
+        position: absolute;
+        left: 0; bottom: -2px;
+        width: 0; height: 2px;
+        background: var(--gold);
+        transition: width .25s ease;
+    }
+    .nav-links a:hover { color: var(--white); }
+    .nav-links a:hover::after { width: 100%; }
+
+    .nav-right {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+    }
+
+    .btn-gold {
+        background: linear-gradient(135deg, var(--gold-light), var(--gold));
+        color: var(--navy);
+        font-weight: 700;
+        font-size: 13.5px;
+        padding: 11px 22px;
+        border-radius: 100px;
+        border: none;
+        cursor: pointer;
+        box-shadow: 0 6px 16px rgba(212,175,55,.35);
+        transition: transform .2s ease, box-shadow .2s ease;
+        white-space: nowrap;
+    }
+    .btn-gold:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 22px rgba(212,175,55,.45);
+    }
+
+    .nav-toggle {
+        display: none;
+        flex-direction: column;
+        gap: 5px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 6px;
+        z-index: 1100;
+    }
+    .nav-toggle span {
+        width: 24px;
+        height: 2px;
+        background: var(--white);
+        border-radius: 2px;
+        transition: transform .3s ease, opacity .3s ease;
+    }
+    .nav-toggle.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .nav-toggle.open span:nth-child(2) { opacity: 0; }
+    .nav-toggle.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+    .nav-mobile-panel {
+        position: fixed;
+        top: 0; right: 0;
+        width: min(78vw, 320px);
+        height: 100vh;
+        background: var(--navy);
+        box-shadow: -12px 0 40px rgba(0,0,0,.3);
+        padding: 100px 32px 40px;
+        display: flex;
+        flex-direction: column;
+        gap: 26px;
+        transform: translateX(100%);
+        transition: transform .35s ease;
+        z-index: 1050;
+    }
+    .nav-mobile-panel.open { transform: translateX(0); }
+    .nav-mobile-panel a {
+        color: var(--white);
+        font-size: 17px;
+        font-weight: 600;
+    }
+    .nav-mobile-panel .btn-gold {
+        text-align: center;
+        margin-top: 8px;
+    }
+    .nav-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.45);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .35s ease;
+        z-index: 1040;
+    }
+    .nav-overlay.open { opacity: 1; pointer-events: auto; }
+
+    /* ── Hero ── */
+    .hero {
+        position: relative;
+        min-height: 100vh;
+        background: radial-gradient(ellipse at 30% 20%, #132a4a 0%, var(--navy) 55%, #060d18 100%);
+        display: flex;
+        align-items: center;
+        overflow: hidden;
+        padding: 140px 0 90px;
+    }
+    .hero-watermark {
+        position: absolute;
+        top: 50%; right: -8%;
+        transform: translateY(-50%);
+        width: 640px;
+        height: 640px;
+        border-radius: 50%;
+        opacity: .07;
+        object-fit: cover;
+        filter: grayscale(1) brightness(2);
+        pointer-events: none;
+        user-select: none;
+    }
+    .hero-watermark-fallback {
+        position: absolute;
+        top: 50%; right: -6%;
+        transform: translateY(-50%);
+        width: 560px;
+        height: 560px;
+        border-radius: 50%;
+        border: 18px solid rgba(212,175,55,.08);
+        pointer-events: none;
+    }
+    .hero-watermark-fallback::after {
+        content: '';
+        position: absolute;
+        inset: 60px;
+        border-radius: 50%;
+        border: 3px solid rgba(212,175,55,.1);
+    }
+    .hero-inner {
+        position: relative;
+        z-index: 2;
+        max-width: 680px;
+    }
+    .hero h1 {
+        color: var(--white);
+        font-size: clamp(32px, 5.6vw, 58px);
+        font-weight: 800;
+        line-height: 1.1;
+        margin-bottom: 22px;
+    }
+    .hero h1 span { color: var(--gold); }
+    .hero-sub {
+        color: rgba(255,255,255,.78);
+        font-size: clamp(16px, 2.2vw, 20px);
+        font-weight: 500;
+        letter-spacing: .5px;
+        margin-bottom: 44px;
+    }
+    .hero-sub b { color: var(--gold-light); font-weight: 700; }
+    .hero-cta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 18px;
+    }
+    .hero-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 17px 30px;
+        border-radius: 14px;
+        font-weight: 700;
+        font-size: 15px;
+        cursor: pointer;
+        transition: transform .2s ease, box-shadow .2s ease;
+    }
+    .hero-btn-primary {
+        background: linear-gradient(135deg, var(--gold-light), var(--gold));
+        color: var(--navy);
+        box-shadow: 0 12px 28px rgba(212,175,55,.3);
+    }
+    .hero-btn-secondary {
+        background: rgba(255,255,255,.06);
+        color: var(--white);
+        border: 1.5px solid rgba(255,255,255,.35);
+    }
+    .hero-btn:hover { transform: translateY(-3px); }
+    .hero-btn-primary:hover { box-shadow: 0 16px 34px rgba(212,175,55,.4); }
+    .hero-btn-secondary:hover { border-color: var(--gold); background: rgba(212,175,55,.1); }
+
+    .hero-scroll-cue {
+        position: absolute;
+        bottom: 34px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: rgba(255,255,255,.5);
+        font-size: 11px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        z-index: 2;
+    }
+    .hero-scroll-cue span {
+        width: 1px;
+        height: 34px;
+        background: linear-gradient(var(--gold), transparent);
+        animation: scrollcue 1.8s ease-in-out infinite;
+    }
+    @keyframes scrollcue {
+        0% { opacity: 0; transform: scaleY(.4); transform-origin: top; }
+        50% { opacity: 1; transform: scaleY(1); transform-origin: top; }
+        100% { opacity: 0; transform: scaleY(.4); transform-origin: bottom; }
+    }
+
+    /* ── Section shared ── */
+    .section {
+        padding: 110px 0;
+    }
+    .section-off { background: var(--off-white); }
+    .section-head {
+        max-width: 620px;
+        margin: 0 auto 60px;
+        text-align: center;
+    }
+    .section-head h2 {
+        font-size: clamp(28px, 4vw, 40px);
+        font-weight: 700;
+        color: var(--navy);
+        margin-bottom: 16px;
+    }
+    .section-head p {
+        color: var(--text-muted);
+        font-size: 16px;
+        line-height: 1.7;
+    }
+
+    /* ── Nosotros ── */
+    .mv-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 28px;
+        margin-bottom: 70px;
+    }
+    .mv-card {
+        background: var(--navy);
+        border-radius: 20px;
+        padding: 40px 36px;
+        color: var(--white);
+        position: relative;
+        overflow: hidden;
+    }
+    .mv-card::before {
+        content: '';
+        position: absolute;
+        top: -40px; right: -40px;
+        width: 140px; height: 140px;
+        border-radius: 50%;
+        background: rgba(212,175,55,.12);
+    }
+    .mv-icon {
+        width: 52px; height: 52px;
+        border-radius: 14px;
+        background: rgba(212,175,55,.15);
+        color: var(--gold);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 24px;
+        margin-bottom: 22px;
+        position: relative;
+        z-index: 1;
+    }
+    .mv-card h3 {
+        font-size: 21px;
+        font-weight: 700;
+        margin-bottom: 14px;
+        color: var(--gold-light);
+        position: relative;
+        z-index: 1;
+    }
+    .mv-card p {
+        font-size: 14.5px;
+        line-height: 1.85;
+        color: rgba(255,255,255,.82);
+        position: relative;
+        z-index: 1;
+    }
+
+    .valores-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 22px;
+    }
+    .valor-card {
+        text-align: center;
+        padding: 30px 18px;
+        border-radius: 16px;
+        border: 1px solid var(--border);
+        background: var(--white);
+        transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+    }
+    .valor-card:hover {
+        transform: translateY(-6px);
+        box-shadow: var(--shadow);
+        border-color: transparent;
+    }
+    .valor-icon {
+        width: 58px; height: 58px;
+        margin: 0 auto 16px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #fdf6e3, #f7e9c1);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 26px;
+    }
+    .valor-card h4 {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--navy);
+        margin-bottom: 8px;
+    }
+    .valor-card p {
+        font-size: 12.5px;
+        color: var(--text-muted);
+        line-height: 1.6;
+    }
+
+    /* ── Modalidades ── */
+    .modalidades-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+    }
+    .modalidad-card {
+        background: var(--white);
+        border: 1px solid var(--border);
+        border-radius: 22px;
+        padding: 44px 38px;
+        transition: transform .3s ease, box-shadow .3s ease;
+        position: relative;
+    }
+    .modalidad-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 24px 50px rgba(10,22,40,.12);
+    }
+    .modalidad-tag {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 1.4px;
+        text-transform: uppercase;
+        color: var(--gold);
+        background: #fbf3dd;
+        padding: 6px 14px;
+        border-radius: 100px;
+        margin-bottom: 20px;
+    }
+    .modalidad-card h3 {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--navy);
+        margin-bottom: 14px;
+    }
+    .modalidad-card p {
+        color: var(--text-muted);
+        font-size: 14.5px;
+        line-height: 1.8;
+        margin-bottom: 22px;
+    }
+    .modalidad-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .modalidad-list li {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 13.5px;
+        color: var(--navy);
+        font-weight: 500;
+    }
+    .modalidad-list li::before {
+        content: '✓';
+        color: var(--gold);
+        font-weight: 800;
+        width: 20px; height: 20px;
+        border-radius: 50%;
+        background: #fbf3dd;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 11px;
+        flex-shrink: 0;
+    }
+
+    /* ── Noticias ── */
+    .noticias-empty {
+        max-width: 560px;
+        margin: 0 auto;
+        text-align: center;
+        background: var(--white);
+        border: 1.5px dashed var(--border);
+        border-radius: 20px;
+        padding: 54px 40px;
+    }
+    .noticias-empty .valor-icon { margin-bottom: 20px; }
+    .noticias-empty h3 {
+        font-size: 19px;
+        font-weight: 700;
+        color: var(--navy);
+        margin-bottom: 10px;
+    }
+    .noticias-empty p {
+        color: var(--text-muted);
+        font-size: 14px;
+        line-height: 1.7;
+    }
+
+    /* ── Contacto ── */
+    .contacto-grid {
+        display: grid;
+        grid-template-columns: 1fr 1.15fr;
+        gap: 40px;
+        align-items: stretch;
+    }
+    .contacto-info {
+        background: var(--navy);
+        border-radius: 22px;
+        padding: 44px 38px;
+        color: var(--white);
+        display: flex;
+        flex-direction: column;
+        gap: 26px;
+    }
+    .contacto-item {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+    }
+    .contacto-icon {
+        width: 44px; height: 44px;
+        border-radius: 12px;
+        background: rgba(212,175,55,.15);
+        color: var(--gold);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 19px;
+        flex-shrink: 0;
+    }
+    .contacto-item h4 {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--gold-light);
+        margin-bottom: 5px;
+        font-weight: 700;
+    }
+    .contacto-item p, .contacto-item a {
+        font-size: 14.5px;
+        color: rgba(255,255,255,.88);
+        line-height: 1.6;
+    }
+    .contacto-item a:hover { color: var(--gold-light); }
+    .contacto-map {
+        border-radius: 22px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        min-height: 320px;
+    }
+    .contacto-map iframe {
+        width: 100%;
+        height: 100%;
+        min-height: 320px;
+        border: 0;
+        display: block;
+    }
+
+    /* ── Footer ── */
+    .footer {
+        background: #060d18;
+        color: rgba(255,255,255,.6);
+        padding: 54px 0 26px;
+    }
+    .footer-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 30px;
+        padding-bottom: 34px;
+        border-bottom: 1px solid rgba(255,255,255,.08);
+        margin-bottom: 22px;
+    }
+    .footer-brand {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        max-width: 380px;
+    }
+    .footer-brand-text .fb-name {
+        color: var(--white);
+        font-family: 'Playfair Display', serif;
+        font-weight: 700;
+        font-size: 16px;
+        margin-bottom: 6px;
+    }
+    .footer-brand-text .fb-addr {
+        font-size: 12.5px;
+        line-height: 1.6;
+    }
+    .footer-links {
+        display: flex;
+        gap: 40px;
+        flex-wrap: wrap;
+    }
+    .footer-links a {
+        font-size: 13px;
+        font-weight: 600;
+        color: rgba(255,255,255,.7);
+        transition: color .2s ease;
+    }
+    .footer-links a:hover { color: var(--gold-light); }
+    .footer-bottom {
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 10px;
+        font-size: 12px;
+    }
+    .footer-bottom .fdev { color: rgba(255,255,255,.4); }
+    .footer-bottom .fdev b { color: var(--gold-light); font-weight: 700; }
+
+    /* ── Responsive ── */
+    @media (max-width: 880px) {
+        .nav-links { display: none; }
+        .nav-right .btn-gold { display: none; }
+        .nav-toggle { display: flex; }
+        .mv-grid { grid-template-columns: 1fr; }
+        .valores-grid { grid-template-columns: repeat(2, 1fr); }
+        .modalidades-grid { grid-template-columns: 1fr; }
+        .contacto-grid { grid-template-columns: 1fr; }
+        .contacto-map { min-height: 260px; }
+        .contacto-map iframe { min-height: 260px; }
+        .hero-watermark, .hero-watermark-fallback { opacity: .05; width: 420px; height: 420px; }
+    }
+    @media (max-width: 560px) {
+        .section { padding: 80px 0; }
+        .hero { padding-top: 120px; }
+        .valores-grid { grid-template-columns: 1fr 1fr; gap: 14px; }
+        .valor-card { padding: 22px 12px; }
+        .mv-card { padding: 30px 24px; }
+        .modalidad-card { padding: 34px 26px; }
+        .contacto-info { padding: 34px 26px; }
+        .footer-top { flex-direction: column; }
+    }
+</style>
+</head>
+<body>
+
+<!-- ═══ NAVBAR ═══ -->
+<nav class="navbar" id="navbar">
+    <div class="container nav-inner">
+        <div class="nav-brand">
+            <img src="logo-idsje.png" alt="Logo IDSJE" class="nav-logo-img" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'nav-logo-fallback',textContent:'SJE'}))">
+            <div class="nav-brand-text">
+                <div class="nav-brand-name">Instituto Diocesano</div>
+                <div class="nav-brand-sub">San Juan Evangelista</div>
+            </div>
+        </div>
+
+        <ul class="nav-links">
+            <li><a href="#inicio">Inicio</a></li>
+            <li><a href="#nosotros">Nosotros</a></li>
+            <li><a href="#noticias">Noticias</a></li>
+            <li><a href="#contacto">Contacto</a></li>
+        </ul>
+
+        <div class="nav-right">
+            <a href="index.html" class="btn-gold">Ingresar al Sistema</a>
+            <button class="nav-toggle" id="navToggle" aria-label="Abrir menú">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </div>
+</nav>
+
+<div class="nav-overlay" id="navOverlay"></div>
+<div class="nav-mobile-panel" id="navMobilePanel">
+    <a href="#inicio">Inicio</a>
+    <a href="#nosotros">Nosotros</a>
+    <a href="#noticias">Noticias</a>
+    <a href="#contacto">Contacto</a>
+    <a href="index.html" class="btn-gold">Ingresar al Sistema</a>
+</div>
+
+<!-- ═══ HERO ═══ -->
+<header class="hero" id="inicio">
+    <img src="logo-idsje.png" alt="" class="hero-watermark" onerror="this.style.display='none'; document.getElementById('heroWatermarkFallback').style.display='block'">
+    <div class="hero-watermark-fallback" id="heroWatermarkFallback" style="display:none"></div>
+
+    <div class="container hero-inner">
+        <span class="eyebrow reveal">San Juan Opico · La Libertad · El Salvador</span>
+        <h1 class="reveal">Instituto Diocesano <span>San Juan Evangelista</span></h1>
+        <p class="hero-sub reveal"><b>Dios, Ciencia, Educación</b></p>
+        <div class="hero-cta reveal">
+            <a href="index.html" class="hero-btn hero-btn-primary">🎓 Área Docentes</a>
+            <a href="index.html" class="hero-btn hero-btn-secondary">⚙️ Área Administrativa</a>
+        </div>
+    </div>
+
+    <div class="hero-scroll-cue">
+        <span></span>
+        Descubrí más
+    </div>
+</header>
+
+<!-- ═══ NOSOTROS ═══ -->
+<section class="section" id="nosotros">
+    <div class="container">
+        <div class="section-head reveal">
+            <span class="eyebrow">Nosotros</span>
+            <h2>Formando con fe, ciencia y excelencia</h2>
+            <p>Más de una comunidad educativa: un proyecto diocesano comprometido con el desarrollo integral de cada estudiante.</p>
+        </div>
+
+        <div class="mv-grid">
+            <div class="mv-card reveal">
+                <div class="mv-icon">🎯</div>
+                <h3>Misión</h3>
+                <p>Formar integralmente a niñas, niños y jóvenes bajo los principios del Evangelio, brindando una educación
+                   científica, humanista y técnica de calidad, que los prepare para servir a la sociedad salvadoreña
+                   con valores cristianos, sentido crítico y vocación de servicio.</p>
+            </div>
+            <div class="mv-card reveal">
+                <div class="mv-icon">🔭</div>
+                <h3>Visión</h3>
+                <p>Ser una institución diocesana referente en la zona por su excelencia académica, su formación en
+                   valores y su compromiso con la comunidad, egresando bachilleres capaces, íntegros y comprometidos
+                   con la transformación positiva de su entorno.</p>
+            </div>
+        </div>
+
+        <div class="valores-grid reveal-stagger reveal">
+            <div class="valor-card stagger-item">
+                <div class="valor-icon">✝️</div>
+                <h4>Fe</h4>
+                <p>Vida cristiana como eje formativo diario.</p>
+            </div>
+            <div class="valor-card stagger-item">
+                <div class="valor-icon">📚</div>
+                <h4>Excelencia</h4>
+                <p>Rigor académico y mejora continua.</p>
+            </div>
+            <div class="valor-card stagger-item">
+                <div class="valor-icon">🤝</div>
+                <h4>Respeto</h4>
+                <p>Convivencia sana entre toda la comunidad.</p>
+            </div>
+            <div class="valor-card stagger-item">
+                <div class="valor-icon">💡</div>
+                <h4>Responsabilidad</h4>
+                <p>Compromiso con el estudio y el prójimo.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══ MODALIDADES ═══ -->
+<section class="section section-off" id="modalidades">
+    <div class="container">
+        <div class="section-head reveal">
+            <span class="eyebrow">Oferta académica</span>
+            <h2>Modalidades de bachillerato</h2>
+            <p>Dos caminos formativos pensados para preparar a nuestros estudiantes tanto para la universidad
+               como para el mundo laboral.</p>
+        </div>
+
+        <div class="modalidades-grid">
+            <div class="modalidad-card reveal">
+                <span class="modalidad-tag">General</span>
+                <h3>Bachillerato General</h3>
+                <p>Formación académica sólida orientada a la continuidad de estudios superiores, con énfasis en
+                   ciencias, matemática, lenguaje y humanidades.</p>
+                <ul class="modalidad-list">
+                    <li>Base científica y humanista</li>
+                    <li>Preparación para la educación superior</li>
+                    <li>Formación en valores cristianos</li>
+                </ul>
+            </div>
+            <div class="modalidad-card reveal">
+                <span class="modalidad-tag">Técnico</span>
+                <h3>Bachillerato Técnico</h3>
+                <p>Formación que combina la base académica general con especialización técnica, preparando al
+                   estudiante para insertarse en el mundo laboral o continuar estudios superiores.</p>
+                <ul class="modalidad-list">
+                    <li>Módulos técnicos especializados</li>
+                    <li>Enfoque práctico y aplicado</li>
+                    <li>Salida laboral y continuidad académica</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══ NOTICIAS ═══ -->
+<section class="section" id="noticias">
+    <div class="container">
+        <div class="section-head reveal">
+            <span class="eyebrow">Noticias</span>
+            <h2>Actualidad institucional</h2>
+        </div>
+        <div class="noticias-empty reveal">
+            <div class="valor-icon" style="margin:0 auto 20px">📰</div>
+            <h3>Próximamente</h3>
+            <p>Estamos preparando esta sección para compartir noticias, eventos y logros del Instituto
+               Diocesano San Juan Evangelista. Volvé pronto.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ═══ CONTACTO ═══ -->
+<section class="section section-off" id="contacto">
+    <div class="container">
+        <div class="section-head reveal">
+            <span class="eyebrow">Contacto</span>
+            <h2>Visitanos o escribinos</h2>
+            <p>Estamos para atenderte. Contactanos por cualquiera de estos medios.</p>
+        </div>
+
+        <div class="contacto-grid reveal">
+            <div class="contacto-info">
+                <div class="contacto-item">
+                    <div class="contacto-icon">📍</div>
+                    <div>
+                        <h4>Dirección</h4>
+                        <p>2a Calle Ote. y 2a Av. Norte, Barrio El Centro, San Juan Opico, La Libertad, El Salvador</p>
+                    </div>
+                </div>
+                <div class="contacto-item">
+                    <div class="contacto-icon">📞</div>
+                    <div>
+                        <h4>Teléfono</h4>
+                        <a href="tel:+50377131964">7713-1964</a>
+                    </div>
+                </div>
+                <div class="contacto-item">
+                    <div class="contacto-icon">✉️</div>
+                    <div>
+                        <h4>Correo</h4>
+                        <a href="mailto:instituto_diocesanosje@idsje.info">instituto_diocesanosje@idsje.info</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="contacto-map">
+                <iframe
+                    src="https://www.google.com/maps?q=2a%20Calle%20Ote.%20y%202a%20Av.%20Norte%2C%20Barrio%20El%20Centro%2C%20San%20Juan%20Opico%2C%20La%20Libertad%2C%20El%20Salvador&output=embed"
+                    loading="lazy"
+                    referrerpolicy="no-referrer-when-downgrade"
+                    title="Ubicación del Instituto Diocesano San Juan Evangelista">
+                </iframe>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<footer class="footer">
+    <div class="container">
+        <div class="footer-top">
+            <div class="footer-brand">
+                <img src="logo-idsje.png" alt="Logo IDSJE" class="nav-logo-img" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'nav-logo-fallback',textContent:'SJE'}))">
+                <div class="footer-brand-text">
+                    <div class="fb-name">Instituto Diocesano San Juan Evangelista</div>
+                    <div class="fb-addr">2a Calle Ote. y 2a Av. Norte, Barrio El Centro, San Juan Opico, La Libertad, El Salvador</div>
+                </div>
+            </div>
+            <div class="footer-links">
+                <a href="#inicio">Inicio</a>
+                <a href="#nosotros">Nosotros</a>
+                <a href="#noticias">Noticias</a>
+                <a href="#contacto">Contacto</a>
+                <a href="index.html">Ingresar al Sistema</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <span>© 2026 Instituto Diocesano San Juan Evangelista. Todos los derechos reservados.</span>
+            <span class="fdev">Sistema Académico desarrollado por <b>EduSoft SV</b></span>
+        </div>
+    </div>
+</footer>
+
+<script>
+(function () {
+    // Navbar: fondo sólido al hacer scroll
+    const navbar = document.getElementById('navbar');
+    const onScroll = () => navbar.classList.toggle('scrolled', window.scrollY > 40);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+
+    // Menú móvil
+    const navToggle = document.getElementById('navToggle');
+    const navPanel = document.getElementById('navMobilePanel');
+    const navOverlay = document.getElementById('navOverlay');
+    const closeMenu = () => {
+        navToggle.classList.remove('open');
+        navPanel.classList.remove('open');
+        navOverlay.classList.remove('open');
+    };
+    navToggle.addEventListener('click', () => {
+        const open = navPanel.classList.toggle('open');
+        navToggle.classList.toggle('open', open);
+        navOverlay.classList.toggle('open', open);
+    });
+    navOverlay.addEventListener('click', closeMenu);
+    navPanel.querySelectorAll('a').forEach(a => a.addEventListener('click', closeMenu));
+
+    // Animaciones al hacer scroll
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('visible');
+                observer.unobserve(entry.target);
+            }
+        });
+    }, { threshold: 0.15, rootMargin: '0px 0px -60px 0px' });
+
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+})();
+</script>
+
+</body>
+</html>

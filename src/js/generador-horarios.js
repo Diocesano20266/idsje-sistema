@@ -4,32 +4,37 @@
 //  Sin Supabase ni DOM acá — admin.js construye `config` con los datos
 //  de Supabase y se encarga de guardar el resultado.
 //
-//  Modelo de bloques: en vez de ubicar "una hora suelta a la vez", cada
-//  materia se reparte en bloques de 2 períodos consecutivos (y a lo sumo
-//  UN bloque de 1 período si las horas semanales son impares). El bloque de
-//  2 es una PREFERENCIA fuerte, no una restricción dura: si un bloque doble
-//  no logra colocarse en ningún día (choque de docente, o no queda posición
-//  doble libre), se reintenta partido en dos períodos sueltos de 1 hora antes
-//  de darlo por imposible — nunca se descarta una asignación válida solo por
-//  no entrar en bloque de 2 (ver el backtracking en resolverGrado). Cada
-//  grado tiene, por día, una secuencia FIJA de posiciones (ver
-//  calcularPosicionesDelDia) que se va llenando en orden desde la primera —
-//  eso garantiza, por construcción, que el horario de un grado nunca tenga
-//  huecos: los períodos ocupados de un día siempre son un prefijo 1..k. La
-//  cantidad de períodos usados por día SÍ puede variar día a día (un grado
-//  puede terminar en P6 un día y en P10 otro): no hay ninguna restricción de
-//  que todos los días tengan la misma cantidad de horas.
+//  SIN preferencia de bloques de 2: cada hora semanal de una materia es una
+//  variable independiente de 1 período — no hay ningún intento de agrupar
+//  horas consecutivas. Esto se quitó a propósito (no es un descuido): con
+//  datos reales del IDSJE, docentes que dan varias materias repartidas entre
+//  muchos grados (ej. un docente con 24h/semana entre Educación Física y
+//  Educación en la Fe en 3 grados cada una) hacían que la preferencia por
+//  bloques dobles le restara flexibilidad justo donde más la necesitaba: el
+//  generador insistía en encontrar DOS períodos consecutivos libres para ese
+//  docente en cada grado, cuando muchas veces solo había huecos sueltos
+//  disponibles. Tratar cada hora como independiente le da al backtracking
+//  la libertad total de acomodar horas en cualquier período libre.
 //
-//  Escalabilidad: resolver TODOS los bloques de TODOS los grados como una
-//  única bolsa de variables (como en la primera versión) se vuelve muy
-//  lento con datos reales (decenas de grados) porque, con este modelo de
-//  posiciones, cada bloque tiene como mucho un candidato por día — un mal
-//  orden global puede atascar el backtracking aunque exista solución.
-//  Por eso el armado se DESCOMPONE por grado: cada grado resuelve su propio
-//  horario con un backtracking chico e independiente, pero todos comparten
-//  el mismo set de ocupación de docentes (`ocupadoDocente`), así que la
-//  garantía real que importa — ningún docente en dos grados a la vez —
-//  se sigue chequeando de forma global, en la misma corrida.
+//  Igual se garantiza, por construcción, que el horario de un grado nunca
+//  tenga huecos: cada grado tiene, por día, una secuencia FIJA de posiciones
+//  (una por cada período de clase — ver calcularPosicionesDelDia) que se va
+//  llenando en orden desde la primera, así que los períodos ocupados de un
+//  día siempre son un prefijo 1..k. La cantidad de períodos usados por día
+//  SÍ puede variar día a día (un grado puede terminar en P6 un día y en P10
+//  otro) — no hay ninguna restricción de que todos los días tengan la misma
+//  cantidad de horas.
+//
+//  Escalabilidad: resolver TODAS las horas de TODOS los grados como una
+//  única bolsa de variables se vuelve muy lento con datos reales (decenas de
+//  grados) porque, con este modelo de posiciones, cada hora tiene como mucho
+//  un candidato por día — un mal orden global puede atascar el backtracking
+//  aunque exista solución. Por eso el armado se DESCOMPONE por grado: cada
+//  grado resuelve su propio horario con un backtracking chico e
+//  independiente, pero todos comparten el mismo set de ocupación de
+//  docentes (`ocupadoDocente`), así que la garantía real que importa —
+//  ningún docente en dos grados a la vez — se sigue chequeando de forma
+//  global, en la misma corrida.
 //
 //  Modo debug / mejor esfuerzo: generarHorario(config, seed, opciones) acepta
 //  { debug, permitirParcial }. `debug:true` no cambia el resultado — solo
@@ -40,55 +45,35 @@
 //  parcial encontrada (sin choques) más el detalle de lo que no entró. Sin
 //  `opciones` (el uso de siempre), el comportamiento es idéntico al anterior:
 //  Array de filas o `null`.
+//
+//  Nota: el análisis de viabilidad por carga docente (>30h = advertencia,
+//  >40h = imposible) NO vive acá — se calcula en admin.js, ANTES de siquiera
+//  llamar a generarHorario, para poder avisarle al admin sin gastar tiempo
+//  de backtracking en un caso matemáticamente irresoluble.
 // ═══════════════════════════════════════════
 import { DIAS_HORARIO, BLOQUES_HORARIO } from './config.js';
 
 const MAX_INTENTOS_POR_GRADO = 100000; // backtracking local, por grado
-const REINTENTOS = 15; // órdenes de grados/semillas distintas antes de rendirse
+const REINTENTOS = 50; // órdenes de grados/semillas distintas antes de rendirse
 const MATERIAS_IMPORTANTES = /matem[aá]tica|lenguaje/i;
 const ULTIMO_PERIODO_MANANA = 7; // 6:45–12:00
 
-// Pesos de las heurísticas blandas de orden (ver el armado de `clave` en
-// resolverGrado). Son multiplicadores de probabilidad, no tiers duros: un
-// peso de 1 = neutro, más alto = "tiende a ir antes" pero sin garantía.
-const PESO_PREFERENCIA_BLOQUE_DOBLE = 1.5; // antes era un tier absoluto — ahora una preferencia MUY suave
-const PESO_PREFERENCIA_MEDIA_JORNADA = 2;  // este sí conviene mantenerlo más marcado: menos slots disponibles de verdad
+// Peso de la preferencia por media jornada (multiplicador de probabilidad en
+// el orden de asignación, ver `clave` en resolverGrado). Sí conviene
+// mantenerlo marcado: a diferencia de los bloques de 2 (una preferencia de
+// estilo, ya eliminada), esto refleja una escasez real de slots disponibles.
+const PESO_PREFERENCIA_MEDIA_JORNADA = 2;
 
-// Agrupa los períodos de clase en segmentos consecutivos (separados por
-// receso/almuerzo) y arma pares dentro de cada segmento, dejando el período
-// impar del segmento (si lo hay) como posición "suelta" de 1 período.
-// Con los bloques actuales de config.js esto da exactamente:
-// (P1,P2) (P3,P4) (P5,P6) (P7) (P8,P9) (P10)
+// Una posición por cada período de clase (los de receso/almuerzo se excluyen
+// acá, ya quedan afuera de BLOQUES_HORARIO.filter). Ya no hay agrupamiento en
+// pares — cada período es su propia posición de tamaño 1.
 function calcularPosicionesDelDia() {
-    const segmentos = [];
-    let actual = [];
-    BLOQUES_HORARIO.forEach(b => {
-        if (b.tipo === 'clase') {
-            actual.push(b.periodo);
-        } else if (actual.length) {
-            segmentos.push(actual);
-            actual = [];
-        }
-    });
-    if (actual.length) segmentos.push(actual);
-
-    const posiciones = [];
-    segmentos.forEach(seg => {
-        let i = 0;
-        while (i < seg.length) {
-            if (i + 1 < seg.length) {
-                posiciones.push({ periodos: [seg[i], seg[i + 1]], size: 2 });
-                i += 2;
-            } else {
-                posiciones.push({ periodos: [seg[i]], size: 1 });
-                i += 1;
-            }
-        }
-    });
-    return posiciones;
+    return BLOQUES_HORARIO
+        .filter(b => b.tipo === 'clase')
+        .map(b => b.periodo);
 }
 
-const POSICIONES_DIA = calcularPosicionesDelDia();
+const POSICIONES_DIA = calcularPosicionesDelDia(); // [1,2,3,4,5,6,7,8,9,10] con los bloques actuales de config.js
 
 // PRNG determinístico (mulberry32): misma seed → mismo resultado siempre.
 // "Generar otro" en la UI solo necesita pasar una seed distinta.
@@ -111,12 +96,12 @@ function mezclar(arr, rng) {
     return copia;
 }
 
-function expandirBloques(asignacionesGrado, disponibilidadDocente, cargaPorDocente) {
+// Una variable por cada HORA semanal (ya no por bloque de 2) — una materia
+// con 6 horas genera 6 variables independientes de 1 período cada una.
+function expandirHoras(asignacionesGrado, disponibilidadDocente, cargaPorDocente) {
     const variables = [];
     asignacionesGrado.forEach(a => {
         const horas = Math.max(0, Math.min(10, parseInt(a.horasPorSemana, 10) || 0));
-        const numDobles = Math.floor(horas / 2);
-        const numSueltos = horas % 2;
         const base = {
             asignacionId: a.id,
             gradoId: a.gradoId,
@@ -127,8 +112,7 @@ function expandirBloques(asignacionesGrado, disponibilidadDocente, cargaPorDocen
             disponibilidad: disponibilidadDocente[a.docenteId] || 'completa',
             carga: (cargaPorDocente && cargaPorDocente[a.docenteId]) || 0,
         };
-        for (let i = 0; i < numDobles; i++) variables.push({ ...base, size: 2 });
-        for (let i = 0; i < numSueltos; i++) variables.push({ ...base, size: 1 });
+        for (let i = 0; i < horas; i++) variables.push({ ...base });
     });
     return variables;
 }
@@ -141,56 +125,39 @@ function expandirBloques(asignacionesGrado, disponibilidadDocente, cargaPorDocen
  * al pasar al siguiente grado. Si falla, deshace todo lo que haya marcado.
  */
 function resolverGrado(asignacionesGrado, disponibilidadDocente, cargaPorDocente, ocupadoDocente, periodosPorDocenteDia, rng, permitirParcial = false) {
-    let variables = expandirBloques(asignacionesGrado, disponibilidadDocente, cargaPorDocente);
+    let variables = expandirHoras(asignacionesGrado, disponibilidadDocente, cargaPorDocente);
     if (!variables.length) return permitirParcial ? { filas: [], completo: true } : [];
 
     // Orden de asignación dentro del grado: una única clave pseudoaleatoria
-    // ponderada, NO tiers duros. Antes, "bloque doble" y "media jornada" eran
-    // criterios de ordenamiento ABSOLUTOS (todos los dobles antes que
-    // cualquier suelto, sin excepción) — en la práctica del IDSJE (5-8 grados,
-    // 10 materias cada uno, horas 2/4/6, varios docentes compartidos) eso
-    // resultaba demasiado rígido: forzaba siempre el mismo tipo de bloque
-    // primero aunque la carga real del docente pidiera otra cosa, y hacía que
-    // REINTENTOS con otra seed no cambiara casi nada la búsqueda.
-    //
-    // Ahora cada variable recibe un peso = pesoTamaño × pesoDisponibilidad ×
-    // pesoCarga, y la clave es un valor exponencial aleatorio dividido por ese
-    // peso (Efraimidis-Spirakis: ordenar ascendente por esta clave equivale a
-    // un muestreo ponderado sin reemplazo). Un peso más alto → tiende a ir
-    // antes, pero nunca lo garantiza — sigue siendo un muestreo, no un tier.
-    // - Bloques dobles: preferencia MUY suave (peso chico) — antes eran el
-    //   criterio dominante; ahora es solo una inclinación.
-    // - Media jornada: preferencia algo más marcada — a diferencia de lo
-    //   anterior, esto sí refleja una escasez real de slots disponibles.
-    // - Carga del docente (MRV): igual que antes, para intentar ubicar
-    //   primero a los docentes más difíciles de encajar más adelante.
-    //   Ponderado (no un sort estricto) por la misma razón de siempre: si un
-    //   solo docente da una materia en TODOS los grados, un sort estricto por
-    //   carga lo pondría SIEMPRE primero en cada grado — y como el primer
-    //   bloque de un grado cae en la posición 0 del día, eso es un choque de
-    //   palomar garantizado en cuanto hay más grados que días (5). Ponderado,
-    //   REINTENTOS con otra seed sí puede encontrar un orden que funcione.
-    //
-    // Además (ver el backtracking más abajo) un bloque doble que no logra
-    // colocarse ya no hace fallar toda la rama: se intenta partido en dos
-    // sueltos antes de descartarlo — la preferencia por dobles es blanda en
-    // dos sentidos distintos, en el orden Y en la restricción en sí.
+    // ponderada (Efraimidis-Spirakis: ordenar ascendente por un valor
+    // exponencial aleatorio dividido por un peso equivale a un muestreo
+    // ponderado sin reemplazo) — NO un tier duro. Un peso más alto → tiende a
+    // ir antes, pero nunca lo garantiza.
+    // - Media jornada: preferencia marcada — escasez real de slots (P1-P7 nomás).
+    // - Carga del docente (MRV): intenta ubicar primero a los docentes con más
+    //   horas totales entre varios grados — son los más difíciles de encajar
+    //   más adelante, cuando queden menos huecos libres. Ponderado (no un sort
+    //   estricto) a propósito: si un solo docente da una materia en TODOS los
+    //   grados, un sort estricto por carga lo pondría SIEMPRE primero en cada
+    //   grado — y como el primer período de un grado siempre cae en la
+    //   posición 0 del día, eso es un choque de palomar garantizado en cuanto
+    //   hay más grados que días (5). Ponderado, REINTENTOS con otra seed sí
+    //   puede encontrar un orden que funcione.
     variables = variables
         .map(v => {
-            const pesoSize = v.size === 2 ? PESO_PREFERENCIA_BLOQUE_DOBLE : 1;
             const pesoDisponibilidad = v.disponibilidad === 'manana' ? PESO_PREFERENCIA_MEDIA_JORNADA : 1;
             const pesoCarga = (v.carga || 0) + 1;
-            const peso = pesoSize * pesoDisponibilidad * pesoCarga;
+            const peso = pesoDisponibilidad * pesoCarga;
             return { v, clave: -Math.log(1 - rng()) / peso };
         })
         .sort((a, b) => a.clave - b.clave)
         .map(x => x.v);
 
     const diasUsadosPorMateria = new Set(); // heurística blanda, solo de este grado
-    const estadoDia = {}; // `${dia}` -> { siguiente, cerrado } — un solo grado, así que alcanza con el día
+    const estadoDia = {}; // `${dia}` -> { siguiente } — próxima posición libre de ese día para este grado
 
     function obtenerEstadoDia(dia) {
-        if (!estadoDia[dia]) estadoDia[dia] = { siguiente: 0, cerrado: false };
+        if (!estadoDia[dia]) estadoDia[dia] = { siguiente: 0 };
         return estadoDia[dia];
     }
 
@@ -217,37 +184,37 @@ function resolverGrado(asignacionesGrado, disponibilidadDocente, cargaPorDocente
 
         DIAS_HORARIO.forEach(dia => {
             const estado = obtenerEstadoDia(dia);
-            if (estado.cerrado || estado.siguiente >= POSICIONES_DIA.length) return;
+            if (estado.siguiente >= POSICIONES_DIA.length) return;
 
-            const pos = POSICIONES_DIA[estado.siguiente];
-            if (v.disponibilidad === 'manana' && !pos.periodos.every(p => p <= ULTIMO_PERIODO_MANANA)) return;
+            const periodo = POSICIONES_DIA[estado.siguiente];
+            if (v.disponibilidad === 'manana' && periodo > ULTIMO_PERIODO_MANANA) return;
+            if (ocupadoDocente.has(`${v.docenteId}|${dia}|${periodo}`)) return;
 
-            // Un bloque de 2 períodos solo entra en la siguiente posición si esta también es de 2.
-            // Un bloque suelto (1 período) entra en cualquier posición (si la posición es de 2,
-            // ocupa solo el primer período y cierra el día — el resto queda vacío al final,
-            // que es justamente "el período suelto va al final del día").
-            if (v.size === 2 && pos.size !== 2) return;
-
-            const choqueDocente = pos.periodos
-                .slice(0, v.size)
-                .some(p => ocupadoDocente.has(`${v.docenteId}|${dia}|${p}`));
-            if (choqueDocente) return;
-
-            candidatos.push({ dia, posicion: pos });
+            candidatos.push({ dia, periodo });
         });
 
         // Puntaje blando — menor es mejor. No afecta las restricciones duras, solo el orden
         // en el que el backtracking prueba los candidatos.
         const puntaje = (c) => {
             let p = 0;
-            if (diasUsadosPorMateria.has(`${v.materiaId}|${c.dia}`)) p += 5; // evitar repetir materia el mismo día
-            if (v.importante && c.posicion.periodos.some(per => per > 4)) p += 2; // materias importantes preferentemente en la mañana
+            // Preferir REUTILIZAR un día que esta materia ya usa en este grado, en vez de
+            // abrir uno nuevo. A propósito es lo opuesto de "evitar repetir materia el
+            // mismo día": ahora que cada hora es independiente (sin bloques de 2), lo
+            // contrario — penalizar la reutilización — hacía que una materia de varias
+            // horas se esparciera por tantos días distintos como pudiera. Eso multiplica
+            // la cantidad de días que un docente COMPARTIDO entre varios grados necesita
+            // en total, y reintroduce el mismo choque de palomar que se buscaba evitar
+            // (con pocos grados y un docente de jornada completa incluso). Preferir
+            // consolidar en menos días imita el efecto compactador que antes daban los
+            // bloques de 2, pero como preferencia blanda: si no hay más lugar ese día,
+            // sigue cayendo a un día nuevo sin problema.
+            if (!diasUsadosPorMateria.has(`${v.materiaId}|${c.dia}`)) p += 3;
+            if (v.importante && c.periodo > 4) p += 2; // materias importantes preferentemente en la mañana
             const periodosDocente = periodosPorDocenteDia[`${v.docenteId}|${c.dia}`];
             if (periodosDocente && periodosDocente.size) {
                 let min = Infinity, max = -Infinity;
                 periodosDocente.forEach(p2 => { if (p2 < min) min = p2; if (p2 > max) max = p2; });
-                const primerPeriodo = c.posicion.periodos[0];
-                if (primerPeriodo < min - 1 || primerPeriodo > max + 1) p += 1; // evitar huecos en el día del docente
+                if (c.periodo < min - 1 || c.periodo > max + 1) p += 1; // evitar huecos en el día del docente
             }
             return p;
         };
@@ -258,45 +225,20 @@ function resolverGrado(asignacionesGrado, disponibilidadDocente, cargaPorDocente
     }
 
     function marcar(v, c) {
-        const periodosUsados = c.posicion.periodos.slice(0, v.size);
-        periodosUsados.forEach(p => ocupadoDocente.add(`${v.docenteId}|${c.dia}|${p}`));
-
+        ocupadoDocente.add(`${v.docenteId}|${c.dia}|${c.periodo}`);
         diasUsadosPorMateria.add(`${v.materiaId}|${c.dia}`);
         const keyDocenteDia = `${v.docenteId}|${c.dia}`;
         if (!periodosPorDocenteDia[keyDocenteDia]) periodosPorDocenteDia[keyDocenteDia] = new Set();
-        periodosUsados.forEach(p => periodosPorDocenteDia[keyDocenteDia].add(p));
-
-        const estado = obtenerEstadoDia(c.dia);
-        if (v.size === 1 && c.posicion.size === 2) {
-            estado.cerrado = true; // bloque suelto usando solo la mitad de una posición doble: el día termina ahí
-        } else {
-            estado.siguiente += 1;
-        }
+        periodosPorDocenteDia[keyDocenteDia].add(c.periodo);
+        obtenerEstadoDia(c.dia).siguiente += 1;
     }
 
     function desmarcarDuro(v, c) {
-        const periodosUsados = c.posicion.periodos.slice(0, v.size);
-        periodosUsados.forEach(p => ocupadoDocente.delete(`${v.docenteId}|${c.dia}|${p}`));
-        periodosPorDocenteDia[`${v.docenteId}|${c.dia}`]?.forEach(p => {
-            if (periodosUsados.includes(p) && !ocupadoDocente.has(`${v.docenteId}|${c.dia}|${p}`)) {
-                periodosPorDocenteDia[`${v.docenteId}|${c.dia}`].delete(p);
-            }
-        });
-
-        const estado = obtenerEstadoDia(c.dia);
-        if (v.size === 1 && c.posicion.size === 2) {
-            estado.cerrado = false;
-        } else {
-            estado.siguiente -= 1;
-        }
+        ocupadoDocente.delete(`${v.docenteId}|${c.dia}|${c.periodo}`);
+        periodosPorDocenteDia[`${v.docenteId}|${c.dia}`]?.delete(c.periodo);
+        obtenerEstadoDia(c.dia).siguiente -= 1;
     }
 
-    // Bloques de 2 períodos: preferencia FUERTE, no restricción dura. Si un bloque
-    // doble no logra colocarse (el docente choca en el segundo período, o no queda
-    // ninguna posición doble libre ese día en ningún día de la semana), no se rechaza
-    // la asignación completa — se reintenta partida en dos períodos sueltos de 1 hora
-    // (que pueden caer en días distintos). Así nunca se pierde una asignación válida
-    // solo por no entrar en bloque de 2.
     function backtrack(idx) {
         registrarProgreso(idx);
         if (idx >= variables.length) return true;
@@ -307,31 +249,10 @@ function resolverGrado(asignacionesGrado, disponibilidadDocente, cargaPorDocente
             if (intentos > MAX_INTENTOS_POR_GRADO) return false;
 
             marcar(v, c);
-            asignado[idx] = [{ v, c }];
+            asignado[idx] = c;
             if (backtrack(idx + 1)) return true;
             asignado[idx] = null;
             desmarcarDuro(v, c);
-        }
-
-        if (v.size === 2) {
-            const vSuelto = { ...v, size: 1 };
-            for (const c1 of candidatosPara(vSuelto)) {
-                intentos++;
-                if (intentos > MAX_INTENTOS_POR_GRADO) return false;
-
-                marcar(vSuelto, c1);
-                for (const c2 of candidatosPara(vSuelto)) {
-                    intentos++;
-                    if (intentos > MAX_INTENTOS_POR_GRADO) { desmarcarDuro(vSuelto, c1); return false; }
-
-                    marcar(vSuelto, c2);
-                    asignado[idx] = [{ v: vSuelto, c: c1 }, { v: vSuelto, c: c2 }];
-                    if (backtrack(idx + 1)) return true;
-                    asignado[idx] = null;
-                    desmarcarDuro(vSuelto, c2);
-                }
-                desmarcarDuro(vSuelto, c1);
-            }
         }
 
         return false;
@@ -342,19 +263,15 @@ function resolverGrado(asignacionesGrado, disponibilidadDocente, cargaPorDocente
     function construirFilas(vars, asigns) {
         const filas = [];
         vars.forEach((v, i) => {
-            const entradas = asigns[i];
-            if (!entradas) return; // variable que no llegó a colocarse (solo pasa en el corte parcial)
-            entradas.forEach(({ v: vColocada, c }) => {
-                c.posicion.periodos.slice(0, vColocada.size).forEach(periodo => {
-                    filas.push({
-                        grado_materia_id: v.asignacionId,
-                        grado_id: v.gradoId,
-                        materia_id: v.materiaId,
-                        docente_id: v.docenteId,
-                        dia: c.dia,
-                        periodo,
-                    });
-                });
+            const c = asigns[i];
+            if (!c) return; // variable que no llegó a colocarse (solo pasa en el corte parcial)
+            filas.push({
+                grado_materia_id: v.asignacionId,
+                grado_id: v.gradoId,
+                materia_id: v.materiaId,
+                docente_id: v.docenteId,
+                dia: c.dia,
+                periodo: c.periodo,
             });
         });
         return filas;
@@ -366,6 +283,18 @@ function resolverGrado(asignacionesGrado, disponibilidadDocente, cargaPorDocente
     }
 
     if (!permitirParcial) return null;
+
+    // El backtracking, al fallar del todo, deshace TODAS las marcas que hizo —
+    // incluidas las del mejor prefijo alcanzado (mejorAsignado) — porque
+    // desmarcarDuro se llama en cada nivel al retroceder. Sin volver a marcar
+    // ese prefijo acá, `ocupadoDocente`/`periodosPorDocenteDia` (compartidos
+    // GLOBALMENTE entre todos los grados de esta corrida) quedarían sin
+    // reflejar las horas que este grado SÍ va a devolver como parte de su
+    // resultado parcial — y el próximo grado podría reutilizar esos mismos
+    // horarios de docente, generando un choque real entre grados en el
+    // resultado final. Se re-marca exactamente ese prefijo (ya se sabe que es
+    // válido: así se llegó a esa profundidad) antes de construir las filas.
+    variables.slice(0, mejorProfundidad).forEach((v, i) => marcar(v, mejorAsignado[i]));
     const filasParciales = construirFilas(variables.slice(0, mejorProfundidad), mejorAsignado);
     return { filas: filasParciales, completo: false };
 }
@@ -399,17 +328,16 @@ function resolverGrado(asignacionesGrado, disponibilidadDocente, cargaPorDocente
  * @returns {Array<{grado_materia_id:string, grado_id:string, materia_id:string, docente_id:string, dia:string, periodo:number}>|null
  *           |{completo:boolean, filas:Array, materiasNoColocadas:Array<{asignacionId,gradoId,materiaId,materiaNombre,docenteId,horasRequeridas,horasColocadas}>}}
  *          Sin `opciones` (uso de siempre): filas listas para guardar en la tabla `horarios` (una
- *          fila por período — un bloque de 2 períodos genera 2 filas con el mismo día/materia/
- *          docente), o null si ningún intento encontró una combinación 100% completa y sin
- *          conflictos. Con `opciones.permitirParcial`: ver arriba.
+ *          fila por período), o null si ningún intento encontró una combinación 100% completa y
+ *          sin conflictos. Con `opciones.permitirParcial`: ver arriba.
  */
 export function generarHorario(config, seed = 1, opciones = {}) {
     // Canary de versión: se imprime SIEMPRE (no depende de debug/permitirParcial) para
     // poder confirmar desde la consola del navegador que el archivo que corre es este
-    // (con soporte de opciones) y no una copia vieja/cacheada de generador-horarios.js
-    // que ignoraría silenciosamente el 3er argumento. Si al generar un horario esta
-    // línea NO aparece en consola, el navegador o el deploy están sirviendo otra versión.
-    console.log('[generador-horarios] v2 (debug/permitirParcial) iniciando — seed=', seed, 'opciones=', opciones);
+    // (sin bloques de 2, con soporte de opciones) y no una copia vieja/cacheada de
+    // generador-horarios.js. Si al generar un horario esta línea NO aparece en consola,
+    // el navegador o el deploy están sirviendo otra versión.
+    console.log('[generador-horarios] v3 (sin bloques de 2, REINTENTOS=50) iniciando — seed=', seed, 'opciones=', opciones);
 
     const { debug = false, permitirParcial = false } = opciones || {};
     const { asignaciones = [], disponibilidadDocente = {} } = config || {};
@@ -422,14 +350,14 @@ export function generarHorario(config, seed = 1, opciones = {}) {
     });
     const gradosEntries = [...porGrado.entries()]; // [ [gradoId, asignaciones[]], ... ]
 
-    // Carga total por docente (en bloques de 2, redondeando hacia arriba), sumada a través
-    // de TODOS los grados en los que da clase. Se usa como sesgo (no como orden estricto,
-    // ver comentario en resolverGrado) para intentar ubicar primero a los docentes más
-    // difíciles de encajar.
+    // Carga total por docente EN HORAS (ya no en "bloques"), sumada a través de
+    // TODOS los grados en los que da clase. Se usa como sesgo (no como orden
+    // estricto, ver comentario en resolverGrado) para intentar ubicar primero
+    // a los docentes más difíciles de encajar.
     const cargaPorDocente = {};
     asignaciones.forEach(a => {
         const horas = Math.max(0, Math.min(10, parseInt(a.horasPorSemana, 10) || 0));
-        cargaPorDocente[a.docenteId] = (cargaPorDocente[a.docenteId] || 0) + Math.ceil(horas / 2);
+        cargaPorDocente[a.docenteId] = (cargaPorDocente[a.docenteId] || 0) + horas;
     });
 
     for (let intento = 0; intento < REINTENTOS; intento++) {

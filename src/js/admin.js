@@ -109,7 +109,7 @@ async function cargarTodo() {
             supabase.from('grados').select('*').order('nombre'),
             supabase.from('usuarios').select('*').order('nombre_completo'),
             supabase.from('materias').select('*').order('nombre'),
-            supabase.from('categorias_grado').select('*').order('orden'),
+            supabase.from('categorias_grado').select('*').order('nombre'),
             // Conteo de matriculados del año activo (no de todo el catálogo de alumnos).
             anioActivoCache
                 ? supabase.from('matriculas').select('*', { count: 'exact', head: true })
@@ -400,6 +400,12 @@ function labelMod(m) {
     return 'GEN';
 }
 
+// Acordeón de Grados por categoría: qué grupos están colapsados (por key —
+// categoria_id o 'sin') y los datos ya armados de la última carga, para que
+// expandir/colapsar un grupo solo vuelva a pintar el DOM sin re-consultar Supabase.
+let gradosAcordeonColapsado = new Set();
+let gradosAcordeonDatos = null; // { grupos: Map(key -> {nombre, grados}), conteoPorGrado }
+
 async function renderGrados() {
     const body = document.getElementById('grados-bubbles-body');
     if (!body) return;
@@ -423,11 +429,14 @@ async function renderGrados() {
     const conteoPorGrado = {};
     (matriculas || []).forEach(m => { if (m.grado_id) conteoPorGrado[m.grado_id] = (conteoPorGrado[m.grado_id] || 0) + 1; });
 
-    // Agrupar por categoría (categorias_grado, ordenadas por `orden`); los
+    // Agrupar por categoría, ordenadas alfabéticamente por nombre; los
     // grados sin categoria_id quedan en un grupo "Sin categoría" al final.
     const gradosDelAnio = gradosCache.filter(g => g.año_academico_id === anioActivoCache.id || !g.año_academico_id);
     const grupos = new Map(); // categoriaId|'sin' -> { nombre, grados: [] }
-    categoriasGradoCache.forEach(c => grupos.set(c.id, { nombre: c.nombre, grados: [] }));
+    categoriasGradoCache
+        .slice()
+        .sort((a, b) => a.nombre.localeCompare(b.nombre))
+        .forEach(c => grupos.set(c.id, { nombre: c.nombre, grados: [] }));
     grupos.set('sin', { nombre: 'Sin categoría', grados: [] });
 
     gradosDelAnio
@@ -437,6 +446,18 @@ async function renderGrados() {
             const key = g.categoria_id && grupos.has(g.categoria_id) ? g.categoria_id : 'sin';
             grupos.get(key).grados.push(g);
         });
+
+    gradosAcordeonDatos = { grupos, conteoPorGrado };
+    renderAcordeonGrados();
+
+    const sg = document.getElementById('stat-grados');
+    if (sg) sg.textContent = gradosCache.length;
+}
+
+function renderAcordeonGrados() {
+    const body = document.getElementById('grados-bubbles-body');
+    if (!body || !gradosAcordeonDatos) return;
+    const { grupos, conteoPorGrado } = gradosAcordeonDatos;
 
     const renderCard = (g) => {
         const guia = usuariosCache.find(u => u.id === g.docente_guia_id);
@@ -458,18 +479,29 @@ async function renderGrados() {
         </div>`;
     };
 
-    body.innerHTML = [...grupos.values()]
-        .filter(grupo => grupo.grados.length)
-        .map(grupo => `
-            <div class="grados-categoria-grupo">
-                <div class="group-label">${grupo.nombre}</div>
+    const entradas = [...grupos.entries()].filter(([, grupo]) => grupo.grados.length);
+
+    body.innerHTML = entradas.map(([key, grupo]) => {
+        const colapsado = gradosAcordeonColapsado.has(key);
+        return `
+        <div class="acordeon-categoria">
+            <div class="acordeon-header" onclick="toggleAcordeonCategoria('${key}')">
+                <span class="acordeon-icono">${colapsado ? '▶' : '▼'}</span>
+                <span class="acordeon-titulo">${grupo.nombre}</span>
+                <span class="acordeon-count">${grupo.grados.length}</span>
+            </div>
+            <div class="acordeon-body ${colapsado ? 'hidden' : ''}">
                 ${grupo.grados.map(renderCard).join('')}
             </div>
-        `).join('') || '<div class="empty-bubbles">No hay grados para el año activo.</div>';
-
-    const sg = document.getElementById('stat-grados');
-    if (sg) sg.textContent = gradosCache.length;
+        </div>`;
+    }).join('') || '<div class="empty-bubbles">No hay grados para el año activo.</div>';
 }
+
+window.toggleAcordeonCategoria = (key) => {
+    if (gradosAcordeonColapsado.has(key)) gradosAcordeonColapsado.delete(key);
+    else gradosAcordeonColapsado.add(key);
+    renderAcordeonGrados();
+};
 
 // ── DRAWER DE DETALLE DE GRADO ───────────────
 let gradoDrawerId  = null;
@@ -2196,9 +2228,9 @@ window.desmatricularAlumno = async (matriculaId) => {
 async function renderVistaCategoriasGrado() {
     const tbody = document.getElementById('tbody-categorias-grado');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Cargando…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Cargando…</td></tr>';
 
-    const { data, error } = await supabase.from('categorias_grado').select('*').order('orden');
+    const { data, error } = await supabase.from('categorias_grado').select('*').order('nombre');
     if (error) return notificarError(error, 'Error cargando categorías');
     categoriasGradoCache = data || [];
 
@@ -2206,13 +2238,12 @@ async function renderVistaCategoriasGrado() {
         <tr>
             <td class="td-bold">${c.nombre}</td>
             <td>${c.descripcion || '—'}</td>
-            <td>${c.orden}</td>
             <td>
                 <button class="btn-sm btn-edit" onclick="abrirModalCategoriaGrado('${c.id}')">Editar</button>
                 <button class="btn-sm btn-del" onclick="eliminarCategoriaGrado('${c.id}')">Eliminar</button>
             </td>
         </tr>
-    `).join('') || '<tr><td colspan="4" class="text-center text-muted">Sin categorías todavía</td></tr>';
+    `).join('') || '<tr><td colspan="3" class="text-center text-muted">Sin categorías todavía</td></tr>';
 }
 
 window.abrirModalCategoriaGrado = (id = null) => {

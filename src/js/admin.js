@@ -2,7 +2,7 @@
 //  IDSJE — Panel Administrador
 // ═══════════════════════════════════════════
 import { supabase, verificarSesion, cerrarSesion, subirFoto } from './auth.js';
-import { CLOUDINARY_CLOUD, CLOUDINARY_PRESET, INSTITUTO, DIAS_HORARIO, BLOQUES_HORARIO, ESTADOS_ASISTENCIA, TIPOS_EXPEDIENTE } from './config.js';
+import { CLOUDINARY_CLOUD, CLOUDINARY_PRESET, INSTITUTO, DIAS_HORARIO, BLOQUES_HORARIO, ESTADOS_ASISTENCIA, TIPOS_EXPEDIENTE, getAñoActivo } from './config.js';
 import { generarHorario, verificarConflictos } from './generador-horarios.js';
 import {
     mostrarToast,
@@ -28,6 +28,15 @@ let usuariosCache = [];
 let materiasCache = [];
 let vistaActual   = 'inicio';
 let dashChart     = null;
+
+// Años académicos — anioActivoCache es la fila completa de `años_academicos`
+// con activo=true (o null si nadie configuró ninguno todavía). Casi todas las
+// queries que antes filtraban alumnos por grado_id ahora pasan por
+// `matriculas`, filtrando además por año_academico_id = anioActivoCache.id.
+let anioActivoCache      = null;
+let aniosAcademicosCache = [];   // todos los años, para el selector "Cambiar año activo"
+let categoriasGradoCache = [];   // categorias_grado, para agrupar la vista Grados
+let matriculaAlumnosCache = [];  // catálogo completo de alumnos + su matrícula (si tiene) del año activo, para la subsección Matrícula
 
 // Horarios
 let horarioGradoSel  = null;  // grado_id actualmente elegido en la vista Horarios
@@ -88,28 +97,37 @@ async function init() {
 
 async function cargarTodo() {
     try {
+        anioActivoCache = await getAñoActivo(supabase);
+
         const [
             { data: grados,   error: eGrados },
             { data: usuarios, error: eUsuarios },
             { data: materias, error: eMaterias },
+            { data: categorias, error: eCategorias },
             { count: cAlumnos, error: eAlumnos },
         ] = await Promise.all([
             supabase.from('grados').select('*').order('nombre'),
             supabase.from('usuarios').select('*').order('nombre_completo'),
             supabase.from('materias').select('*').order('nombre'),
-            supabase.from('alumnos').select('*', { count: 'exact', head: true }),
+            supabase.from('categorias_grado').select('*').order('orden'),
+            // Conteo de matriculados del año activo (no de todo el catálogo de alumnos).
+            anioActivoCache
+                ? supabase.from('matriculas').select('*', { count: 'exact', head: true })
+                    .eq('año_academico_id', anioActivoCache.id).eq('activo', true)
+                : Promise.resolve({ count: 0, error: null }),
         ]);
 
-        const errorDeRed = [eGrados, eUsuarios, eMaterias, eAlumnos].find(e => e && esErrorDeRed(e));
+        const errorDeRed = [eGrados, eUsuarios, eMaterias, eCategorias, eAlumnos].find(e => e && esErrorDeRed(e));
         if (errorDeRed) {
             mostrarBannerSinConexion(() => cargarTodo());
             return;
         }
         ocultarBannerSinConexion();
 
-        gradosCache   = grados   || [];
-        usuariosCache = usuarios || [];
-        materiasCache = materias || [];
+        gradosCache      = grados      || [];
+        usuariosCache    = usuarios    || [];
+        materiasCache    = materias    || [];
+        categoriasGradoCache = categorias || [];
         const sg = document.getElementById('stat-grados');
         const sa = document.getElementById('stat-alumnos');
         const sd = document.getElementById('stat-docentes');
@@ -120,6 +138,7 @@ async function cargarTodo() {
         if (sm) sm.textContent = materiasCache.length;
         const ini = document.getElementById('admin-iniciales');
         if (ini && usuarioActual?.nombre_completo) ini.textContent = usuarioActual.nombre_completo.charAt(0).toUpperCase();
+        renderAnioActivoHeader();
     } catch (err) {
         if (esErrorDeRed(err)) {
             mostrarBannerSinConexion(() => cargarTodo());
@@ -127,6 +146,15 @@ async function cargarTodo() {
         }
         notificarError(err, 'Error cargando los datos');
     }
+}
+
+// Muestra el año activo (o una advertencia si no hay ninguno configurado)
+// en el badge del topbar — ver admin.html (#anio-activo-badge).
+function renderAnioActivoHeader() {
+    const el = document.getElementById('anio-activo-badge');
+    if (!el) return;
+    el.textContent = anioActivoCache ? `Año ${anioActivoCache.anio}` : '⚠ Sin año activo';
+    el.classList.toggle('anio-badge-alerta', !anioActivoCache);
 }
 
 // ── VISTAS ──────────────────────────────────
@@ -142,6 +170,9 @@ const TITULOS = {
     expedientes: 'Expedientes',
     configuracion: 'Configuración',
     reportes: 'Reportes',
+    'anio-academico': 'Año Académico',
+    matricula: 'Matrícula de Alumnos',
+    'categorias-grado': 'Categorías de Grados',
 };
 
 const VISTA_CONFIG = {
@@ -156,6 +187,9 @@ const VISTA_CONFIG = {
     expedientes: { titulo: 'Expedientes',          accion: '' },
     configuracion: { titulo: 'Configuración',      accion: '' },
     reportes:    { titulo: 'Reportes',             accion: '' },
+    'anio-academico': { titulo: 'Año Académico', accion: `<button class="btn-secondary" onclick="abrirModalCambiarAnio()">Cambiar año activo</button><button class="btn-primary" onclick="abrirModalNuevoAnio()">+ Nuevo Año Académico</button>` },
+    matricula:   { titulo: 'Matrícula de Alumnos', accion: `<button class="btn-primary" onclick="abrirModalAlumno()">+ Alumno nuevo</button>` },
+    'categorias-grado': { titulo: 'Categorías de Grados', accion: `<button class="btn-primary" onclick="abrirModalCategoriaGrado()">+ Nueva Categoría</button>` },
 };
 
 window.mostrarVista = async (vista) => {
@@ -187,6 +221,9 @@ window.mostrarVista = async (vista) => {
     if (vista === 'expedientes') renderVistaExpedientes();
     if (vista === 'configuracion') renderVistaConfiguracion();
     if (vista === 'reportes') renderVistaReportes();
+    if (vista === 'anio-academico') renderVistaAnioAcademico();
+    if (vista === 'matricula') renderVistaMatricula();
+    if (vista === 'categorias-grado') renderVistaCategoriasGrado();
     if (vista === 'alumnos') {
         // Poblar filtro grado
         const { data, error } = await supabase.from('grados').select('*').order('nombre');
@@ -212,19 +249,28 @@ function codigoGrado(g) {
 }
 
 // ── DASHBOARD (INICIO) ───────────────────────
+// Alumnos MATRICULADOS en el año activo (vía `matriculas`), con su grado —
+// ya no se puede leer grado_id/anio_ingreso directamente de `alumnos`
+// (ver supabase/migracion-años.sql: alumnos es ahora catálogo puro).
+// Devuelve objetos "aplanados" con la forma que el resto del dashboard
+// espera: { ...alumno, grados, created_at: fecha_matricula }.
 async function cargarAlumnosDashboard() {
+    if (!anioActivoCache) return [];
+
     const { data, error } = await supabase
-        .from('alumnos')
-        .select('*, grados(nombre, seccion)')
-        .order('created_at', { ascending: false });
+        .from('matriculas')
+        .select('*, alumnos(*), grados(nombre, seccion)')
+        .eq('año_academico_id', anioActivoCache.id)
+        .eq('activo', true)
+        .order('fecha_matricula', { ascending: false });
 
-    if (!error) return data || [];
+    if (error) return [];
 
-    // La tabla podría no tener columna created_at: reintentar sin ese orden
-    const fallback = await supabase.from('alumnos').select('*, grados(nombre, seccion)');
-    const alumnos = fallback.data || [];
-    alumnos.sort((a, b) => (b.anio_ingreso || 0) - (a.anio_ingreso || 0));
-    return alumnos;
+    return (data || []).map(m => ({
+        ...m.alumnos,
+        grados: m.grados,
+        created_at: m.alumnos?.created_at || m.fecha_matricula,
+    }));
 }
 
 // Variación de un conteo respecto al año anterior. Null si no hay dato del año anterior.
@@ -364,14 +410,35 @@ async function renderGrados() {
 
     body.innerHTML = '<div class="empty-bubbles">Cargando…</div>';
 
-    const { data: alumnos } = await supabase.from('alumnos').select('grado_id');
+    if (!anioActivoCache) {
+        body.innerHTML = '<div class="info-box">⚠ No hay un año académico activo — configuralo en "Año Académico" antes de gestionar grados.</div>';
+        return;
+    }
+
+    const { data: matriculas } = await supabase
+        .from('matriculas')
+        .select('grado_id')
+        .eq('año_academico_id', anioActivoCache.id)
+        .eq('activo', true);
     const conteoPorGrado = {};
-    (alumnos || []).forEach(a => { if (a.grado_id) conteoPorGrado[a.grado_id] = (conteoPorGrado[a.grado_id] || 0) + 1; });
+    (matriculas || []).forEach(m => { if (m.grado_id) conteoPorGrado[m.grado_id] = (conteoPorGrado[m.grado_id] || 0) + 1; });
 
-    const gradosOrdenados = [...gradosCache].sort((a, b) =>
-        a.nombre.localeCompare(b.nombre) || a.seccion.localeCompare(b.seccion));
+    // Agrupar por categoría (categorias_grado, ordenadas por `orden`); los
+    // grados sin categoria_id quedan en un grupo "Sin categoría" al final.
+    const gradosDelAnio = gradosCache.filter(g => g.año_academico_id === anioActivoCache.id || !g.año_academico_id);
+    const grupos = new Map(); // categoriaId|'sin' -> { nombre, grados: [] }
+    categoriasGradoCache.forEach(c => grupos.set(c.id, { nombre: c.nombre, grados: [] }));
+    grupos.set('sin', { nombre: 'Sin categoría', grados: [] });
 
-    body.innerHTML = gradosOrdenados.map(g => {
+    gradosDelAnio
+        .slice()
+        .sort((a, b) => a.nombre.localeCompare(b.nombre) || a.seccion.localeCompare(b.seccion))
+        .forEach(g => {
+            const key = g.categoria_id && grupos.has(g.categoria_id) ? g.categoria_id : 'sin';
+            grupos.get(key).grados.push(g);
+        });
+
+    const renderCard = (g) => {
         const guia = usuariosCache.find(u => u.id === g.docente_guia_id);
         return `
         <div class="grado-row-card" onclick="abrirDrawerGrado('${g.id}')">
@@ -389,7 +456,16 @@ async function renderGrados() {
             </div>
             <div class="grc-chevron">›</div>
         </div>`;
-    }).join('');
+    };
+
+    body.innerHTML = [...grupos.values()]
+        .filter(grupo => grupo.grados.length)
+        .map(grupo => `
+            <div class="grados-categoria-grupo">
+                <div class="group-label">${grupo.nombre}</div>
+                ${grupo.grados.map(renderCard).join('')}
+            </div>
+        `).join('') || '<div class="empty-bubbles">No hay grados para el año activo.</div>';
 
     const sg = document.getElementById('stat-grados');
     if (sg) sg.textContent = gradosCache.length;
@@ -469,6 +545,7 @@ async function renderTabDrawerGrado(tab) {
 
     if (tab === 'general') {
         const guia = usuariosCache.find(u => u.id === g.docente_guia_id);
+        const categoria = categoriasGradoCache.find(c => c.id === g.categoria_id);
         cont.innerHTML = `
             <div class="gd-field">
                 <div class="gd-field-label">Docente guía</div>
@@ -481,14 +558,24 @@ async function renderTabDrawerGrado(tab) {
             <div class="gd-field">
                 <div class="gd-field-label">Modalidad</div>
                 <div class="gd-field-val">${g.modalidad}</div>
+            </div>
+            <div class="gd-field">
+                <div class="gd-field-label">Categoría</div>
+                <div class="gd-field-val">${categoria?.nombre || 'Sin categoría'}</div>
             </div>`;
         return;
     }
 
     if (tab === 'alumnos') {
-        const { data, error } = await supabase.from('alumnos').select('*').eq('grado_id', g.id).order('apellidos');
+        if (!anioActivoCache) { cont.innerHTML = '<div class="info-box">⚠ No hay un año académico activo.</div>'; return; }
+        const { data, error } = await supabase
+            .from('matriculas')
+            .select('*, alumnos(*)')
+            .eq('grado_id', g.id)
+            .eq('año_academico_id', anioActivoCache.id)
+            .eq('activo', true);
         if (error) { cont.innerHTML = '<div class="empty-bubbles">Error cargando alumnos</div>'; return; }
-        const alumnos = data || [];
+        const alumnos = (data || []).map(m => m.alumnos).filter(Boolean).sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || ''));
         cont.innerHTML =
             (alumnos.length
                 ? alumnos.map(a => `
@@ -590,12 +677,19 @@ window.abrirModalGrado = (id = null) => {
     document.getElementById('grado-nombre').value = grado?.nombre || '';
     document.getElementById('grado-seccion').value = grado?.seccion || 'A';
     document.getElementById('grado-modalidad').value = grado?.modalidad || 'General';
-    document.getElementById('grado-anio').value   = grado?.anio || 2026;
+    document.getElementById('grado-anio').value   = grado?.anio || anioActivoCache?.anio || 2026;
 
     // Poblar select de docente guía
     const sel = document.getElementById('grado-guia');
     sel.innerHTML = '<option value="">— Sin asignar —</option>' +
         usuariosCache.map(u => `<option value="${u.id}" ${u.id === grado?.docente_guia_id ? 'selected' : ''}>${u.nombre_completo}</option>`).join('');
+
+    // Poblar select de categoría
+    const selCat = document.getElementById('grado-categoria');
+    if (selCat) {
+        selCat.innerHTML = '<option value="">— Sin categoría —</option>' +
+            categoriasGradoCache.map(c => `<option value="${c.id}" ${c.id === grado?.categoria_id ? 'selected' : ''}>${c.nombre}</option>`).join('');
+    }
 
     abrirModal('modal-grado');
 };
@@ -610,6 +704,7 @@ window.guardarGrado = async () => {
     const modalidad = document.getElementById('grado-modalidad').value.trim();
     const anio     = parseInt(document.getElementById('grado-anio').value);
     const guia     = document.getElementById('grado-guia').value || null;
+    const categoriaId = document.getElementById('grado-categoria')?.value || null;
 
     let valido = true;
     if (!nombre)  { mostrarErrorCampo('grado-nombre', 'El nombre es obligatorio'); valido = false; }
@@ -619,7 +714,9 @@ window.guardarGrado = async () => {
     const btn = document.getElementById('btn-guardar-grado');
     setBotonCargando(btn, true);
 
-    const payload = { nombre, seccion, modalidad, anio, docente_guia_id: guia };
+    const payload = { nombre, seccion, modalidad, anio, docente_guia_id: guia, categoria_id: categoriaId };
+    // Un grado nuevo queda anclado al año activo — no se puede crear "suelto".
+    if (!id) payload.año_academico_id = anioActivoCache?.id || null;
     const { error } = id
         ? await supabase.from('grados').update(payload).eq('id', id)
         : await supabase.from('grados').insert([payload]);
@@ -1402,19 +1499,24 @@ async function cargarAsistenciaDiaAdmin() {
     document.getElementById('lista-asistencia').innerHTML = '<div class="empty-bubbles">Cargando…</div>';
     document.getElementById('asis-banner').classList.add('hidden');
 
+    if (!anioActivoCache) {
+        document.getElementById('lista-asistencia').innerHTML = '<div class="info-box">⚠ No hay un año académico activo.</div>';
+        return;
+    }
+
     try {
-        const { data: alumnos, error: eAl } = await supabase
-            .from('alumnos')
-            .select('*')
+        const { data: matriculas, error: eAl } = await supabase
+            .from('matriculas')
+            .select('*, alumnos(*)')
             .eq('grado_id', asisGradoId)
-            .eq('activo', true)
-            .order('apellidos');
+            .eq('año_academico_id', anioActivoCache.id)
+            .eq('activo', true);
 
         if (eAl && esErrorDeRed(eAl)) { mostrarBannerSinConexion(() => cargarAsistenciaDiaAdmin()); return; }
         ocultarBannerSinConexion();
         if (eAl) return notificarError(eAl, 'Error cargando alumnos');
 
-        alumnosAsis = alumnos || [];
+        alumnosAsis = (matriculas || []).map(m => m.alumnos).filter(Boolean).sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || ''));
         asisCache = {};
         asisEdit = {};
         asisRegistroInfo = null;
@@ -1523,11 +1625,15 @@ async function cargarResumenMensualAdmin() {
     const desde = `${mes}-01`;
     const hasta = `${mes}-${String(new Date(anio, mesNum, 0).getDate()).padStart(2, '0')}`;
 
-    let queryAlumnos = supabase.from('alumnos').select('*, grados(nombre, seccion)').eq('activo', true);
-    if (gradoFiltro) queryAlumnos = queryAlumnos.eq('grado_id', gradoFiltro);
-    const { data: alumnos, error: eAl } = await queryAlumnos;
+    if (!anioActivoCache) { cont.innerHTML = '<div class="info-box">⚠ No hay un año académico activo.</div>'; return; }
+
+    let queryMatriculas = supabase.from('matriculas').select('*, alumnos(*), grados(nombre, seccion)')
+        .eq('año_academico_id', anioActivoCache.id).eq('activo', true);
+    if (gradoFiltro) queryMatriculas = queryMatriculas.eq('grado_id', gradoFiltro);
+    const { data: matriculas, error: eAl } = await queryMatriculas;
     if (eAl) { notificarError(eAl, 'Error cargando alumnos'); return; }
-    if (!alumnos?.length) { cont.innerHTML = '<div class="empty-bubbles">No hay alumnos para este filtro.</div>'; return; }
+    const alumnos = (matriculas || []).map(m => ({ ...m.alumnos, grados: m.grados })).filter(a => a.id);
+    if (!alumnos.length) { cont.innerHTML = '<div class="empty-bubbles">No hay alumnos para este filtro.</div>'; return; }
 
     const alumnoIds = alumnos.map(a => a.id);
     const { data: registros, error: eReg } = await supabase
@@ -1603,9 +1709,12 @@ window.buscarAlumnoExpediente = async () => {
     if (!texto) { cont.innerHTML = ''; return; }
 
     cont.innerHTML = '<div class="empty-bubbles">Buscando…</div>';
+    // La búsqueda es sobre el catálogo de alumnos (nombres/apellidos/nie ya no
+    // tienen grado_id embebido). El grado que se muestra es su matrícula del
+    // año activo, si tiene una — se busca aparte porque alumnos ya no tiene FK a grados.
     const { data, error } = await supabase
         .from('alumnos')
-        .select('*, grados(nombre, seccion)')
+        .select('*')
         .or(`nombres.ilike.%${texto}%,apellidos.ilike.%${texto}%,nie.ilike.%${texto}%`)
         .order('apellidos')
         .limit(20);
@@ -1614,6 +1723,18 @@ window.buscarAlumnoExpediente = async () => {
 
     expAdminAlumnos = data || [];
     if (!expAdminAlumnos.length) { cont.innerHTML = '<div class="empty-bubbles">Sin resultados.</div>'; return; }
+
+    if (anioActivoCache && expAdminAlumnos.length) {
+        const { data: matriculas } = await supabase
+            .from('matriculas')
+            .select('alumno_id, grados(nombre, seccion)')
+            .in('alumno_id', expAdminAlumnos.map(a => a.id))
+            .eq('año_academico_id', anioActivoCache.id)
+            .eq('activo', true);
+        const gradoPorAlumno = {};
+        (matriculas || []).forEach(m => { gradoPorAlumno[m.alumno_id] = m.grados; });
+        expAdminAlumnos = expAdminAlumnos.map(a => ({ ...a, grados: gradoPorAlumno[a.id] || null }));
+    }
 
     cont.innerHTML = expAdminAlumnos.map(a => `
         <div class="exp-resultado-item" onclick="seleccionarAlumnoExpedienteAdmin('${a.id}')">
@@ -1850,6 +1971,291 @@ window.guardarPeriodosAcademicos = async () => {
     await cargarPeriodosAcademicos();
 };
 
+// ── AÑO ACADÉMICO ────────────────────────────
+async function renderVistaAnioAcademico() {
+    const cont = document.getElementById('anio-academico-body');
+    if (!cont) return;
+    cont.innerHTML = '<div class="empty-bubbles">Cargando…</div>';
+
+    const { data, error } = await supabase.from('años_academicos').select('*').order('anio', { ascending: false });
+    if (error) return notificarError(error, 'Error cargando años académicos');
+    aniosAcademicosCache = data || [];
+
+    if (!aniosAcademicosCache.length) {
+        cont.innerHTML = '<div class="info-box">⚠ No hay ningún año académico configurado todavía. Creá el primero con el botón "+ Nuevo Año Académico" de arriba.</div>';
+        return;
+    }
+
+    cont.innerHTML = aniosAcademicosCache.map(a => `
+        <div class="grado-row-card" style="cursor:default">
+            <div class="grc-nombre-wrap">
+                <div class="grc-nombre">Año ${a.anio} ${a.activo ? '<span class="badge-mod mod-voc">ACTIVO</span>' : ''}</div>
+                <div class="grc-seccion">${a.fecha_inicio || '—'} a ${a.fecha_fin || '—'}</div>
+            </div>
+            <div class="grc-guia" style="min-width:auto;margin-left:auto">
+                <button class="btn-sm btn-del" onclick="eliminarAnioAcademico('${a.id}')">Eliminar</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+window.abrirModalNuevoAnio = () => {
+    document.getElementById('nanio-numero').value = (anioActivoCache?.anio || new Date().getFullYear()) + 1;
+    document.getElementById('nanio-inicio').value = '';
+    document.getElementById('nanio-fin').value = '';
+    document.getElementById('nanio-copiar').checked = !!anioActivoCache;
+    document.getElementById('nanio-copiar-wrap').classList.toggle('hidden', !anioActivoCache);
+    abrirModal('modal-nuevo-anio');
+};
+
+// Clona grados + grado_materia + horarios del año anterior hacia el año nuevo.
+// Materias y docentes son catálogos globales (no están atados a un año), así
+// que no hace falta clonarlos — solo las asociaciones que sí son por-año.
+async function copiarEstructuraAnio(anioAnteriorId, anioNuevoId, anioNuevoNumero) {
+    const { data: gradosViejos, error: eG } = await supabase.from('grados').select('*').eq('año_academico_id', anioAnteriorId);
+    if (eG) throw eG;
+    if (!gradosViejos?.length) return;
+
+    const mapaGrados = {};
+    for (const g of gradosViejos) {
+        const { data: nuevo, error } = await supabase.from('grados').insert([{
+            nombre: g.nombre, seccion: g.seccion, modalidad: g.modalidad, anio: anioNuevoNumero,
+            docente_guia_id: g.docente_guia_id, categoria_id: g.categoria_id, año_academico_id: anioNuevoId,
+        }]).select().single();
+        if (error) throw error;
+        mapaGrados[g.id] = nuevo.id;
+    }
+
+    const gradoIdsViejos = Object.keys(mapaGrados);
+
+    const { data: gmViejos, error: eGm } = await supabase.from('grado_materia').select('*').in('grado_id', gradoIdsViejos);
+    if (eGm) throw eGm;
+    if (gmViejos?.length) {
+        const nuevosGm = gmViejos.map(gm => ({ grado_id: mapaGrados[gm.grado_id], materia_id: gm.materia_id, docente_id: gm.docente_id }));
+        const { error } = await supabase.from('grado_materia').insert(nuevosGm);
+        if (error) throw error;
+    }
+
+    const { data: horViejos, error: eHor } = await supabase.from('horarios').select('*').in('grado_id', gradoIdsViejos);
+    if (eHor) throw eHor;
+    if (horViejos?.length) {
+        const nuevosHor = horViejos.map(h => ({
+            grado_id: mapaGrados[h.grado_id], materia_id: h.materia_id, docente_id: h.docente_id,
+            dia: h.dia, periodo: h.periodo, hora_inicio: h.hora_inicio, hora_fin: h.hora_fin, año_academico_id: anioNuevoId,
+        }));
+        const { error } = await supabase.from('horarios').insert(nuevosHor);
+        if (error) throw error;
+    }
+}
+
+window.guardarNuevoAnio = async () => {
+    const anio          = parseInt(document.getElementById('nanio-numero').value, 10);
+    const fechaInicio    = document.getElementById('nanio-inicio').value || null;
+    const fechaFin       = document.getElementById('nanio-fin').value || null;
+    const copiarEstructura = document.getElementById('nanio-copiar').checked;
+
+    if (!anio) { mostrarToast('Ingresá el año', 'advertencia'); return; }
+
+    const btn = document.getElementById('btn-guardar-nuevo-anio');
+    setBotonCargando(btn, true);
+
+    const { data: nuevoAnio, error } = await supabase.from('años_academicos')
+        .insert([{ anio, fecha_inicio: fechaInicio, fecha_fin: fechaFin, activo: false }])
+        .select().single();
+
+    if (error) { setBotonCargando(btn, false); return notificarError(error, 'Error creando el año académico'); }
+
+    if (copiarEstructura && anioActivoCache) {
+        try {
+            await copiarEstructuraAnio(anioActivoCache.id, nuevoAnio.id, anio);
+        } catch (err) {
+            setBotonCargando(btn, false);
+            notificarError(err, 'El año se creó, pero hubo un error copiando la estructura del año anterior');
+            cerrarModal('modal-nuevo-anio');
+            await renderVistaAnioAcademico();
+            return;
+        }
+    }
+
+    setBotonCargando(btn, false);
+    mostrarToast(`Año ${anio} creado` + (copiarEstructura ? ' con la estructura del año anterior copiada' : ''), 'exito');
+    cerrarModal('modal-nuevo-anio');
+    await renderVistaAnioAcademico();
+};
+
+window.abrirModalCambiarAnio = () => {
+    const sel = document.getElementById('canio-select');
+    sel.innerHTML = aniosAcademicosCache.map(a =>
+        `<option value="${a.id}" ${a.activo ? 'selected' : ''}>Año ${a.anio}${a.activo ? ' (activo actualmente)' : ''}</option>`
+    ).join('');
+    abrirModal('modal-cambiar-anio');
+};
+
+window.guardarCambioAnioActivo = async () => {
+    const nuevoId = document.getElementById('canio-select').value;
+    if (!nuevoId) { mostrarToast('Seleccioná un año', 'advertencia'); return; }
+    if (anioActivoCache && nuevoId === anioActivoCache.id) { cerrarModal('modal-cambiar-anio'); return; }
+
+    const btn = document.getElementById('btn-guardar-cambio-anio');
+    setBotonCargando(btn, true);
+
+    // Primero desactivar el año actual — el índice único parcial de
+    // años_academicos.activo no permite tener dos años activos a la vez,
+    // así que este paso tiene que confirmarse antes de activar el nuevo.
+    if (anioActivoCache) {
+        const { error } = await supabase.from('años_academicos').update({ activo: false }).eq('id', anioActivoCache.id);
+        if (error) { setBotonCargando(btn, false); return notificarError(error, 'Error desactivando el año anterior'); }
+    }
+    const { error } = await supabase.from('años_academicos').update({ activo: true }).eq('id', nuevoId);
+    setBotonCargando(btn, false);
+    if (error) return notificarError(error, 'Error activando el nuevo año');
+
+    mostrarToast('Año académico activo actualizado', 'exito');
+    cerrarModal('modal-cambiar-anio');
+    await cargarTodo();
+    if (vistaActual === 'anio-academico') await renderVistaAnioAcademico();
+};
+
+window.eliminarAnioAcademico = async (id) => {
+    const anio = aniosAcademicosCache.find(a => a.id === id);
+    if (!anio) return;
+    const escrito = window.prompt(
+        `Esta acción borra TODO lo relacionado al año ${anio.anio} (grados, horarios, notas, asistencias, competencias, criterios de evaluación, matrículas y períodos académicos). No se puede deshacer.\n\nEscribí "${anio.anio}" para confirmar:`
+    );
+    if (escrito !== String(anio.anio)) { mostrarToast('Cancelado', 'info'); return; }
+
+    const { error } = await supabase.from('años_academicos').delete().eq('id', id);
+    if (error) return notificarError(error, 'Error eliminando el año académico');
+    mostrarToast(`Año ${anio.anio} eliminado`, 'exito');
+    await cargarTodo();
+    await renderVistaAnioAcademico();
+};
+
+// ── MATRÍCULA DE ALUMNOS ─────────────────────
+async function renderVistaMatricula() {
+    const cont = document.getElementById('matricula-body');
+    if (!cont) return;
+    cont.innerHTML = '<div class="empty-bubbles">Cargando…</div>';
+
+    if (!anioActivoCache) {
+        cont.innerHTML = '<div class="info-box">⚠ No hay un año académico activo — configuralo en "Año Académico" antes de matricular alumnos.</div>';
+        return;
+    }
+
+    const [{ data: alumnos, error: eAl }, { data: matriculas, error: eMat }] = await Promise.all([
+        supabase.from('alumnos').select('*').order('apellidos'),
+        supabase.from('matriculas').select('*').eq('año_academico_id', anioActivoCache.id).eq('activo', true),
+    ]);
+    if (eAl)  return notificarError(eAl, 'Error cargando el catálogo de alumnos');
+    if (eMat) return notificarError(eMat, 'Error cargando las matrículas');
+
+    const matriculaPorAlumno = {};
+    (matriculas || []).forEach(m => { matriculaPorAlumno[m.alumno_id] = m; });
+    matriculaAlumnosCache = (alumnos || []).map(a => ({ ...a, matricula: matriculaPorAlumno[a.id] || null }));
+
+    cont.innerHTML = matriculaAlumnosCache.map(a => {
+        const grado = a.matricula ? gradosCache.find(g => g.id === a.matricula.grado_id) : null;
+        return `
+        <div class="mat-fila">
+            <div class="mat-nombre">${a.apellidos}, ${a.nombres} <span class="text-muted">NIE ${a.nie || '—'}</span></div>
+            <div class="mat-estado">${grado ? `${grado.nombre} ${grado.seccion}` : '<span class="text-muted">No matriculado este año</span>'}</div>
+            <div class="mat-acciones">
+                <select id="mat-grado-${a.id}">
+                    <option value="">— Elegir grado —</option>
+                    ${gradosCache.map(g => `<option value="${g.id}" ${g.id === a.matricula?.grado_id ? 'selected' : ''}>${g.nombre} ${g.seccion}</option>`).join('')}
+                </select>
+                <button class="btn-sm btn-info" onclick="matricularAlumno('${a.id}')">${a.matricula ? 'Cambiar' : 'Matricular'}</button>
+                ${a.matricula ? `<button class="btn-sm btn-del" onclick="desmatricularAlumno('${a.matricula.id}')">Desmatricular</button>` : ''}
+            </div>
+        </div>`;
+    }).join('') || '<div class="empty-bubbles">No hay alumnos en el catálogo todavía.</div>';
+}
+
+window.matricularAlumno = async (alumnoId) => {
+    const gradoId = document.getElementById(`mat-grado-${alumnoId}`).value;
+    if (!gradoId) { mostrarToast('Elegí un grado', 'advertencia'); return; }
+    const { error } = await supabase.from('matriculas').upsert(
+        [{ alumno_id: alumnoId, grado_id: gradoId, año_academico_id: anioActivoCache.id, activo: true }],
+        { onConflict: 'alumno_id,año_academico_id' }
+    );
+    if (error) return notificarError(error, 'Error matriculando al alumno');
+    mostrarToast('Alumno matriculado', 'exito');
+    await renderVistaMatricula();
+};
+
+window.desmatricularAlumno = async (matriculaId) => {
+    const ok = await mostrarConfirm('¿Desmatricular a este alumno del año activo?', { textoConfirmar: 'Desmatricular' });
+    if (!ok) return;
+    const { error } = await supabase.from('matriculas').update({ activo: false }).eq('id', matriculaId);
+    if (error) return notificarError(error, 'Error desmatriculando al alumno');
+    mostrarToast('Alumno desmatriculado', 'exito');
+    await renderVistaMatricula();
+};
+
+// ── CATEGORÍAS DE GRADOS ─────────────────────
+async function renderVistaCategoriasGrado() {
+    const tbody = document.getElementById('tbody-categorias-grado');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Cargando…</td></tr>';
+
+    const { data, error } = await supabase.from('categorias_grado').select('*').order('orden');
+    if (error) return notificarError(error, 'Error cargando categorías');
+    categoriasGradoCache = data || [];
+
+    tbody.innerHTML = categoriasGradoCache.map(c => `
+        <tr>
+            <td class="td-bold">${c.nombre}</td>
+            <td>${c.descripcion || '—'}</td>
+            <td>${c.orden}</td>
+            <td>
+                <button class="btn-sm btn-edit" onclick="abrirModalCategoriaGrado('${c.id}')">Editar</button>
+                <button class="btn-sm btn-del" onclick="eliminarCategoriaGrado('${c.id}')">Eliminar</button>
+            </td>
+        </tr>
+    `).join('') || '<tr><td colspan="4" class="text-center text-muted">Sin categorías todavía</td></tr>';
+}
+
+window.abrirModalCategoriaGrado = (id = null) => {
+    const c = id ? categoriasGradoCache.find(x => x.id === id) : null;
+    document.getElementById('modal-categoria-grado-title').textContent = c ? 'Editar Categoría' : 'Nueva Categoría';
+    document.getElementById('categoria-grado-id').value = c?.id || '';
+    document.getElementById('categoria-grado-nombre').value = c?.nombre || '';
+    document.getElementById('categoria-grado-descripcion').value = c?.descripcion || '';
+    document.getElementById('categoria-grado-orden').value = c?.orden ?? categoriasGradoCache.length;
+    abrirModal('modal-categoria-grado');
+};
+
+window.guardarCategoriaGrado = async () => {
+    const id          = document.getElementById('categoria-grado-id').value;
+    const nombre      = document.getElementById('categoria-grado-nombre').value.trim();
+    const descripcion = document.getElementById('categoria-grado-descripcion').value.trim();
+    const orden       = parseInt(document.getElementById('categoria-grado-orden').value, 10) || 0;
+    if (!nombre) { mostrarErrorCampo('categoria-grado-nombre', 'El nombre es obligatorio'); return; }
+
+    const btn = document.getElementById('btn-guardar-categoria-grado');
+    setBotonCargando(btn, true);
+    const { error } = id
+        ? await supabase.from('categorias_grado').update({ nombre, descripcion, orden }).eq('id', id)
+        : await supabase.from('categorias_grado').insert([{ nombre, descripcion, orden }]);
+    setBotonCargando(btn, false);
+    if (error) return notificarError(error, 'Error guardando la categoría');
+
+    mostrarToast(id ? 'Categoría actualizada' : 'Categoría creada', 'exito');
+    cerrarModal('modal-categoria-grado');
+    await renderVistaCategoriasGrado();
+    await cargarTodo(); // refresca categoriasGradoCache usada al agrupar la vista Grados
+};
+
+window.eliminarCategoriaGrado = async (id) => {
+    const ok = await mostrarConfirm('¿Eliminar esta categoría? Los grados que la usaban quedarán sin categoría.', { textoConfirmar: 'Eliminar' });
+    if (!ok) return;
+    const { error } = await supabase.from('categorias_grado').delete().eq('id', id);
+    if (error) return notificarError(error, 'Error eliminando la categoría');
+    mostrarToast('Categoría eliminada', 'exito');
+    await renderVistaCategoriasGrado();
+    await cargarTodo();
+};
+
 // ── OTROS REPORTES ───────────────────────────
 window.imprimirMatriculaAdmin = () => {
     const gradoId = document.getElementById('filtro-grado')?.value;
@@ -1905,17 +2311,37 @@ window.imprimirListaActividadesAdmin = () => {
 };
 
 // ── ALUMNOS ─────────────────────────────────
+// matriculaPorAlumnoCache: alumno_id -> fila de `matriculas` del año activo
+// que se ve actualmente en la tabla — se usa para precargar el grado al
+// editar (abrirModalAlumno) sin hacer una query extra por cada click en Editar.
+let matriculaPorAlumnoCache = {};
+
 window.renderAlumnos = async function renderAlumnos() {
     renderSkeletonFilas('tbody-alumnos', 6, 6);
 
+    if (!anioActivoCache) {
+        document.getElementById('tbody-alumnos').innerHTML =
+            '<tr><td colspan="6"><div class="info-box">⚠ No hay un año académico activo — configuralo en "Año Académico".</div></td></tr>';
+        alumnosCache = [];
+        return;
+    }
+
     const gradoFiltro = document.getElementById('filtro-grado')?.value || '';
-    let query = supabase.from('alumnos').select('*, grados(nombre, seccion)').order('apellidos');
+    let query = supabase.from('matriculas').select('*, alumnos(*), grados(nombre, seccion)')
+        .eq('año_academico_id', anioActivoCache.id).eq('activo', true);
     if (gradoFiltro) query = query.eq('grado_id', gradoFiltro);
     const { data, error } = await query;
 
     if (error) { notificarError(error, 'Error cargando alumnos'); return; }
 
-    alumnosCache = data || [];
+    matriculaPorAlumnoCache = {};
+    alumnosCache = (data || [])
+        .filter(m => m.alumnos)
+        .map(m => {
+            matriculaPorAlumnoCache[m.alumnos.id] = m;
+            return { ...m.alumnos, grados: m.grados };
+        })
+        .sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || ''));
 
     document.getElementById('tbody-alumnos').innerHTML = alumnosCache.map(a => `
         <tr>
@@ -1941,18 +2367,18 @@ const CAMPOS_ALUMNO = ['alumno-nie', 'alumno-nombres', 'alumno-apellidos', 'alum
 window.abrirModalAlumno = async (id = null) => {
     limpiarErroresFormulario(CAMPOS_ALUMNO);
     const a = id ? alumnosCache.find(x => x.id === id) : null;
+    const matriculaActual = id ? matriculaPorAlumnoCache[id] : null;
     document.getElementById('modal-alumno-title').textContent = a ? 'Editar Alumno' : 'Nuevo Alumno';
     document.getElementById('alumno-id').value        = a?.id || '';
     document.getElementById('alumno-nie').value       = a?.nie || '';
     document.getElementById('alumno-nombres').value   = a?.nombres || '';
     document.getElementById('alumno-apellidos').value = a?.apellidos || '';
-    document.getElementById('alumno-anio').value      = a?.anio_ingreso || 2026;
     document.getElementById('alumno-foto-preview').src = a?.foto_url || '';
     document.getElementById('alumno-foto-preview').style.display = a?.foto_url ? 'block' : 'none';
 
     const sel = document.getElementById('alumno-grado');
     sel.innerHTML = '<option value="">— Seleccionar grado —</option>' +
-        gradosCache.map(g => `<option value="${g.id}" ${g.id === a?.grado_id ? 'selected' : ''}>${g.nombre} ${g.seccion}</option>`).join('');
+        gradosCache.map(g => `<option value="${g.id}" ${g.id === matriculaActual?.grado_id ? 'selected' : ''}>${g.nombre} ${g.seccion}</option>`).join('');
 
     abrirModal('modal-alumno');
 };
@@ -1961,12 +2387,13 @@ window.editarAlumno = (id) => window.abrirModalAlumno(id);
 
 window.guardarAlumno = async () => {
     limpiarErroresFormulario(CAMPOS_ALUMNO);
+    if (!anioActivoCache) { mostrarToast('No hay un año académico activo — configuralo primero en "Año Académico"', 'advertencia'); return; }
+
     const id        = document.getElementById('alumno-id').value;
     const nie       = document.getElementById('alumno-nie').value.trim();
     const nombres   = document.getElementById('alumno-nombres').value.trim().toUpperCase();
     const apellidos = document.getElementById('alumno-apellidos').value.trim().toUpperCase();
     const gradoId   = document.getElementById('alumno-grado').value;
-    const anio      = parseInt(document.getElementById('alumno-anio').value);
     const fotoFile  = document.getElementById('alumno-foto').files[0];
 
     let valido = true;
@@ -1989,17 +2416,27 @@ window.guardarAlumno = async () => {
         }
     }
 
-    const payload = { nie, nombres, apellidos, grado_id: gradoId, anio_ingreso: anio, foto_url };
-    const { error } = id
-        ? await supabase.from('alumnos').update(payload).eq('id', id)
-        : await supabase.from('alumnos').insert([{ ...payload, activo: true }]);
+    // `alumnos` es catálogo puro (sin grado_id/anio_ingreso/activo) — el grado
+    // se guarda aparte, como una matrícula del año activo (ver migracion-años.sql).
+    const payloadAlumno = { nie, nombres, apellidos, foto_url };
+    const { data: alumnoGuardado, error } = id
+        ? await supabase.from('alumnos').update(payloadAlumno).eq('id', id).select().single()
+        : await supabase.from('alumnos').insert([payloadAlumno]).select().single();
+
+    if (error) { setBotonCargando(btn, false); return notificarError(error, 'Error guardando el alumno'); }
+
+    const { error: errorMatricula } = await supabase.from('matriculas').upsert(
+        [{ alumno_id: alumnoGuardado.id, grado_id: gradoId, año_academico_id: anioActivoCache.id, activo: true }],
+        { onConflict: 'alumno_id,año_academico_id' }
+    );
 
     setBotonCargando(btn, false);
-    if (error) return notificarError(error, 'Error guardando el alumno');
+    if (errorMatricula) return notificarError(errorMatricula, 'El alumno se guardó, pero no se pudo matricular en el grado');
 
     mostrarToast(id ? 'Alumno actualizado' : 'Alumno creado', 'exito');
     cerrarModal('modal-alumno');
-    await renderAlumnos();
+    if (vistaActual === 'matricula') await renderVistaMatricula();
+    else await renderAlumnos();
 };
 
 window.eliminarAlumno = async (id) => {
@@ -2014,13 +2451,23 @@ window.eliminarAlumno = async (id) => {
 window.eliminarAlumnosMasivo = async () => {
     const gradoId = document.getElementById('filtro-grado').value;
     if (!gradoId) return mostrarToast('Seleccioná un grado primero para hacer eliminación masiva', 'advertencia');
+    if (!anioActivoCache) return mostrarToast('No hay un año académico activo', 'advertencia');
     const grado = gradosCache.find(g => g.id === gradoId);
     const ok = await mostrarConfirm(
-        `¿Eliminar TODOS los alumnos de ${grado.nombre} ${grado.seccion}? Esta acción no se puede deshacer.`,
+        `¿Eliminar TODOS los alumnos matriculados en ${grado.nombre} ${grado.seccion} este año? Esta acción no se puede deshacer.`,
         { textoConfirmar: 'Eliminar todos' }
     );
     if (!ok) return;
-    const { error } = await supabase.from('alumnos').delete().eq('grado_id', gradoId);
+
+    const { data: matriculas, error: eMat } = await supabase
+        .from('matriculas').select('alumno_id')
+        .eq('grado_id', gradoId).eq('año_academico_id', anioActivoCache.id).eq('activo', true);
+    if (eMat) return notificarError(eMat, 'Error buscando los alumnos del grado');
+
+    const alumnoIds = (matriculas || []).map(m => m.alumno_id);
+    if (!alumnoIds.length) { await renderAlumnos(); return; }
+
+    const { error } = await supabase.from('alumnos').delete().in('id', alumnoIds);
     if (error) return notificarError(error, 'Error eliminando alumnos');
     await renderAlumnos();
     mostrarToast('Alumnos eliminados', 'exito');
@@ -2060,6 +2507,11 @@ window.importarAlumnosExcel = async (event) => {
         event.target.value = '';
         return;
     }
+    if (!anioActivoCache) {
+        mostrarToast('No hay un año académico activo — configuralo primero en "Año Académico"', 'advertencia');
+        event.target.value = '';
+        return;
+    }
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -2074,15 +2526,23 @@ window.importarAlumnosExcel = async (event) => {
                 const apellidos = (row[1] || '').toString().trim().toUpperCase();
                 const nombres   = (row[2] || '').toString().trim().toUpperCase();
                 if (!nie || !apellidos || !nombres) continue;
-                nuevos.push({ nie, apellidos, nombres, grado_id: gradoId, activo: true, anio_ingreso: 2026 });
+                nuevos.push({ nie, apellidos, nombres });
             }
 
             if (!nuevos.length) { mostrarToast('No se encontraron alumnos en el archivo', 'advertencia'); return; }
 
-            const { error } = await supabase.from('alumnos').insert(nuevos);
+            // 1. Crear en el catálogo `alumnos` (ya no lleva grado_id/activo/anio_ingreso).
+            const { data: alumnosCreados, error } = await supabase.from('alumnos').insert(nuevos).select();
             if (error) { notificarError(error, 'Error importando alumnos'); return; }
 
-            mostrarToast(`${nuevos.length} alumno(s) importado(s) correctamente`, 'exito');
+            // 2. Matricularlos a todos en el grado del filtro, para el año activo.
+            const matriculasNuevas = (alumnosCreados || []).map(a => ({
+                alumno_id: a.id, grado_id: gradoId, año_academico_id: anioActivoCache.id, activo: true,
+            }));
+            const { error: errorMat } = await supabase.from('matriculas').insert(matriculasNuevas);
+            if (errorMat) { notificarError(errorMat, 'Los alumnos se crearon, pero no se pudieron matricular'); return; }
+
+            mostrarToast(`${nuevos.length} alumno(s) importado(s) y matriculado(s) correctamente`, 'exito');
             await renderAlumnos();
         } catch (err) {
             notificarError(err, 'Error leyendo el archivo');

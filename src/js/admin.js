@@ -47,9 +47,11 @@ let gradoMatHorario   = [];   // grado_materia del grado elegido (para el select
 let genAsignaciones  = [];   // [{ id (grado_materia_id), gradoId, gradoNombre, materiaId, materiaNombre, docenteId, docenteNombre, horasPorSemana, incluida }]
 let genSinDocenteCount = 0;  // materias sin docente asignado, excluidas del formulario (solo para el aviso)
 let genDocentes      = [];   // [{ id, nombre, disponibilidad: 'completa'|'manana' }]
-let genResultado     = null; // filas generadas (sin guardar), o null si no hay resultado aún / no se encontró solución
+let genResultado     = null; // filas generadas (sin guardar) — null si no hay resultado aún, o [] si no se pudo ubicar nada (ver genCompleto/genMateriasNoColocadas para saber si es parcial)
 let genSeed          = 1;
 let genGradoPreview  = null; // grado_id que se muestra en el grid de vista previa
+let genCompleto           = true; // false si genResultado es una solución PARCIAL (permitirParcial:true)
+let genMateriasNoColocadas = [];  // [{asignacionId, gradoId, materiaId, materiaNombre, docenteId, horasRequeridas, horasColocadas}]
 
 // Expedientes disciplinarios
 let expAdminAlumnos    = []; // resultados de la búsqueda actual
@@ -1364,27 +1366,38 @@ function construirConfigGenerador() {
     };
 }
 
-// debug:true no cambia el resultado (sigue siendo Array|null) — si ningún
-// intento encuentra una solución completa, generarHorario igual imprime en
-// consola (console.warn) qué materia/docente quedó bloqueado y con cuántas
-// horas. Abrí la consola del navegador (F12) antes de generar para verlo.
+// debug:true imprime en consola (console.warn), cuando ningún intento encuentra
+// una solución completa, qué materia/docente quedó bloqueado y con cuántas
+// horas — abrí la consola del navegador (F12) antes de generar para verlo.
+// permitirParcial:true cambia el contrato de retorno de generarHorario: en vez
+// de Array|null, siempre devuelve { completo, filas, materiasNoColocadas }, así
+// que acá se desarma esa forma en las variables de módulo de siempre
+// (genResultado sigue siendo el Array de filas que usa el resto del código).
+function aplicarResultadoGenerador(resultado) {
+    genResultado = resultado.filas;
+    genCompleto = resultado.completo;
+    genMateriasNoColocadas = resultado.materiasNoColocadas;
+    mostrarResultadoGenerador();
+}
+
 window.ejecutarGenerarHorario = () => {
     if (!genAsignaciones.some(a => a.incluida)) { mostrarToast('Marcá al menos una materia para generar el horario', 'advertencia'); return; }
     genSeed = Date.now() % 100000;
-    genResultado = generarHorario(construirConfigGenerador(), genSeed, { debug: true });
-    mostrarResultadoGenerador();
+    aplicarResultadoGenerador(generarHorario(construirConfigGenerador(), genSeed, { debug: true, permitirParcial: true }));
 };
 
 window.generarOtroHorario = () => {
     genSeed += 1;
-    genResultado = generarHorario(construirConfigGenerador(), genSeed, { debug: true });
-    mostrarResultadoGenerador();
+    aplicarResultadoGenerador(generarHorario(construirConfigGenerador(), genSeed, { debug: true, permitirParcial: true }));
 };
 
 function mostrarResultadoGenerador() {
     document.getElementById('gen-formulario').classList.add('hidden');
 
-    if (!genResultado) {
+    // Con permitirParcial:true, generarHorario ya no devuelve null — un Array
+    // vacío (nada se pudo colocar en ningún grado) es el único caso "sin nada
+    // que mostrar" que queda.
+    if (!genResultado || !genResultado.length) {
         document.getElementById('gen-sin-solucion').classList.remove('hidden');
         document.getElementById('gen-resultado').classList.add('hidden');
         return;
@@ -1403,6 +1416,7 @@ function mostrarResultadoGenerador() {
 
     document.getElementById('gen-sin-solucion').classList.add('hidden');
     document.getElementById('gen-resultado').classList.remove('hidden');
+    renderAvisoMateriasNoColocadas();
 
     const gradosConHoras = [...new Map(genAsignaciones.map(a => [a.gradoId, a.gradoNombre])).entries()];
     const selPreview = document.getElementById('gen-grado-preview');
@@ -1412,6 +1426,33 @@ function mostrarResultadoGenerador() {
     }
     selPreview.value = genGradoPreview;
     renderGridGenerador();
+}
+
+// Con permitirParcial:true el resultado puede ser una solución PARCIAL (no
+// todas las materias/horas se pudieron ubicar) — esto avisa cuáles, sin
+// bloquear la vista previa: el admin igual puede ver/guardar lo que sí se
+// resolvió y completar el resto a mano en Horarios. El div se crea una sola
+// vez (id fijo) y se reutiliza en cada render para no ir acumulando copias.
+function renderAvisoMateriasNoColocadas() {
+    let aviso = document.getElementById('gen-aviso-parcial');
+    if (!aviso) {
+        aviso = document.createElement('div');
+        aviso.id = 'gen-aviso-parcial';
+        aviso.className = 'info-box hidden';
+        document.getElementById('gen-resultado').prepend(aviso);
+    }
+
+    if (genCompleto || !genMateriasNoColocadas.length) {
+        aviso.classList.add('hidden');
+        return;
+    }
+
+    aviso.classList.remove('hidden');
+    const detalle = genMateriasNoColocadas.map(m => {
+        const asign = genAsignaciones.find(a => a.id === m.asignacionId);
+        return `${asign?.gradoNombre || m.gradoId} — ${m.materiaNombre || m.materiaId} (${asign?.docenteNombre || m.docenteId}): ${m.horasColocadas}/${m.horasRequeridas} horas ubicadas`;
+    }).join('<br>');
+    aviso.innerHTML = `⚠ No se encontró una solución 100% completa — se generó la mejor combinación posible, pero ${genMateriasNoColocadas.length} materia(s) quedaron con horas sin ubicar:<br>${detalle}`;
 }
 
 window.cambiarPreviewGenerador = () => {
@@ -1459,6 +1500,8 @@ function renderGridGenerador() {
 
 window.descartarHorarioGenerado = () => {
     genResultado = null;
+    genCompleto = true;
+    genMateriasNoColocadas = [];
     document.getElementById('gen-resultado').classList.add('hidden');
     document.getElementById('gen-sin-solucion').classList.add('hidden');
     document.getElementById('gen-formulario').classList.remove('hidden');
@@ -1468,8 +1511,11 @@ window.guardarHorarioGenerado = async () => {
     if (!genResultado || !genResultado.length) return;
 
     const gradoIds = [...new Set(genResultado.map(f => f.grado_id))];
+    const avisoParcial = !genCompleto
+        ? ` ⚠ Esta combinación NO está completa — ${genMateriasNoColocadas.length} materia(s) quedaron con horas sin ubicar y vas a tener que completarlas manualmente después en Horarios.`
+        : '';
     const ok = await mostrarConfirm(
-        `Esto va a REEMPLAZAR el horario actual de ${gradoIds.length} grado(s) por el que acabás de generar. ¿Continuar?`,
+        `Esto va a REEMPLAZAR el horario actual de ${gradoIds.length} grado(s) por el que acabás de generar.${avisoParcial} ¿Continuar?`,
         { textoConfirmar: 'Guardar y reemplazar' }
     );
     if (!ok) return;

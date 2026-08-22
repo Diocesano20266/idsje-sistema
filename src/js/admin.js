@@ -52,6 +52,7 @@ let genSeed          = 1;
 let genGradoPreview  = null; // grado_id que se muestra en el grid de vista previa
 let genCompleto           = true; // false si genResultado es una solución PARCIAL (permitirParcial:true)
 let genMateriasNoColocadas = [];  // [{asignacionId, gradoId, materiaId, materiaNombre, docenteId, horasRequeridas, horasColocadas}]
+let genImposiblePorCarga  = false; // true si algún docente supera 40h/semana entre las materias incluidas — bloquea "Generar"
 
 // Expedientes disciplinarios
 let expAdminAlumnos    = []; // resultados de la búsqueda actual
@@ -1293,6 +1294,79 @@ async function renderVistaGenerador() {
     }
 }
 
+// Análisis de viabilidad por carga docente, ANTES de siquiera intentar generar.
+// 5 días × 8h/día (P1-P10 salvo receso/almuerzo) = 40h/semana es el techo físico
+// real de un docente — por encima de eso ningún horario sin choques es posible,
+// sin importar cuánto tiempo o cuántos reintentos se le den al backtracking.
+// Entre 30 y 40h sigue siendo válido pero deja muy poco margen (alto riesgo de
+// que el generador no encuentre una combinación 100% completa).
+const CARGA_MAXIMA_FISICA = 40;
+const CARGA_RIESGO_ALTO   = 30;
+const CARGA_ADVERTENCIA   = 20;
+
+function calcularCargaPorDocenteGenerador() {
+    const carga = {};
+    genAsignaciones.filter(a => a.incluida).forEach(a => {
+        const horas = Math.max(0, Math.min(10, parseInt(a.horasPorSemana, 10) || 0));
+        carga[a.docenteId] = (carga[a.docenteId] || 0) + horas;
+    });
+    return Object.entries(carga)
+        .map(([docenteId, horas]) => ({
+            docenteId, horas,
+            nombre: genAsignaciones.find(a => a.docenteId === docenteId)?.docenteNombre || docenteId,
+        }))
+        .sort((a, b) => b.horas - a.horas);
+}
+
+function renderViabilidadGenerador() {
+    let cont = document.getElementById('gen-viabilidad');
+    if (!cont) {
+        cont = document.createElement('div');
+        cont.id = 'gen-viabilidad';
+        document.getElementById('gen-materias-lista').insertAdjacentElement('beforebegin', cont);
+    }
+
+    const filas = calcularCargaPorDocenteGenerador();
+    if (!filas.length) { cont.innerHTML = ''; genImposiblePorCarga = false; return; }
+
+    const imposibles = filas.filter(f => f.horas > CARGA_MAXIMA_FISICA);
+    const riesgosas  = filas.filter(f => f.horas > CARGA_RIESGO_ALTO && f.horas <= CARGA_MAXIMA_FISICA);
+    genImposiblePorCarga = imposibles.length > 0;
+
+    const paletaDe = (horas) => {
+        if (horas > CARGA_RIESGO_ALTO) return { bg: '#fde8e8', fg: '#b52828', bd: '#f5c2c2' }; // rojo
+        if (horas > CARGA_ADVERTENCIA) return { bg: '#fef9e7', fg: '#92400e', bd: '#fde68a' }; // amarillo
+        return { bg: '#e8fdf0', fg: '#1a7a40', bd: '#bbf7d0' }; // verde
+    };
+
+    const chips = filas.map(f => {
+        const p = paletaDe(f.horas);
+        return `<span style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:100px;background:${p.bg};color:${p.fg};border:1px solid ${p.bd};font-size:11px;font-weight:600">${f.nombre} · ${f.horas}h</span>`;
+    }).join('');
+
+    const avisoImposible = imposibles.length
+        ? `<div class="info-box" style="background:#fde8e8;border-color:#f5c2c2;color:#b52828;margin-top:10px">
+            🚫 ${imposibles.length} docente(s) superan las ${CARGA_MAXIMA_FISICA} horas semanales (el máximo físico: 5 días × 8 períodos) —
+            es matemáticamente imposible armar un horario sin choques mientras esto no se corrija.
+            No se puede generar hasta reducir su carga o quitar/reasignar materias:
+            ${imposibles.map(f => `${f.nombre} (${f.horas}h)`).join(', ')}.
+           </div>`
+        : '';
+    const avisoRiesgo = (!imposibles.length && riesgosas.length)
+        ? `<div class="info-box" style="margin-top:10px">
+            ⚠ ${riesgosas.length} docente(s) superan las ${CARGA_RIESGO_ALTO} horas semanales — riesgo alto de que el
+            generador no encuentre una solución 100% completa: ${riesgosas.map(f => `${f.nombre} (${f.horas}h)`).join(', ')}.
+           </div>`
+        : '';
+
+    cont.innerHTML = `
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;margin-bottom:14px">
+            <div style="font-size:12px;font-weight:700;color:#0a1628;margin-bottom:10px;text-transform:uppercase;letter-spacing:.6px">Carga semanal por docente</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px">${chips}</div>
+            ${avisoImposible}${avisoRiesgo}
+        </div>`;
+}
+
 function renderFormularioGenerador() {
     const avisoSinDocente = genSinDocenteCount
         ? `<div class="info-box">⚠ ${genSinDocenteCount} materia(s) sin docente asignado no se incluyen — asignalas primero en Grados → Materias del grado.</div>`
@@ -1301,8 +1375,11 @@ function renderFormularioGenerador() {
     if (!genAsignaciones.length) {
         document.getElementById('gen-materias-lista').innerHTML = avisoSinDocente + '<div class="empty-bubbles">No hay materias con docente asignado todavía.</div>';
         document.getElementById('gen-docentes-lista').innerHTML = '';
+        genImposiblePorCarga = false;
         return;
     }
+
+    renderViabilidadGenerador();
 
     const gradosAgrupados = new Map();
     genAsignaciones.forEach(a => {
@@ -1340,6 +1417,7 @@ function renderFormularioGenerador() {
 window.actualizarHorasGenerador = (asignacionId, valor) => {
     const a = genAsignaciones.find(x => x.id === asignacionId);
     if (a) a.horasPorSemana = Math.max(1, Math.min(10, parseInt(valor, 10) || 1));
+    renderViabilidadGenerador(); // la carga por docente cambió — refrescar el semáforo
 };
 
 window.actualizarIncluidaGenerador = (asignacionId, checked) => {
@@ -1382,11 +1460,13 @@ function aplicarResultadoGenerador(resultado) {
 
 window.ejecutarGenerarHorario = () => {
     if (!genAsignaciones.some(a => a.incluida)) { mostrarToast('Marcá al menos una materia para generar el horario', 'advertencia'); return; }
+    if (genImposiblePorCarga) { mostrarToast('Hay docente(s) con más de 40 horas semanales — corregí su carga antes de generar', 'error'); return; }
     genSeed = Date.now() % 100000;
     aplicarResultadoGenerador(generarHorario(construirConfigGenerador(), genSeed, { debug: true, permitirParcial: true }));
 };
 
 window.generarOtroHorario = () => {
+    if (genImposiblePorCarga) { mostrarToast('Hay docente(s) con más de 40 horas semanales — corregí su carga antes de generar', 'error'); return; }
     genSeed += 1;
     aplicarResultadoGenerador(generarHorario(construirConfigGenerador(), genSeed, { debug: true, permitirParcial: true }));
 };

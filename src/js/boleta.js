@@ -2,16 +2,18 @@
 //  IDSJE — Generador de Boletas
 // ═══════════════════════════════════════════
 import { supabase, verificarSesion } from './auth.js';
-import { INSTITUTO } from './config.js';
+import { INSTITUTO, getAñoActivo } from './config.js';
 import { mostrarToast, notificarError, esErrorDeRed, mostrarBannerSinConexion, ocultarBannerSinConexion, setBotonCargando } from './utils.js';
 
 let gradosCache = [];
 let periodoSel  = 1;
 let gradoSel    = null;
+let anioActivoCache = null;
 
 export async function init() {
     const res = await verificarSesion('admin');
     if (!res) return;
+    anioActivoCache = await getAñoActivo(supabase);
     await cargarGrados();
 }
 
@@ -61,19 +63,29 @@ window.generarBoletas = async () => {
     document.getElementById('loading-boletas').classList.remove('hidden');
     document.getElementById('contenedor-boletas').innerHTML = '';
 
-    // Cargar alumnos
-    const { data: alumnos, error: eAlumnos } = await supabase
-        .from('alumnos')
-        .select('*')
+    if (!anioActivoCache) {
+        document.getElementById('loading-boletas').classList.add('hidden');
+        setBotonCargando(btn, false);
+        mostrarToast('No hay un año académico activo configurado', 'advertencia');
+        return;
+    }
+
+    // Cargar alumnos matriculados (vía `matriculas`, del año activo — ver
+    // supabase/migracion-años.sql: alumnos ya no tiene grado_id/activo).
+    const { data: matriculas, error: eAlumnos } = await supabase
+        .from('matriculas')
+        .select('*, alumnos(*)')
         .eq('grado_id', gradoId)
-        .eq('activo', true)
-        .order('apellidos');
+        .eq('año_academico_id', anioActivoCache.id)
+        .eq('activo', true);
 
     if (eAlumnos) {
         document.getElementById('loading-boletas').classList.add('hidden');
         setBotonCargando(btn, false);
         return notificarError(eAlumnos, 'Error cargando alumnos');
     }
+
+    const alumnos = (matriculas || []).map(m => m.alumnos).filter(Boolean).sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || ''));
 
     if (!alumnos?.length) {
         document.getElementById('loading-boletas').classList.add('hidden');

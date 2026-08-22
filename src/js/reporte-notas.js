@@ -3,7 +3,7 @@
 //  Uso: reporte-notas.html?grado=<id>&periodo=1..4
 // ═══════════════════════════════════════════
 import { supabase, verificarSesion } from './auth.js';
-import { INSTITUTO } from './config.js';
+import { INSTITUTO, getAñoActivo } from './config.js';
 import { notificarError, esErrorDeRed, mostrarBannerSinConexion, ocultarBannerSinConexion } from './utils.js';
 
 async function init() {
@@ -26,9 +26,12 @@ async function init() {
 async function renderReporte(gradoId, periodo) {
     const cont = document.getElementById('contenedor-notas');
     try {
-        const [{ data: grado, error: eG }, { data: alumnos, error: eAl }, { data: gradoMaterias, error: eGm }] = await Promise.all([
+        const anioActivo = await getAñoActivo(supabase);
+        const [{ data: grado, error: eG }, { data: matriculas, error: eAl }, { data: gradoMaterias, error: eGm }] = await Promise.all([
             supabase.from('grados').select('*').eq('id', gradoId).single(),
-            supabase.from('alumnos').select('*').eq('grado_id', gradoId).eq('activo', true).order('apellidos'),
+            anioActivo
+                ? supabase.from('matriculas').select('*, alumnos(*)').eq('grado_id', gradoId).eq('año_academico_id', anioActivo.id).eq('activo', true)
+                : Promise.resolve({ data: [], error: null }),
             supabase.from('grado_materia').select('*, materias(id, nombre)').eq('grado_id', gradoId),
         ]);
 
@@ -38,6 +41,9 @@ async function renderReporte(gradoId, periodo) {
         if (eG) return notificarError(eG, 'Error cargando el grado');
         if (eAl) return notificarError(eAl, 'Error cargando alumnos');
         if (eGm) return notificarError(eGm, 'Error cargando materias');
+        if (!anioActivo) return notificarError({ message: 'No hay un año académico activo configurado' }, 'Error');
+
+        const alumnos = (matriculas || []).map(m => m.alumnos).filter(Boolean).sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || ''));
 
         const materiaIds = (gradoMaterias || []).map(gm => gm.id);
         let notas = [];

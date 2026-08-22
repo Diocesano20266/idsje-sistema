@@ -32,19 +32,23 @@ async function renderReporte(gradoId, mes, blanco) {
     const dias = diasHabilesDelMes(anio, mesNum);
 
     try {
+        // El año académico se resuelve por el número de año del mes pedido en
+        // la URL (no necesariamente el año "activo" — este reporte puede
+        // imprimirse para meses de un año ya cerrado).
         const { data: grado, error: eG } = await supabase.from('grados').select('*').eq('id', gradoId).single();
-        const { data: alumnos, error: eAl } = await supabase
-            .from('alumnos')
-            .select('*')
-            .eq('grado_id', gradoId)
-            .eq('activo', true)
-            .order('apellidos');
+        const { data: anioAcademico, error: eAnio } = await supabase.from('años_academicos').select('*').eq('anio', anio).maybeSingle();
+        const { data: matriculas, error: eAl } = anioAcademico
+            ? await supabase.from('matriculas').select('*, alumnos(*)').eq('grado_id', gradoId).eq('año_academico_id', anioAcademico.id).eq('activo', true)
+            : { data: [], error: null };
 
-        const errorDeRed = [eG, eAl].find(e => e && esErrorDeRed(e));
+        const errorDeRed = [eG, eAnio, eAl].find(e => e && esErrorDeRed(e));
         if (errorDeRed) { mostrarBannerSinConexion(() => renderReporte(gradoId, mes, blanco)); return; }
         ocultarBannerSinConexion();
         if (eG) return notificarError(eG, 'Error cargando el grado');
         if (eAl) return notificarError(eAl, 'Error cargando alumnos');
+        if (!anioAcademico) return notificarError({ message: `No hay un año académico ${anio} configurado` }, 'Error');
+
+        const alumnos = (matriculas || []).map(m => m.alumnos).filter(Boolean).sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || ''));
 
         let porAlumno = {};
         if (!blanco && alumnos?.length) {

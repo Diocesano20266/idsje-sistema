@@ -30,13 +30,29 @@
 //  el mismo set de ocupación de docentes (`ocupadoDocente`), así que la
 //  garantía real que importa — ningún docente en dos grados a la vez —
 //  se sigue chequeando de forma global, en la misma corrida.
+//
+//  Modo debug / mejor esfuerzo: generarHorario(config, seed, opciones) acepta
+//  { debug, permitirParcial }. `debug:true` no cambia el resultado — solo
+//  imprime en consola, cuando ningún intento encuentra una solución 100%
+//  completa, qué materia/docente quedó bloqueado y cuántas horas le faltaron.
+//  `permitirParcial:true` sí cambia el contrato de retorno: en vez de `null`,
+//  devuelve { completo, filas, materiasNoColocadas } con la mejor combinación
+//  parcial encontrada (sin choques) más el detalle de lo que no entró. Sin
+//  `opciones` (el uso de siempre), el comportamiento es idéntico al anterior:
+//  Array de filas o `null`.
 // ═══════════════════════════════════════════
 import { DIAS_HORARIO, BLOQUES_HORARIO } from './config.js';
 
-const MAX_INTENTOS_POR_GRADO = 20000; // backtracking local, por grado
-const REINTENTOS = 8; // órdenes de grados/semillas distintas antes de rendirse
+const MAX_INTENTOS_POR_GRADO = 100000; // backtracking local, por grado
+const REINTENTOS = 15; // órdenes de grados/semillas distintas antes de rendirse
 const MATERIAS_IMPORTANTES = /matem[aá]tica|lenguaje/i;
 const ULTIMO_PERIODO_MANANA = 7; // 6:45–12:00
+
+// Pesos de las heurísticas blandas de orden (ver el armado de `clave` en
+// resolverGrado). Son multiplicadores de probabilidad, no tiers duros: un
+// peso de 1 = neutro, más alto = "tiende a ir antes" pero sin garantía.
+const PESO_PREFERENCIA_BLOQUE_DOBLE = 1.5; // antes era un tier absoluto — ahora una preferencia MUY suave
+const PESO_PREFERENCIA_MEDIA_JORNADA = 2;  // este sí conviene mantenerlo más marcado: menos slots disponibles de verdad
 
 // Agrupa los períodos de clase en segmentos consecutivos (separados por
 // receso/almuerzo) y arma pares dentro de cada segmento, dejando el período
@@ -124,44 +140,50 @@ function expandirBloques(asignacionesGrado, disponibilidadDocente, cargaPorDocen
  * ocupaciones de este grado en `ocupadoDocente` — el llamador las conserva
  * al pasar al siguiente grado. Si falla, deshace todo lo que haya marcado.
  */
-function resolverGrado(asignacionesGrado, disponibilidadDocente, cargaPorDocente, ocupadoDocente, periodosPorDocenteDia, rng) {
+function resolverGrado(asignacionesGrado, disponibilidadDocente, cargaPorDocente, ocupadoDocente, periodosPorDocenteDia, rng, permitirParcial = false) {
     let variables = expandirBloques(asignacionesGrado, disponibilidadDocente, cargaPorDocente);
-    if (!variables.length) return [];
+    if (!variables.length) return permitirParcial ? { filas: [], completo: true } : [];
 
-    // Orden de asignación dentro del grado:
-    // a) TODOS los bloques dobles antes que CUALQUIER bloque suelto — si un suelto se coloca
-    //    antes de que el día tenga varias posiciones dobles ya ocupadas, el cursor todavía está
-    //    cerca del principio del día, así que el suelto termina "cerrando" el día casi entero
-    //    (desperdiciando 4-5 posiciones) en vez de caer en el hueco al final que se buscaba;
-    // b) media jornada primero (menos slots posibles);
-    // c) entre bloques del mismo tamaño y disponibilidad, los docentes con más carga total
-    //    (más horas repartidas entre varios grados — MRV: son los más difíciles de encajar
-    //    más adelante, cuando queden menos huecos libres) tienden a ir primero.
+    // Orden de asignación dentro del grado: una única clave pseudoaleatoria
+    // ponderada, NO tiers duros. Antes, "bloque doble" y "media jornada" eran
+    // criterios de ordenamiento ABSOLUTOS (todos los dobles antes que
+    // cualquier suelto, sin excepción) — en la práctica del IDSJE (5-8 grados,
+    // 10 materias cada uno, horas 2/4/6, varios docentes compartidos) eso
+    // resultaba demasiado rígido: forzaba siempre el mismo tipo de bloque
+    // primero aunque la carga real del docente pidiera otra cosa, y hacía que
+    // REINTENTOS con otra seed no cambiara casi nada la búsqueda.
     //
-    // Ojo con (c): NO es un orden determinista fijo. Se implementa como una clave
-    // pseudoaleatoria ponderada por la carga (más carga → clave típicamente más chica →
-    // va antes), no como "sort descendente por carga". La razón: si un mismo docente da
-    // la misma materia en TODOS los grados (frecuente: Informática, Educación Física...) y
-    // el orden fuera un sort estricto por carga, ese docente terminaría SIEMPRE primero en
-    // la lista de CADA grado — y como el primer bloque de un grado siempre cae en la
-    // posición 0 del día (todavía no se marcó nada ese día), ese único docente necesitaría
-    // "la posición 0" en los 5 días para CADA grado que atiende. Con 6+ grados compitiendo
-    // por ese mismo casillero es un choque garantizado (palomar), no un problema de
-    // búsqueda, y ningún reintento con otra seed lo arregla porque el orden es siempre
-    // el mismo. Con la clave ponderada, la prioridad sigue estando sesgada hacia los
-    // docentes más cargados (se gana lo que pide la búsqueda: menos backtracking), pero
-    // varía con la seed, así que REINTENTOS sí puede encontrar un orden que funcione.
-    // Además, (ver más abajo) un bloque doble que no logra colocarse ya no hace fallar
-    // toda la rama: se intenta partido en dos sueltos antes de descartarlo.
+    // Ahora cada variable recibe un peso = pesoTamaño × pesoDisponibilidad ×
+    // pesoCarga, y la clave es un valor exponencial aleatorio dividido por ese
+    // peso (Efraimidis-Spirakis: ordenar ascendente por esta clave equivale a
+    // un muestreo ponderado sin reemplazo). Un peso más alto → tiende a ir
+    // antes, pero nunca lo garantiza — sigue siendo un muestreo, no un tier.
+    // - Bloques dobles: preferencia MUY suave (peso chico) — antes eran el
+    //   criterio dominante; ahora es solo una inclinación.
+    // - Media jornada: preferencia algo más marcada — a diferencia de lo
+    //   anterior, esto sí refleja una escasez real de slots disponibles.
+    // - Carga del docente (MRV): igual que antes, para intentar ubicar
+    //   primero a los docentes más difíciles de encajar más adelante.
+    //   Ponderado (no un sort estricto) por la misma razón de siempre: si un
+    //   solo docente da una materia en TODOS los grados, un sort estricto por
+    //   carga lo pondría SIEMPRE primero en cada grado — y como el primer
+    //   bloque de un grado cae en la posición 0 del día, eso es un choque de
+    //   palomar garantizado en cuanto hay más grados que días (5). Ponderado,
+    //   REINTENTOS con otra seed sí puede encontrar un orden que funcione.
+    //
+    // Además (ver el backtracking más abajo) un bloque doble que no logra
+    // colocarse ya no hace fallar toda la rama: se intenta partido en dos
+    // sueltos antes de descartarlo — la preferencia por dobles es blanda en
+    // dos sentidos distintos, en el orden Y en la restricción en sí.
     variables = variables
-        .map(v => ({ v, clave: -Math.log(1 - rng()) / ((v.carga || 0) + 1) }))
-        .sort((a, b) => {
-            if (a.v.size !== b.v.size) return b.v.size - a.v.size;
-            const rx = a.v.disponibilidad === 'manana' ? 0 : 1;
-            const ry = b.v.disponibilidad === 'manana' ? 0 : 1;
-            if (rx !== ry) return rx - ry;
-            return a.clave - b.clave;
+        .map(v => {
+            const pesoSize = v.size === 2 ? PESO_PREFERENCIA_BLOQUE_DOBLE : 1;
+            const pesoDisponibilidad = v.disponibilidad === 'manana' ? PESO_PREFERENCIA_MEDIA_JORNADA : 1;
+            const pesoCarga = (v.carga || 0) + 1;
+            const peso = pesoSize * pesoDisponibilidad * pesoCarga;
+            return { v, clave: -Math.log(1 - rng()) / peso };
         })
+        .sort((a, b) => a.clave - b.clave)
         .map(x => x.v);
 
     const diasUsadosPorMateria = new Set(); // heurística blanda, solo de este grado
@@ -174,6 +196,21 @@ function resolverGrado(asignacionesGrado, disponibilidadDocente, cargaPorDocente
 
     const asignado = new Array(variables.length).fill(null);
     let intentos = 0;
+
+    // Para el modo "mejor esfuerzo": si el backtracking termina sin éxito,
+    // en vez de tirar todo, se reconstruye la solución parcial más profunda
+    // que se haya alcanzado en cualquier punto de la búsqueda. `asignado[0..idx-1]`
+    // es siempre una asignación válida (sin choques) en el momento en que
+    // backtrack(idx) arranca — por construcción del backtracking chronológico —
+    // así que basta con recordar el mayor `idx` visto y una copia de esa porción.
+    let mejorProfundidad = 0;
+    let mejorAsignado = [];
+    function registrarProgreso(idx) {
+        if (idx > mejorProfundidad) {
+            mejorProfundidad = idx;
+            mejorAsignado = asignado.slice(0, idx);
+        }
+    }
 
     function candidatosPara(v) {
         const candidatos = [];
@@ -261,6 +298,7 @@ function resolverGrado(asignacionesGrado, disponibilidadDocente, cargaPorDocente
     // (que pueden caer en días distintos). Así nunca se pierde una asignación válida
     // solo por no entrar en bloque de 2.
     function backtrack(idx) {
+        registrarProgreso(idx);
         if (idx >= variables.length) return true;
         const v = variables[idx];
 
@@ -300,24 +338,36 @@ function resolverGrado(asignacionesGrado, disponibilidadDocente, cargaPorDocente
     }
 
     const exito = backtrack(0);
-    if (!exito) return null;
 
-    const filas = [];
-    variables.forEach((v, i) => {
-        asignado[i].forEach(({ v: vColocada, c }) => {
-            c.posicion.periodos.slice(0, vColocada.size).forEach(periodo => {
-                filas.push({
-                    grado_materia_id: v.asignacionId,
-                    grado_id: v.gradoId,
-                    materia_id: v.materiaId,
-                    docente_id: v.docenteId,
-                    dia: c.dia,
-                    periodo,
+    function construirFilas(vars, asigns) {
+        const filas = [];
+        vars.forEach((v, i) => {
+            const entradas = asigns[i];
+            if (!entradas) return; // variable que no llegó a colocarse (solo pasa en el corte parcial)
+            entradas.forEach(({ v: vColocada, c }) => {
+                c.posicion.periodos.slice(0, vColocada.size).forEach(periodo => {
+                    filas.push({
+                        grado_materia_id: v.asignacionId,
+                        grado_id: v.gradoId,
+                        materia_id: v.materiaId,
+                        docente_id: v.docenteId,
+                        dia: c.dia,
+                        periodo,
+                    });
                 });
             });
         });
-    });
-    return filas;
+        return filas;
+    }
+
+    if (exito) {
+        const filas = construirFilas(variables, asignado);
+        return permitirParcial ? { filas, completo: true } : filas;
+    }
+
+    if (!permitirParcial) return null;
+    const filasParciales = construirFilas(variables.slice(0, mejorProfundidad), mejorAsignado);
+    return { filas: filasParciales, completo: false };
 }
 
 /**
@@ -337,14 +387,33 @@ function resolverGrado(asignacionesGrado, disponibilidadDocente, cargaPorDocente
  * @param {Object.<string,'completa'|'manana'>} [config.disponibilidadDocente] - docenteId -> disponibilidad. Por defecto 'completa'.
  * @param {number} [seed] - semilla del PRNG. La misma seed + config siempre da el mismo resultado
  *        (si el primer intento interno encuentra solución, que es el caso normal).
- * @returns {Array<{grado_materia_id:string, grado_id:string, materia_id:string, docente_id:string, dia:string, periodo:number}>|null}
- *          filas listas para guardar en la tabla `horarios` (una fila por período — un bloque de
- *          2 períodos genera 2 filas con el mismo día/materia/docente), o null si ningún intento
- *          encontró una combinación sin conflictos.
+ * @param {Object} [opciones]
+ * @param {boolean} [opciones.debug=false] - si es true, cuando ningún intento encuentra una
+ *        solución 100% completa, imprime en consola (console.warn) qué materia/docente quedó
+ *        bloqueado y con cuántas horas sin ubicar. No cambia el valor de retorno.
+ * @param {boolean} [opciones.permitirParcial=false] - si es true, cambia el contrato de retorno:
+ *        en vez de `null` cuando nadie encuentra una solución completa, devuelve
+ *        { completo, filas, materiasNoColocadas } con la mejor combinación parcial encontrada
+ *        (sin choques, ver verificarConflictos) y el detalle de qué no se pudo ubicar. Si SÍ se
+ *        encuentra una solución completa, igual devuelve ese mismo shape con completo:true.
+ * @returns {Array<{grado_materia_id:string, grado_id:string, materia_id:string, docente_id:string, dia:string, periodo:number}>|null
+ *           |{completo:boolean, filas:Array, materiasNoColocadas:Array<{asignacionId,gradoId,materiaId,materiaNombre,docenteId,horasRequeridas,horasColocadas}>}}
+ *          Sin `opciones` (uso de siempre): filas listas para guardar en la tabla `horarios` (una
+ *          fila por período — un bloque de 2 períodos genera 2 filas con el mismo día/materia/
+ *          docente), o null si ningún intento encontró una combinación 100% completa y sin
+ *          conflictos. Con `opciones.permitirParcial`: ver arriba.
  */
-export function generarHorario(config, seed = 1) {
+export function generarHorario(config, seed = 1, opciones = {}) {
+    // Canary de versión: se imprime SIEMPRE (no depende de debug/permitirParcial) para
+    // poder confirmar desde la consola del navegador que el archivo que corre es este
+    // (con soporte de opciones) y no una copia vieja/cacheada de generador-horarios.js
+    // que ignoraría silenciosamente el 3er argumento. Si al generar un horario esta
+    // línea NO aparece en consola, el navegador o el deploy están sirviendo otra versión.
+    console.log('[generador-horarios] v2 (debug/permitirParcial) iniciando — seed=', seed, 'opciones=', opciones);
+
+    const { debug = false, permitirParcial = false } = opciones || {};
     const { asignaciones = [], disponibilidadDocente = {} } = config || {};
-    if (!asignaciones.length) return [];
+    if (!asignaciones.length) return permitirParcial ? { completo: true, filas: [], materiasNoColocadas: [] } : [];
 
     const porGrado = new Map();
     asignaciones.forEach(a => {
@@ -365,21 +434,34 @@ export function generarHorario(config, seed = 1) {
 
     for (let intento = 0; intento < REINTENTOS; intento++) {
         const resultado = intentarUnaVez(gradosEntries, disponibilidadDocente, cargaPorDocente, seed + intento * 104729);
-        if (resultado) return resultado;
+        if (resultado) return permitirParcial ? { completo: true, filas: resultado, materiasNoColocadas: [] } : resultado;
     }
-    return null;
+
+    // Ningún intento (de los REINTENTOS) encontró una solución 100% completa. Se hace UNA
+    // pasada más en modo "mejor esfuerzo": a diferencia de intentarUnaVez, esta no aborta
+    // apenas un grado falla — sigue con el resto y junta, por cada grado, la mejor combinación
+    // parcial que el backtracking haya alcanzado (ver resolverGrado/registrarProgreso).
+    const mejorEsfuerzo = intentarMejorEsfuerzo(gradosEntries, disponibilidadDocente, cargaPorDocente, seed, asignaciones);
+    if (debug) logDiagnosticoFallo(mejorEsfuerzo, seed);
+
+    if (!permitirParcial) return null;
+    return mejorEsfuerzo;
 }
 
-function intentarUnaVez(gradosEntries, disponibilidadDocente, cargaPorDocente, seed) {
-    const rng = crearRng(seed);
-
-    // Orden de grados: los de mayor demanda total primero (los más difíciles de
-    // encajar si se dejan para el final, cuando ya quedan menos huecos libres).
-    const gradosOrdenados = mezclar(gradosEntries, rng).sort((a, b) => {
+// Orden de grados: los de mayor demanda total primero (los más difíciles de
+// encajar si se dejan para el final, cuando ya quedan menos huecos libres).
+// Compartido por intentarUnaVez e intentarMejorEsfuerzo.
+function ordenarGrados(gradosEntries, rng) {
+    return mezclar(gradosEntries, rng).sort((a, b) => {
         const totalA = a[1].reduce((s, x) => s + (Math.max(0, Math.min(10, parseInt(x.horasPorSemana, 10) || 0))), 0);
         const totalB = b[1].reduce((s, x) => s + (Math.max(0, Math.min(10, parseInt(x.horasPorSemana, 10) || 0))), 0);
         return totalB - totalA;
     });
+}
+
+function intentarUnaVez(gradosEntries, disponibilidadDocente, cargaPorDocente, seed) {
+    const rng = crearRng(seed);
+    const gradosOrdenados = ordenarGrados(gradosEntries, rng);
 
     const ocupadoDocente = new Set();       // GLOBAL — compartido por todos los grados de este intento
     const periodosPorDocenteDia = {};       // GLOBAL — heurística blanda de huecos del docente
@@ -394,6 +476,72 @@ function intentarUnaVez(gradosEntries, disponibilidadDocente, cargaPorDocente, s
     }
 
     return filas;
+}
+
+// Modo "mejor esfuerzo": resuelve TODOS los grados igual que intentarUnaVez, pero un grado
+// que no logra completarse no aborta la corrida — se queda con su mejor solución parcial
+// (permitirParcial:true en resolverGrado) y se sigue con el resto de los grados, para que
+// una sola materia/docente bloqueado en un grado no oculte que los demás sí se resolvieron bien.
+function intentarMejorEsfuerzo(gradosEntries, disponibilidadDocente, cargaPorDocente, seed, asignaciones) {
+    const rng = crearRng(seed);
+    const gradosOrdenados = ordenarGrados(gradosEntries, rng);
+
+    const ocupadoDocente = new Set();
+    const periodosPorDocenteDia = {};
+    const filas = [];
+    let completo = true;
+
+    for (const [, asignacionesGrado] of gradosOrdenados) {
+        const resultadoGrado = resolverGrado(
+            asignacionesGrado, disponibilidadDocente, cargaPorDocente, ocupadoDocente, periodosPorDocenteDia, rng, true
+        );
+        filas.push(...resultadoGrado.filas);
+        if (!resultadoGrado.completo) completo = false;
+    }
+
+    const materiasNoColocadas = calcularNoColocadas(asignaciones, filas);
+    return { completo: completo && materiasNoColocadas.length === 0, filas, materiasNoColocadas };
+}
+
+// Compara, para cada asignación (grado_materia) original, cuántas horas quedaron
+// realmente colocadas en `filas` contra las que pedía — cualquier faltante (parcial
+// o total) se reporta. Funciona igual para una corrida completa (da []) o parcial.
+function calcularNoColocadas(asignaciones, filas) {
+    const horasColocadasPorAsignacion = {};
+    filas.forEach(f => {
+        horasColocadasPorAsignacion[f.grado_materia_id] = (horasColocadasPorAsignacion[f.grado_materia_id] || 0) + 1;
+    });
+
+    return asignaciones
+        .map(a => {
+            const horasRequeridas = Math.max(0, Math.min(10, parseInt(a.horasPorSemana, 10) || 0));
+            const horasColocadas = horasColocadasPorAsignacion[a.id] || 0;
+            if (horasColocadas >= horasRequeridas) return null;
+            return {
+                asignacionId: a.id,
+                gradoId: a.gradoId,
+                materiaId: a.materiaId,
+                materiaNombre: a.materiaNombre || '',
+                docenteId: a.docenteId,
+                horasRequeridas,
+                horasColocadas,
+            };
+        })
+        .filter(Boolean);
+}
+
+// Modo debug: no cambia nada del resultado, solo informa en consola qué quedó bloqueado.
+function logDiagnosticoFallo(mejorEsfuerzo, seed) {
+    const { materiasNoColocadas } = mejorEsfuerzo;
+    console.warn(`[generador-horarios] Ningún intento (${REINTENTOS} órdenes distintos desde la seed ${seed}) encontró una solución 100% completa.`);
+    if (!materiasNoColocadas.length) {
+        console.warn('[generador-horarios] La mejor combinación parcial encontrada igual quedó completa — revisar verificarConflictos() por posibles choques residuales.');
+        return;
+    }
+    console.warn(`[generador-horarios] ${materiasNoColocadas.length} asignación(es) quedaron sin ubicar del todo:`);
+    materiasNoColocadas.forEach(m => {
+        console.warn(`  · Grado ${m.gradoId} — "${m.materiaNombre || m.materiaId}" (docente ${m.docenteId}): ${m.horasColocadas}/${m.horasRequeridas} horas ubicadas.`);
+    });
 }
 
 /**

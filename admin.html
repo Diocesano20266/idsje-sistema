@@ -105,6 +105,20 @@
         .mod-tec{background:#fef3e2;color:#a06010;border:1px solid #f5ddb0}
         .mod-voc{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
         .empty-bubbles{padding:32px;text-align:center;color:#94a3b8;font-size:13px}
+        .grados-categoria-grupo{margin-bottom:22px}
+        .grados-categoria-grupo:last-child{margin-bottom:0}
+
+        /* ── AÑO ACADÉMICO (badge en topbar) ── */
+        .anio-activo-badge{background:rgba(27,58,107,.08);color:#1B3A6B;border:1px solid rgba(27,58,107,.2);padding:6px 14px;border-radius:100px;font-size:12px;font-weight:700;white-space:nowrap}
+        .anio-activo-badge.anio-badge-alerta{background:#fef3c7;color:#92400e;border-color:#fde68a}
+
+        /* ── MATRÍCULA DE ALUMNOS ── */
+        .mat-fila{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid #f7f9fc;flex-wrap:wrap}
+        .mat-fila:last-child{border-bottom:none}
+        .mat-nombre{flex:1;min-width:200px;font-size:13px;font-weight:600;color:#0a1628}
+        .mat-estado{min-width:160px;font-size:12px;color:#475569}
+        .mat-acciones{display:flex;align-items:center;gap:8px}
+        .mat-acciones select{padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;outline:none;background:#fff}
 
         .grado-row-card{display:flex;align-items:center;gap:16px;padding:14px 16px;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:10px;cursor:pointer;transition:all .18s;background:#fff}
         .grado-row-card:last-child{margin-bottom:0}
@@ -389,6 +403,19 @@
                 <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M5 5h6M5 8h4M5 11h5" stroke="rgba(255,255,255,.6)" stroke-width="1.2"/></svg>
                 <span class="nav-txt">Otros Reportes</span>
             </div>
+            <div class="nav-group-label" style="margin-top:14px">Año Académico</div>
+            <div class="nav-item" data-vista="anio-academico" onclick="mostrarVista('anio-academico')">
+                <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="2.5" width="13" height="12" rx="1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M1.5 6h13M4.5 1.5v2M11.5 1.5v2" stroke="rgba(255,255,255,.6)" stroke-width="1.2" stroke-linecap="round"/></svg>
+                <span class="nav-txt">Año Académico</span>
+            </div>
+            <div class="nav-item" data-vista="matricula" onclick="mostrarVista('matricula')">
+                <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M3 3h10v10H3z" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M5.5 8l1.7 1.7L10.5 6" stroke="rgba(255,255,255,.6)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="nav-txt">Matrícula de Alumnos</span>
+            </div>
+            <div class="nav-item" data-vista="categorias-grado" onclick="mostrarVista('categorias-grado')">
+                <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="2" width="5" height="5" rx="1" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><rect x="9.5" y="2" width="5" height="5" rx="1" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><rect x="1.5" y="9" width="5" height="5" rx="1" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><rect x="9.5" y="9" width="5" height="5" rx="1" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/></svg>
+                <span class="nav-txt">Categorías de Grados</span>
+            </div>
             <div class="nav-group-label" style="margin-top:14px">Sistema</div>
             <div class="nav-item" data-vista="configuracion" onclick="mostrarVista('configuracion')">
                 <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M8 1.5v2M8 12.5v2M14.5 8h-2M3.5 8h-2M12.4 3.6l-1.4 1.4M5 9.6l-1.4 1.4M12.4 12.4l-1.4-1.4M5 6.4L3.6 5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" stroke-linecap="round"/></svg>
@@ -416,9 +443,12 @@
             <button class="hamburger" onclick="toggleSidebar()" id="hamburger-btn">
                 <span></span><span></span><span></span>
             </button>
-            <div>
-                <div class="tb-title" id="topbar-titulo">Grados y Secciones</div>
-                <div class="tb-sub">Instituto Diocesano San Juan Evangelista · 2026</div>
+            <div style="display:flex;align-items:center;gap:12px">
+                <div>
+                    <div class="tb-title" id="topbar-titulo">Grados y Secciones</div>
+                    <div class="tb-sub">Instituto Diocesano San Juan Evangelista · 2026</div>
+                </div>
+                <span class="anio-activo-badge" id="anio-activo-badge">—</span>
             </div>
             <div class="topbar-actions" id="topbar-actions">
                 <button class="btn-primary" onclick="abrirModalGrado()">+ Nuevo Grado</button>
@@ -714,6 +744,38 @@
                 </div>
             </div>
 
+            <!-- AÑO ACADÉMICO -->
+            <div id="vista-anio-academico" class="hidden">
+                <div class="grados-section">
+                    <div class="gs-header">
+                        <div class="gs-title"><span class="gs-dot"></span>Años académicos configurados</div>
+                    </div>
+                    <div class="gs-body" id="anio-academico-body">
+                        <div class="empty-bubbles">Cargando…</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MATRÍCULA DE ALUMNOS -->
+            <div id="vista-matricula" class="hidden">
+                <div class="tabla-wrap">
+                    <div class="tabla-header">
+                        <div class="tabla-title">📋 Catálogo de alumnos y su matrícula del año activo</div>
+                    </div>
+                    <div id="matricula-body" style="padding:8px 20px"></div>
+                </div>
+            </div>
+
+            <!-- CATEGORÍAS DE GRADOS -->
+            <div id="vista-categorias-grado" class="hidden">
+                <div class="tabla-wrap">
+                    <table>
+                        <thead><tr><th>Nombre</th><th>Descripción</th><th>Orden</th><th>Acciones</th></tr></thead>
+                        <tbody id="tbody-categorias-grado"></tbody>
+                    </table>
+                </div>
+            </div>
+
         </div>
     </div>
 
@@ -729,6 +791,7 @@
             </div>
             <div class="field"><label>Año</label><input type="number" id="grado-anio" value="2026"></div>
             <div class="field"><label>Docente Guía</label><select id="grado-guia"></select></div>
+            <div class="field"><label>Categoría</label><select id="grado-categoria"></select></div>
             <div class="modal-actions">
                 <button class="btn-primary" id="btn-guardar-grado" onclick="guardarGrado()">Guardar</button>
                 <button class="btn-secondary" onclick="cerrarModal('modal-grado')">Cancelar</button>
@@ -847,11 +910,58 @@
             <div class="field"><label>NIE</label><input type="text" id="alumno-nie" placeholder="Número de Identificación Estudiantil"></div>
             <div class="field"><label>Apellidos</label><input type="text" id="alumno-apellidos" placeholder="APELLIDOS"></div>
             <div class="field"><label>Nombres</label><input type="text" id="alumno-nombres" placeholder="NOMBRES"></div>
-            <div class="field"><label>Grado y Sección</label><select id="alumno-grado"></select></div>
-            <div class="field"><label>Año de ingreso</label><input type="number" id="alumno-anio" value="2026"></div>
+            <div class="field"><label>Grado y Sección (año activo)</label><select id="alumno-grado"></select></div>
             <div class="modal-actions">
                 <button class="btn-primary" id="btn-guardar-alumno" onclick="guardarAlumno()">Guardar</button>
                 <button class="btn-secondary" onclick="cerrarModal('modal-alumno')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: NUEVO AÑO ACADÉMICO -->
+    <div class="modal-overlay" id="modal-nuevo-anio">
+        <div class="modal">
+            <div class="modal-title">Nuevo Año Académico</div>
+            <div class="field"><label>Año</label><input type="number" id="nanio-numero" placeholder="2027"></div>
+            <div class="field"><label>Fecha de inicio</label><input type="date" id="nanio-inicio"></div>
+            <div class="field"><label>Fecha de fin</label><input type="date" id="nanio-fin"></div>
+            <div class="field" id="nanio-copiar-wrap">
+                <label class="mgm-check" style="background:#f8fafc;padding:10px 12px;border-radius:8px">
+                    <input type="checkbox" id="nanio-copiar">
+                    <span>Copiar la estructura del año activo (grados, materias asignadas, docentes y horarios)</span>
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-primary" id="btn-guardar-nuevo-anio" onclick="guardarNuevoAnio()">Crear año</button>
+                <button class="btn-secondary" onclick="cerrarModal('modal-nuevo-anio')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CAMBIAR AÑO ACTIVO -->
+    <div class="modal-overlay" id="modal-cambiar-anio">
+        <div class="modal">
+            <div class="modal-title">Cambiar Año Activo</div>
+            <div class="field"><label>Año académico</label><select id="canio-select"></select></div>
+            <div class="info-box">⚠ Todo el sistema (Grados, Alumnos matriculados, Horarios, Asistencias, etc.) pasará a mostrar los datos de este año.</div>
+            <div class="modal-actions">
+                <button class="btn-primary" id="btn-guardar-cambio-anio" onclick="guardarCambioAnioActivo()">Confirmar cambio</button>
+                <button class="btn-secondary" onclick="cerrarModal('modal-cambiar-anio')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CATEGORÍA DE GRADO -->
+    <div class="modal-overlay" id="modal-categoria-grado">
+        <div class="modal">
+            <div class="modal-title" id="modal-categoria-grado-title">Nueva Categoría</div>
+            <input type="hidden" id="categoria-grado-id">
+            <div class="field"><label>Nombre</label><input type="text" id="categoria-grado-nombre" placeholder="Ej: Bachillerato Técnico"></div>
+            <div class="field"><label>Descripción (opcional)</label><input type="text" id="categoria-grado-descripcion"></div>
+            <div class="field"><label>Orden</label><input type="number" id="categoria-grado-orden" value="0"></div>
+            <div class="modal-actions">
+                <button class="btn-primary" id="btn-guardar-categoria-grado" onclick="guardarCategoriaGrado()">Guardar</button>
+                <button class="btn-secondary" onclick="cerrarModal('modal-categoria-grado')">Cancelar</button>
             </div>
         </div>
     </div>

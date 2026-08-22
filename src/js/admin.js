@@ -1364,16 +1364,20 @@ function construirConfigGenerador() {
     };
 }
 
+// debug:true no cambia el resultado (sigue siendo Array|null) — si ningún
+// intento encuentra una solución completa, generarHorario igual imprime en
+// consola (console.warn) qué materia/docente quedó bloqueado y con cuántas
+// horas. Abrí la consola del navegador (F12) antes de generar para verlo.
 window.ejecutarGenerarHorario = () => {
     if (!genAsignaciones.some(a => a.incluida)) { mostrarToast('Marcá al menos una materia para generar el horario', 'advertencia'); return; }
     genSeed = Date.now() % 100000;
-    genResultado = generarHorario(construirConfigGenerador(), genSeed);
+    genResultado = generarHorario(construirConfigGenerador(), genSeed, { debug: true });
     mostrarResultadoGenerador();
 };
 
 window.generarOtroHorario = () => {
     genSeed += 1;
-    genResultado = generarHorario(construirConfigGenerador(), genSeed);
+    genResultado = generarHorario(construirConfigGenerador(), genSeed, { debug: true });
     mostrarResultadoGenerador();
 };
 

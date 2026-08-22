@@ -4,7 +4,7 @@
 //       &cotidianas=0..10&integradoras=0..5&examenes=0..3
 // ═══════════════════════════════════════════
 import { supabase, verificarSesion } from './auth.js';
-import { INSTITUTO } from './config.js';
+import { INSTITUTO, getAñoActivo } from './config.js';
 import { notificarError, esErrorDeRed, mostrarBannerSinConexion, ocultarBannerSinConexion } from './utils.js';
 
 const MAX_COTIDIANAS   = 10;
@@ -41,10 +41,13 @@ async function init() {
 async function renderReporte(gradoId, materiaId, periodo, cantidades) {
     const cont = document.getElementById('contenedor-actividades');
     try {
-        const [{ data: grado, error: eG }, { data: gm, error: eGm }, { data: alumnos, error: eAl }] = await Promise.all([
+        const anioActivo = await getAñoActivo(supabase);
+        const [{ data: grado, error: eG }, { data: gm, error: eGm }, { data: matriculas, error: eAl }] = await Promise.all([
             supabase.from('grados').select('*').eq('id', gradoId).single(),
             supabase.from('grado_materia').select('*, materias(id, nombre)').eq('id', materiaId).single(),
-            supabase.from('alumnos').select('*').eq('grado_id', gradoId).eq('activo', true).order('apellidos'),
+            anioActivo
+                ? supabase.from('matriculas').select('*, alumnos(*)').eq('grado_id', gradoId).eq('año_academico_id', anioActivo.id).eq('activo', true)
+                : Promise.resolve({ data: [], error: null }),
         ]);
 
         const errorDeRed = [eG, eGm, eAl].find(e => e && esErrorDeRed(e));
@@ -53,8 +56,10 @@ async function renderReporte(gradoId, materiaId, periodo, cantidades) {
         if (eG) return notificarError(eG, 'Error cargando el grado');
         if (eGm) return notificarError(eGm, 'Error cargando la materia');
         if (eAl) return notificarError(eAl, 'Error cargando alumnos');
+        if (!anioActivo) return notificarError({ message: 'No hay un año académico activo configurado' }, 'Error');
 
-        cont.innerHTML = generarHTML(grado, gm, alumnos || [], periodo, cantidades);
+        const alumnos = (matriculas || []).map(m => m.alumnos).filter(Boolean).sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || ''));
+        cont.innerHTML = generarHTML(grado, gm, alumnos, periodo, cantidades);
     } catch (err) {
         if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => renderReporte(gradoId, materiaId, periodo, cantidades)); return; }
         notificarError(err, 'Error cargando el reporte');

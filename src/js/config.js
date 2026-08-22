@@ -18,6 +18,25 @@ export const INSTITUTO = {
 
 export const CONCEPTOS = ['E', 'MB', 'B', 'R', 'D'];
 
+// ── Años académicos ────────────────────────────
+// Recibe el cliente de Supabase como parámetro (en vez de importarlo de
+// auth.js) a propósito: auth.js importa SUPABASE_URL/SUPABASE_KEY de este
+// mismo archivo, así que importar `supabase` acá crearía una dependencia
+// circular (config.js → auth.js → config.js). Cada módulo que ya tiene
+// `supabase` importado de auth.js simplemente lo pasa: getAñoActivo(supabase).
+//
+// Devuelve la fila de `años_academicos` con activo = true, o null si no hay
+// ninguno configurado todavía (la UI debe mostrar una advertencia en ese caso).
+export async function getAñoActivo(supabaseClient) {
+    const { data, error } = await supabaseClient
+        .from('años_academicos')
+        .select('*')
+        .eq('activo', true)
+        .maybeSingle();
+    if (error) throw error;
+    return data || null;
+}
+
 // ── Horarios ──────────────────────────────────
 export const DIAS_HORARIO = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 

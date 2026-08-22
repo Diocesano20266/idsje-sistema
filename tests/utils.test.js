@@ -271,7 +271,7 @@ describe('generarHorario', () => {
         expect(generarHorario(configImposible, 1)).toBeNull();
     });
 
-    // ── Bloques de 2 períodos consecutivos ──
+    // ── Sin preferencia de bloques de 2 (cada hora es independiente) ──
     function agruparPeriodosPorGradoDia(filas) {
         const grupos = {};
         filas.forEach(f => {
@@ -282,21 +282,19 @@ describe('generarHorario', () => {
         return grupos;
     }
 
-    test('una materia con horas pares queda en un único bloque de 2 períodos consecutivos', () => {
-        // gm2 (Educación Física, D2, 2 horas) — con solo 2 horas, tiene que salir
-        // como UN bloque de 2 períodos seguidos en un mismo día, no dos días sueltos.
+    test('sin bloques de 2 obligatorios: cada hora es independiente y no necesita caer en períodos consecutivos', () => {
+        // gm2 (Educación Física, D2, 2 horas) — a diferencia de versiones
+        // anteriores del generador, ya NO se exige que las 2 horas caigan en
+        // un bloque de 2 períodos seguidos ni siquiera en el mismo día. Lo
+        // único que se garantiza es la cantidad exacta de horas y que el
+        // horario del grado siga sin huecos (ver el test de huecos más abajo).
         const resultado = generarHorario(configFactible, 42);
         const filasGm2 = resultado.filter(f => f.grado_materia_id === 'gm2');
-
         expect(filasGm2).toHaveLength(2);
-        const dias = new Set(filasGm2.map(f => f.dia));
-        expect(dias.size).toBe(1); // las 2 horas caen el mismo día
-
-        const periodos = filasGm2.map(f => f.periodo).sort((a, b) => a - b);
-        expect(periodos[1] - periodos[0]).toBe(1); // períodos consecutivos
+        expect(verificarConflictos(resultado).ok).toBe(true);
     });
 
-    test('una materia con horas impares deja exactamente un bloque suelto de 1 período y el resto en pares de 2', () => {
+    test('una materia con horas impares (5) coloca las 5 horas exactas, sin gaps ni choques, sin necesidad de pares', () => {
         const config = {
             asignaciones: [
                 { id: 'x1', gradoId: 'G1', materiaId: 'M9', materiaNombre: 'Test', docenteId: 'D9', horasPorSemana: 5 },
@@ -304,18 +302,13 @@ describe('generarHorario', () => {
         };
         const resultado = generarHorario(config, 5);
         expect(resultado).not.toBeNull();
+        expect(resultado).toHaveLength(5);
+        expect(verificarConflictos(resultado).ok).toBe(true);
 
-        const porDia = {};
-        resultado.forEach(f => { (porDia[f.dia] = porDia[f.dia] || []).push(f.periodo); });
-        const tamanosDeBloque = Object.values(porDia).map(periodos => periodos.length).sort((a, b) => a - b);
-
-        // 5 horas = 2 bloques de 2 + 1 bloque suelto de 1 → tamaños [1,2,2]
-        expect(tamanosDeBloque).toEqual([1, 2, 2]);
-
-        // Los bloques de tamaño 2 deben ser períodos consecutivos
-        Object.values(porDia).filter(p => p.length === 2).forEach(periodos => {
-            const [a, b] = [...periodos].sort((x, y) => x - y);
-            expect(b - a).toBe(1);
+        const grupos = agruparPeriodosPorGradoDia(resultado);
+        Object.values(grupos).forEach(periodos => {
+            const ordenados = [...periodos].sort((a, b) => a - b);
+            ordenados.forEach((periodo, i) => expect(periodo).toBe(i + 1));
         });
     });
 

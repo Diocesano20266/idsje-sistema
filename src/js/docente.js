@@ -2,7 +2,7 @@
 //  IDSJE — Panel Docente
 // ═══════════════════════════════════════════
 import { supabase, verificarSesion, cerrarSesion } from './auth.js';
-import { CONCEPTOS, DIAS_HORARIO, BLOQUES_HORARIO, ESTADOS_ASISTENCIA, TIPOS_EXPEDIENTE } from './config.js';
+import { CONCEPTOS, DIAS_HORARIO, BLOQUES_HORARIO, ESTADOS_ASISTENCIA, TIPOS_EXPEDIENTE, getAñoActivo } from './config.js';
 import {
     calcularNotaFinal,
     promedioPonderado,
@@ -25,7 +25,8 @@ import {
 let usuarioActual   = null;
 let gradoMatCache   = [];  // grado_materia asignadas al docente (con grados y materias embebidos)
 let gradosGuiaCache = [];  // grados donde el docente es guía (docente_guia_id)
-let alumnosPorGrado = {};  // conteo de alumnos activos por grado_id
+let alumnosPorGrado = {};  // conteo de alumnos matriculados (año activo) por grado_id
+let anioActivoCache = null; // fila de `años_academicos` con activo=true, o null si no hay ninguno configurado
 
 // Mi Horario
 let horarioDocenteCache = null; // null = aún no cargado; [] = cargado y vacío
@@ -79,6 +80,9 @@ async function init() {
 
 async function cargarDatosDocente() {
     try {
+        anioActivoCache = await getAñoActivo(supabase);
+        renderAnioActivoHeaderDocente();
+
         const [{ data: gm, error: eGm }, { data: guia, error: eGuia }] = await Promise.all([
             supabase.from('grado_materia').select('*, grados(id, nombre, seccion, modalidad, anio), materias(id, nombre)').eq('docente_id', usuarioActual.id),
             supabase.from('grados').select('*').eq('docente_guia_id', usuarioActual.id).order('nombre')
@@ -98,14 +102,17 @@ async function cargarDatosDocente() {
             ...gradosGuiaCache.map(g => g.id)
         ])];
 
+        // Conteo de alumnos MATRICULADOS en el año activo (ya no se puede leer
+        // alumnos.grado_id/activo directamente — ver supabase/migracion-años.sql).
         alumnosPorGrado = {};
-        if (gradoIds.length) {
-            const { data: alumnos } = await supabase
-                .from('alumnos')
-                .select('id, grado_id')
+        if (gradoIds.length && anioActivoCache) {
+            const { data: matriculas } = await supabase
+                .from('matriculas')
+                .select('grado_id')
+                .eq('año_academico_id', anioActivoCache.id)
                 .eq('activo', true)
                 .in('grado_id', gradoIds);
-            (alumnos || []).forEach(a => { alumnosPorGrado[a.grado_id] = (alumnosPorGrado[a.grado_id] || 0) + 1; });
+            (matriculas || []).forEach(m => { alumnosPorGrado[m.grado_id] = (alumnosPorGrado[m.grado_id] || 0) + 1; });
         }
 
         // Competencias Ciudadanas solo es visible/accesible si el docente es guía de algún grado
@@ -118,6 +125,15 @@ async function cargarDatosDocente() {
         }
         notificarError(err, 'Error cargando tus datos');
     }
+}
+
+// Muestra el año académico activo (o una advertencia si no hay ninguno) en
+// el header del panel docente — ver docente.html (#anio-activo-badge-docente).
+function renderAnioActivoHeaderDocente() {
+    const el = document.getElementById('anio-activo-badge-docente');
+    if (!el) return;
+    el.textContent = anioActivoCache ? `Año ${anioActivoCache.anio}` : '⚠ Sin año activo';
+    el.classList.toggle('anio-badge-alerta', !anioActivoCache);
 }
 
 function vistaActualDocente() {
@@ -361,19 +377,24 @@ async function cargarAsistenciaDia() {
     document.getElementById('lista-asistencia').innerHTML = '<div class="empty-state">Cargando…</div>';
     document.getElementById('asis-banner').classList.add('hidden');
 
+    if (!anioActivoCache) {
+        document.getElementById('lista-asistencia').innerHTML = '<div class="info-box">⚠ No hay un año académico activo configurado.</div>';
+        return;
+    }
+
     try {
-        const { data: alumnos, error: eAl } = await supabase
-            .from('alumnos')
-            .select('*')
+        const { data: matriculas, error: eAl } = await supabase
+            .from('matriculas')
+            .select('*, alumnos(*)')
             .eq('grado_id', asisGradoId)
-            .eq('activo', true)
-            .order('apellidos');
+            .eq('año_academico_id', anioActivoCache.id)
+            .eq('activo', true);
 
         if (eAl && esErrorDeRed(eAl)) { mostrarBannerSinConexion(() => cargarAsistenciaDia()); return; }
         ocultarBannerSinConexion();
         if (eAl) return notificarError(eAl, 'Error cargando alumnos');
 
-        alumnosAsis = alumnos || [];
+        alumnosAsis = (matriculas || []).map(m => m.alumnos).filter(Boolean).sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || ''));
         asisCache = {};
         asisEdit = {};
         asisRegistroInfo = null;
@@ -536,20 +557,31 @@ async function initVistaExpediente() {
     empty.classList.add('hidden');
     panel.classList.remove('hidden');
 
+    if (!anioActivoCache) {
+        empty.classList.remove('hidden');
+        panel.classList.add('hidden');
+        return;
+    }
+
     try {
         const gradoIds = grados.map(g => g.id);
         const { data, error } = await supabase
-            .from('alumnos')
-            .select('*')
+            .from('matriculas')
+            .select('grado_id, alumnos(*)')
             .in('grado_id', gradoIds)
-            .eq('activo', true)
-            .order('apellidos');
+            .eq('año_academico_id', anioActivoCache.id)
+            .eq('activo', true);
 
         if (error && esErrorDeRed(error)) { mostrarBannerSinConexion(() => initVistaExpediente()); return; }
         ocultarBannerSinConexion();
         if (error) return notificarError(error, 'Error cargando alumnos');
 
-        expAlumnos = data || [];
+        // Aplana grado_id (de la matrícula) sobre el alumno — el resto del código
+        // de expediente (ej. cambiarAlumnoExpediente) sigue usando alumno.grado_id.
+        expAlumnos = (data || [])
+            .filter(m => m.alumnos)
+            .map(m => ({ ...m.alumnos, grado_id: m.grado_id }))
+            .sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || ''));
         const sel = document.getElementById('exp-alumno');
         sel.innerHTML = '<option value="">— Seleccioná un alumno —</option>' +
             expAlumnos.map(a => `<option value="${a.id}">${a.apellidos}, ${a.nombres}</option>`).join('');
@@ -807,16 +839,18 @@ window.generarTablaNotas = async () => {
 async function cargarAlumnosYNotas() {
     renderSkeletonFilas('tbody-notas', 8, 5);
 
-    const { data: alumnos, error } = await supabase
-        .from('alumnos')
-        .select('*')
+    if (!anioActivoCache) { notificarError({ message: 'No hay un año académico activo' }, 'Error'); return; }
+
+    const { data: matriculas, error } = await supabase
+        .from('matriculas')
+        .select('*, alumnos(*)')
         .eq('grado_id', notasGradoId)
-        .eq('activo', true)
-        .order('apellidos');
+        .eq('año_academico_id', anioActivoCache.id)
+        .eq('activo', true);
 
     if (error) { notificarError(error, 'Error cargando alumnos'); return; }
 
-    alumnosNotas = alumnos || [];
+    alumnosNotas = (matriculas || []).map(m => m.alumnos).filter(Boolean).sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || ''));
 
     notasCache      = {};
     notasDetalle    = {};
@@ -1148,12 +1182,16 @@ async function cargarAlumnosComp() {
     if (!compGradoId) return;
     renderSkeletonFilas('tbody-comp', 8, 5);
 
-    const { data: alumnos, error } = await supabase
-        .from('alumnos')
-        .select('*')
+    if (!anioActivoCache) { notificarError({ message: 'No hay un año académico activo' }, 'Error'); return; }
+
+    const { data: matriculas, error } = await supabase
+        .from('matriculas')
+        .select('*, alumnos(*)')
         .eq('grado_id', compGradoId)
-        .eq('activo', true)
-        .order('apellidos');
+        .eq('año_academico_id', anioActivoCache.id)
+        .eq('activo', true);
+
+    const alumnos = (matriculas || []).map(m => m.alumnos).filter(Boolean).sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || ''));
 
     if (error) { notificarError(error, 'Error cargando alumnos'); return; }
 

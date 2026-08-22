@@ -481,6 +481,130 @@ describe('generarHorario', () => {
             ordenados.forEach((p, i) => expect(p).toBe(i + 1));
         });
     });
+
+    // ── Configuración real del IDSJE ──
+    test('escenario real del IDSJE (6 grados × 10 materias, horas 2/4/6 mixtas, docentes compartidos, algunos solo mañana) encuentra solución completa', () => {
+        const GRADOS = Array.from({ length: 6 }, (_, i) => `G${i + 1}`);
+        // Horas 2/4/6 mixtas, igual que la carga real del instituto. Idioma
+        // Extranjero, Educación en la Fe y Orientación tienen un único docente
+        // que da esa materia en LOS 6 grados (el caso más exigente para el
+        // heurístico de orden) y además solo están disponibles en la mañana.
+        const MATERIAS = [
+            { nombre: 'Matemática',              horas: 6, docentes: ['DM1', 'DM2'] },
+            { nombre: 'Lenguaje',                 horas: 6, docentes: ['DL1', 'DL2'] },
+            { nombre: 'Ciencias Naturales',       horas: 4, docentes: ['DC1', 'DC2'] },
+            { nombre: 'Estudios Sociales',        horas: 4, docentes: ['DS1', 'DS2'] },
+            { nombre: 'Idioma Extranjero',        horas: 4, docentes: ['DI1'] },
+            { nombre: 'Informática',              horas: 2, docentes: ['DIN1'] },
+            { nombre: 'Educación Física',         horas: 2, docentes: ['DEF1', 'DEF2'] },
+            { nombre: 'Educación en la Fe',       horas: 2, docentes: ['DR1'] },
+            { nombre: 'Orientación para la Vida', horas: 2, docentes: ['DO1'] },
+            { nombre: 'Módulo',                   horas: 4, docentes: ['DMO1', 'DMO2'] },
+        ];
+
+        const asignaciones = [];
+        let contador = 0;
+        GRADOS.forEach((gradoId, gi) => {
+            MATERIAS.forEach(m => {
+                const docenteId = m.docentes[gi % m.docentes.length];
+                asignaciones.push({
+                    id: `asig-${contador++}`,
+                    gradoId,
+                    materiaId: m.nombre,
+                    materiaNombre: m.nombre,
+                    docenteId,
+                    horasPorSemana: m.horas,
+                });
+            });
+        });
+
+        const disponibilidadDocente = { DI1: 'manana', DR1: 'manana', DO1: 'manana' };
+
+        const resultado = generarHorario({ asignaciones, disponibilidadDocente }, 2026);
+
+        expect(resultado).not.toBeNull();
+        expect(verificarConflictos(resultado).ok).toBe(true);
+
+        asignaciones.forEach(a => {
+            const horas = resultado.filter(f => f.grado_materia_id === a.id).length;
+            expect(horas).toBe(a.horasPorSemana);
+        });
+
+        const docentesManana = new Set(['DI1', 'DR1', 'DO1']);
+        resultado.forEach(f => {
+            if (docentesManana.has(f.docente_id)) expect(f.periodo).toBeLessThanOrEqual(7);
+        });
+
+        const grupos = {};
+        resultado.forEach(f => {
+            const key = `${f.grado_id}|${f.dia}`;
+            (grupos[key] = grupos[key] || []).push(f.periodo);
+        });
+        Object.values(grupos).forEach(periodos => {
+            const ordenados = [...periodos].sort((a, b) => a - b);
+            ordenados.forEach((p, i) => expect(p).toBe(i + 1));
+        });
+    });
+
+    // ── Modo "mejor esfuerzo" (opciones.permitirParcial) ──
+    test('con permitirParcial:true, un caso imposible devuelve la mejor combinación parcial en vez de null', () => {
+        // Mismo caso "imposible por pigeonhole" que ya prueba el modo por defecto:
+        // un docente de media jornada (máx. 35h/semana) con 40h de demanda repartidas
+        // entre 4 grados. Sin permitirParcial, generarHorario da null; con la opción
+        // activada, debe devolver lo que sí se pudo ubicar más el detalle de lo que no.
+        const configImposible = {
+            asignaciones: [
+                { id: 'a1', gradoId: 'G1', materiaId: 'M1', materiaNombre: 'X', docenteId: 'D1', horasPorSemana: 10 },
+                { id: 'a2', gradoId: 'G2', materiaId: 'M1', materiaNombre: 'X', docenteId: 'D1', horasPorSemana: 10 },
+                { id: 'a3', gradoId: 'G3', materiaId: 'M1', materiaNombre: 'X', docenteId: 'D1', horasPorSemana: 10 },
+                { id: 'a4', gradoId: 'G4', materiaId: 'M1', materiaNombre: 'X', docenteId: 'D1', horasPorSemana: 10 },
+            ],
+            disponibilidadDocente: { D1: 'manana' },
+        };
+
+        expect(generarHorario(configImposible, 1)).toBeNull(); // el modo por defecto no cambia
+
+        const resultado = generarHorario(configImposible, 1, { permitirParcial: true });
+
+        expect(resultado.completo).toBe(false);
+        expect(Array.isArray(resultado.filas)).toBe(true);
+        expect(verificarConflictos(resultado.filas).ok).toBe(true); // lo parcial tampoco tiene choques
+        expect(resultado.materiasNoColocadas.length).toBeGreaterThan(0);
+        resultado.materiasNoColocadas.forEach(m => {
+            expect(m.horasColocadas).toBeLessThan(m.horasRequeridas);
+            expect(m.docenteId).toBe('D1');
+        });
+    });
+
+    test('con permitirParcial:true, una configuración factible sigue devolviendo completo:true con materiasNoColocadas vacío', () => {
+        const resultado = generarHorario(configFactible, 42, { permitirParcial: true });
+        expect(resultado.completo).toBe(true);
+        expect(resultado.materiasNoColocadas).toEqual([]);
+        expect(verificarConflictos(resultado.filas).ok).toBe(true);
+    });
+
+    // ── Modo debug ──
+    test('con debug:true, al no encontrar solución completa registra en consola el motivo del bloqueo sin cambiar el resultado', () => {
+        const spy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+        const configImposible = {
+            asignaciones: [
+                { id: 'a1', gradoId: 'G1', materiaId: 'M1', materiaNombre: 'X', docenteId: 'D1', horasPorSemana: 10 },
+                { id: 'a2', gradoId: 'G2', materiaId: 'M1', materiaNombre: 'X', docenteId: 'D1', horasPorSemana: 10 },
+                { id: 'a3', gradoId: 'G3', materiaId: 'M1', materiaNombre: 'X', docenteId: 'D1', horasPorSemana: 10 },
+                { id: 'a4', gradoId: 'G4', materiaId: 'M1', materiaNombre: 'X', docenteId: 'D1', horasPorSemana: 10 },
+            ],
+            disponibilidadDocente: { D1: 'manana' },
+        };
+
+        const resultado = generarHorario(configImposible, 1, { debug: true });
+
+        expect(resultado).toBeNull(); // sin permitirParcial, el shape de retorno no cambia
+        expect(spy).toHaveBeenCalled();
+        const mensajes = spy.mock.calls.map(args => args.join(' ')).join('\n');
+        expect(mensajes).toMatch(/D1/); // menciona el docente bloqueado
+
+        spy.mockRestore();
+    });
 });
 
 describe('verificarConflictos', () => {

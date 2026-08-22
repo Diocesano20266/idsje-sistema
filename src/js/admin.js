@@ -1295,13 +1295,18 @@ async function renderVistaGenerador() {
 }
 
 // Análisis de viabilidad por carga docente, ANTES de siquiera intentar generar.
-// 5 días × 8h/día (P1-P10 salvo receso/almuerzo) = 40h/semana es el techo físico
-// real de un docente — por encima de eso ningún horario sin choques es posible,
-// sin importar cuánto tiempo o cuántos reintentos se le den al backtracking.
-// Entre 30 y 40h sigue siendo válido pero deja muy poco margen (alto riesgo de
-// que el generador no encuentre una combinación 100% completa).
-const CARGA_MAXIMA_FISICA = 40;
-const CARGA_RIESGO_ALTO   = 30;
+// 5 días × 10 períodos = 50 slots disponibles por semana es el techo físico
+// real de un docente (P1-P10, ver BLOQUES_HORARIO) — por encima de eso ningún
+// horario sin choques es posible, sin importar cuánto tiempo o cuántos
+// reintentos se le den al backtracking. El límite de "imposible" se deja en
+// 48 (no 50) porque llenarle a un docente los 50 slots exactos no deja NINGÚN
+// margen de maniobra al backtracking (tendría que acertar la única
+// combinación posible a la primera), así que en la práctica ya es
+// inviable antes de llegar al tope matemático. Entre 35 y 48h sigue siendo
+// válido pero deja muy poco margen (alto riesgo de que el generador no
+// encuentre una combinación 100% completa).
+const CARGA_MAXIMA_FISICA = 48;
+const CARGA_RIESGO_ALTO   = 35;
 const CARGA_ADVERTENCIA   = 20;
 
 function calcularCargaPorDocenteGenerador() {
@@ -1346,7 +1351,7 @@ function renderViabilidadGenerador() {
 
     const avisoImposible = imposibles.length
         ? `<div class="info-box" style="background:#fde8e8;border-color:#f5c2c2;color:#b52828;margin-top:10px">
-            🚫 ${imposibles.length} docente(s) superan las ${CARGA_MAXIMA_FISICA} horas semanales (el máximo físico: 5 días × 8 períodos) —
+            🚫 ${imposibles.length} docente(s) superan las ${CARGA_MAXIMA_FISICA} horas semanales (5 días × 10 períodos = 50 slots disponibles) —
             es matemáticamente imposible armar un horario sin choques mientras esto no se corrija.
             No se puede generar hasta reducir su carga o quitar/reasignar materias:
             ${imposibles.map(f => `${f.nombre} (${f.horas}h)`).join(', ')}.
@@ -1460,13 +1465,13 @@ function aplicarResultadoGenerador(resultado) {
 
 window.ejecutarGenerarHorario = () => {
     if (!genAsignaciones.some(a => a.incluida)) { mostrarToast('Marcá al menos una materia para generar el horario', 'advertencia'); return; }
-    if (genImposiblePorCarga) { mostrarToast('Hay docente(s) con más de 40 horas semanales — corregí su carga antes de generar', 'error'); return; }
+    if (genImposiblePorCarga) { mostrarToast(`Hay docente(s) con más de ${CARGA_MAXIMA_FISICA} horas semanales — corregí su carga antes de generar`, 'error'); return; }
     genSeed = Date.now() % 100000;
     aplicarResultadoGenerador(generarHorario(construirConfigGenerador(), genSeed, { debug: true, permitirParcial: true }));
 };
 
 window.generarOtroHorario = () => {
-    if (genImposiblePorCarga) { mostrarToast('Hay docente(s) con más de 40 horas semanales — corregí su carga antes de generar', 'error'); return; }
+    if (genImposiblePorCarga) { mostrarToast(`Hay docente(s) con más de ${CARGA_MAXIMA_FISICA} horas semanales — corregí su carga antes de generar`, 'error'); return; }
     genSeed += 1;
     aplicarResultadoGenerador(generarHorario(construirConfigGenerador(), genSeed, { debug: true, permitirParcial: true }));
 };

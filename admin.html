@@ -274,6 +274,7 @@
         .dem-tarjeta{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:20px 16px;text-align:center;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
         .dem-tarjeta::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--dem-color,#94a3b8)}
         .dem-tarjeta:hover{transform:translateY(-3px);box-shadow:0 10px 26px rgba(10,22,40,.1);border-color:var(--dem-color,#d4af37)}
+        .dem-tarjeta.activo{border-color:var(--dem-color,#d4af37);box-shadow:0 0 0 2px var(--dem-color,#d4af37)}
         .dem-tarjeta-icono{font-size:22px;margin-bottom:6px}
         .dem-tarjeta-umbral{font-family:'Playfair Display',serif;font-size:24px;font-weight:800;color:var(--dem-color,#0a1628)}
         .dem-tarjeta-label{font-size:11px;color:#475569;line-height:1.4;margin:6px 0 10px;min-height:30px}
@@ -735,21 +736,19 @@
                         <option value="">— Todos los grados —</option>
                     </select>
                 </div>
-                <div id="dem-tarjetas-wrap">
-                    <div class="info-box" style="background:#e8f4fd;border-color:#c3ddf5;color:#1a5f9a">
-                        Escala de consecuencias por deméritos activos (no redimidos) del alumno. Hacé clic en una tarjeta para ver los alumnos que están en ese nivel.
-                    </div>
-                    <div class="dem-tarjetas" id="dem-tarjetas">
-                        <div class="empty-bubbles">Cargando…</div>
-                    </div>
+                <div class="info-box" style="background:#e8f4fd;border-color:#c3ddf5;color:#1a5f9a">
+                    Elegí un grado para ver a <b>todos</b> sus alumnos (incluidos los que no tienen deméritos) con su nivel actual. Las tarjetas son contadores — hacé clic en una para filtrar la lista a ese nivel.
+                </div>
+                <div class="dem-tarjetas" id="dem-tarjetas">
+                    <div class="empty-bubbles">Cargando…</div>
                 </div>
 
-                <div id="dem-lista-wrap" class="hidden">
+                <div id="dem-roster-wrap" class="hidden" style="margin-top:20px">
                     <div class="dem-lista-header">
-                        <button class="btn-secondary" onclick="volverTarjetasDemerito()">← Volver a niveles</button>
-                        <div class="dem-lista-titulo" id="dem-lista-titulo"></div>
+                        <div class="dem-lista-titulo" id="dem-roster-titulo"></div>
+                        <button class="btn-secondary hidden" id="btn-dem-quitar-filtro" onclick="quitarFiltroNivelDemerito()">✕ Quitar filtro de nivel</button>
                     </div>
-                    <div class="exp-resultados" id="dem-lista-alumnos"></div>
+                    <div class="exp-resultados" id="dem-roster-alumnos"></div>
                 </div>
             </div>
 

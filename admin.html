@@ -267,6 +267,20 @@
         .exp-item-btn:hover{text-decoration:underline}
         .exp-item-btn-del{color:#b52828}
 
+        /* ── DEMÉRITOS ── */
+        .dem-tarjetas{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+        @media(max-width:1100px){.dem-tarjetas{grid-template-columns:repeat(3,1fr)}}
+        @media(max-width:640px){.dem-tarjetas{grid-template-columns:repeat(2,1fr)}}
+        .dem-tarjeta{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:20px 16px;text-align:center;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+        .dem-tarjeta::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--dem-color,#94a3b8)}
+        .dem-tarjeta:hover{transform:translateY(-3px);box-shadow:0 10px 26px rgba(10,22,40,.1);border-color:var(--dem-color,#d4af37)}
+        .dem-tarjeta-icono{font-size:22px;margin-bottom:6px}
+        .dem-tarjeta-umbral{font-family:'Playfair Display',serif;font-size:24px;font-weight:800;color:var(--dem-color,#0a1628)}
+        .dem-tarjeta-label{font-size:11px;color:#475569;line-height:1.4;margin:6px 0 10px;min-height:30px}
+        .dem-tarjeta-count{display:inline-block;padding:4px 12px;border-radius:100px;background:var(--dem-bg,#f1f5f9);color:var(--dem-color,#475569);font-size:12px;font-weight:700}
+        .dem-lista-header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+        .dem-lista-titulo{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:#0a1628}
+
         /* ── MATERIAS ASIGNADAS ── */
         .materia-asignada{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#f8fafc;border-radius:8px;margin-bottom:6px;font-size:12px;border:1px solid #f1f5fb}
         .materia-asignada span:first-child{flex:1;font-weight:500}
@@ -428,6 +442,10 @@
                         <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M4 1.5h6l3 3V14a.5.5 0 0 1-.5.5h-9A.5.5 0 0 1 3 14V2a.5.5 0 0 1 .5-.5H4z" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M5.5 7.5h5M5.5 10h3.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" stroke-linecap="round"/></svg>
                         <span class="nav-txt">Expedientes</span>
                     </div>
+                    <div class="nav-item" data-vista="demeritos" onclick="mostrarVista('demeritos')">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M8 1.5L9.7 5H14L10.6 7.4l1.3 4.1L8 9l-3.9 2.5 1.3-4.1L2 5h4.3L8 1.5z" stroke="rgba(255,255,255,.6)" stroke-width="1.1" fill="none" stroke-linejoin="round"/></svg>
+                        <span class="nav-txt">Deméritos</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -572,6 +590,25 @@
                 </div>
             </div>
 
+            <!-- DRAWER DE DETALLE DE DEMÉRITOS -->
+            <div class="grado-drawer-overlay" id="demerito-drawer-overlay" onclick="if(event.target===this) cerrarDrawerDemerito()">
+                <div class="grado-drawer">
+                    <div class="gd-header">
+                        <div class="gd-header-top">
+                            <div>
+                                <div class="gd-nombre" id="dem-drawer-nombre"></div>
+                                <div class="gd-seccion" id="dem-drawer-grado"></div>
+                            </div>
+                            <button class="gd-close" onclick="cerrarDrawerDemerito()">✕</button>
+                        </div>
+                        <div class="gd-actions">
+                            <button class="gd-btn-edit" id="btn-abrir-redencion" onclick="abrirModalRedencion()">↩ Aplicar Redención</button>
+                        </div>
+                    </div>
+                    <div class="gd-tab-content" id="dem-drawer-content"></div>
+                </div>
+            </div>
+
             <!-- ALUMNOS -->
             <div id="vista-alumnos" class="hidden">
                 <div class="filtros">
@@ -650,7 +687,7 @@
                     <button class="btn-secondary" onclick="volverListaAlumnosExpediente()">← Volver</button>
                     <div class="tabla-title" style="margin:16px 0 12px" id="exp-admin-nombre"></div>
 
-                    <div class="exp-stats" id="exp-admin-resumen"></div>
+                    <div class="exp-stats" id="exp-admin-resumen" style="grid-template-columns:repeat(4,1fr)"></div>
 
                     <div class="dash-card" style="margin-top:16px">
                         <div class="dash-card-header"><div class="dash-card-title"><span class="gs-dot"></span>Historial del expediente</div></div>
@@ -671,25 +708,50 @@
                                     <option value="reconocimiento">Reconocimiento</option>
                                 </select>
                             </div>
-                            <div class="field" id="exp-admin-campo-categoria">
-                                <label>Categoría</label>
-                                <select id="exp-admin-categoria">
-                                    <option value="leve">Leve</option>
-                                    <option value="grave">Grave</option>
-                                    <option value="muy_grave">Muy grave</option>
+                            <div class="field" id="exp-admin-campo-codigo">
+                                <label>Código de falta</label>
+                                <select id="exp-admin-codigo">
+                                    <option value="A">A — No saludar al ingresar o dirigirse a docentes/compañeros</option>
+                                    <option value="B">B — Omitir "por favor" en solicitudes</option>
+                                    <option value="C">C — Omitir "gracias" al recibir ayuda</option>
+                                    <option value="D">D — Tono grosero, desafiante o irrespetuoso</option>
                                 </select>
+                            </div>
+                            <div class="field hidden" id="exp-admin-campo-fecha-demerito">
+                                <label>Fecha</label>
+                                <input type="date" id="exp-admin-fecha-demerito">
                             </div>
                             <div class="field hidden" id="exp-admin-campo-dias">
                                 <label>Días de suspensión</label>
                                 <input type="number" id="exp-admin-dias" value="1" min="1" max="30">
                             </div>
                             <div class="field">
-                                <label>Descripción</label>
+                                <label id="exp-admin-label-descripcion">Descripción</label>
                                 <textarea id="exp-admin-descripcion" rows="3" placeholder="Describí lo sucedido..." style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;outline:none;resize:vertical"></textarea>
                             </div>
                             <button class="btn-primary" id="btn-guardar-expediente-admin" onclick="guardarRegistroExpedienteAdmin()">Guardar registro</button>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- DEMÉRITOS -->
+            <div id="vista-demeritos" class="hidden">
+                <div id="dem-tarjetas-wrap">
+                    <div class="info-box" style="background:#e8f4fd;border-color:#c3ddf5;color:#1a5f9a">
+                        Escala de consecuencias por deméritos activos (no redimidos) del alumno. Hacé clic en una tarjeta para ver los alumnos que están en ese nivel.
+                    </div>
+                    <div class="dem-tarjetas" id="dem-tarjetas">
+                        <div class="empty-bubbles">Cargando…</div>
+                    </div>
+                </div>
+
+                <div id="dem-lista-wrap" class="hidden">
+                    <div class="dem-lista-header">
+                        <button class="btn-secondary" onclick="volverTarjetasDemerito()">← Volver a niveles</button>
+                        <div class="dem-lista-titulo" id="dem-lista-titulo"></div>
+                    </div>
+                    <div class="exp-resultados" id="dem-lista-alumnos"></div>
                 </div>
             </div>
 
@@ -852,12 +914,13 @@
             <div class="modal-title" id="modal-exp-editar-title">Editar registro</div>
             <input type="hidden" id="exp-edit-tabla">
             <input type="hidden" id="exp-edit-id">
-            <div class="field hidden" id="exp-edit-campo-categoria">
-                <label>Categoría</label>
-                <select id="exp-edit-categoria">
-                    <option value="leve">Leve</option>
-                    <option value="grave">Grave</option>
-                    <option value="muy_grave">Muy grave</option>
+            <div class="field hidden" id="exp-edit-campo-codigo">
+                <label>Código de falta</label>
+                <select id="exp-edit-codigo">
+                    <option value="A">A — No saludar al ingresar o dirigirse a docentes/compañeros</option>
+                    <option value="B">B — Omitir "por favor" en solicitudes</option>
+                    <option value="C">C — Omitir "gracias" al recibir ayuda</option>
+                    <option value="D">D — Tono grosero, desafiante o irrespetuoso</option>
                 </select>
             </div>
             <div class="field hidden" id="exp-edit-campo-dias">
@@ -871,6 +934,24 @@
             <div class="modal-actions">
                 <button class="btn-primary" id="btn-guardar-exp-editar" onclick="guardarEdicionExpediente()">Guardar</button>
                 <button class="btn-secondary" onclick="cerrarModal('modal-exp-editar')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: APLICAR REDENCIÓN DE DEMÉRITOS -->
+    <div class="modal-overlay" id="modal-redencion">
+        <div class="modal">
+            <div class="modal-title">Aplicar Redención</div>
+            <input type="hidden" id="red-alumno-id">
+            <div class="info-box">Se marcan como redimidos los deméritos activos más antiguos del alumno, hasta completar la cantidad indicada.</div>
+            <div class="field"><label>Actividad realizada</label>
+                <textarea id="red-actividad" rows="3" placeholder="Describí la actividad de redención..." style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;outline:none;resize:vertical"></textarea>
+            </div>
+            <div class="field"><label>Cantidad de deméritos a quitar</label><input type="number" id="red-cantidad" min="1" value="1"></div>
+            <div class="field"><label>Fecha</label><input type="date" id="red-fecha"></div>
+            <div class="modal-actions">
+                <button class="btn-primary" id="btn-guardar-redencion" onclick="guardarRedencion()">Aplicar</button>
+                <button class="btn-secondary" onclick="cerrarModal('modal-redencion')">Cancelar</button>
             </div>
         </div>
     </div>

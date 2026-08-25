@@ -69,19 +69,39 @@ export const ESTADOS_ASISTENCIA = [
     { codigo: 'T', label: 'Tardanza',    color: '#a16207', bg: '#fef3c7' },
 ];
 
-// ── Expediente disciplinario ──────────────────
-// `clave` es lo que arma el timeline en admin.js/docente.js a partir de la
-// tabla de origen: 'anecdotico' (tabla anecdoticos), 'demerito_leve' |
-// 'demerito_grave' | 'demerito_muy_grave' (tabla demeritos + su categoria),
-// y 'acta' | 'suspension' | 'reconocimiento' (tabla actas + su tipo).
+// ── Expediente disciplinario (módulos independientes) ────────
+// `clave` es lo que arma el timeline de cada módulo y el del Expediente
+// (solo lectura, mezcla todo): 'anecdotico' (tabla anecdoticos),
+// 'demerito_A'|'B'|'C'|'D' (tabla demeritos + su codigo — 'demerito_leve'|
+// 'grave'|'muy_grave' para el historial de antes del rediseño por código),
+// 'amonestacion_acta'|'ficha'|'castigo'|'suspension' (tabla amonestaciones +
+// su tipo) y 'reconocimiento_academico'|'deportivo'|'cultural'|
+// 'disciplinario' (tabla reconocimientos + su tipo).
+
 // Las 4 categorías de falta que puede llevar un demérito. `label` es lo que
-// se muestra en el select de "Registrar nuevo" (código + descripción, tal
-// como pide el rediseño); `descripcion` se reutiliza sola en el timeline.
+// se muestra en el select de "Nuevo Demérito" (código + descripción);
+// `descripcion` se reutiliza sola en el timeline.
 export const CODIGOS_DEMERITO = [
     { codigo: 'A', descripcion: 'No saludar al ingresar o dirigirse a docentes/compañeros' },
     { codigo: 'B', descripcion: 'Omitir "por favor" en solicitudes' },
     { codigo: 'C', descripcion: 'Omitir "gracias" al recibir ayuda' },
     { codigo: 'D', descripcion: 'Tono grosero, desafiante o irrespetuoso' },
+];
+
+// Tipos del módulo Amonestaciones (tabla amonestaciones.tipo).
+export const TIPOS_AMONESTACION = [
+    { clave: 'acta',       label: 'Acta' },
+    { clave: 'ficha',      label: 'Ficha' },
+    { clave: 'castigo',    label: 'Castigo' },
+    { clave: 'suspension', label: 'Suspensión' },
+];
+
+// Tipos del módulo Reconocimientos (tabla reconocimientos.tipo).
+export const TIPOS_RECONOCIMIENTO = [
+    { clave: 'academico',     label: 'Académico' },
+    { clave: 'deportivo',     label: 'Deportivo' },
+    { clave: 'cultural',      label: 'Cultural' },
+    { clave: 'disciplinario', label: 'Disciplinario' },
 ];
 
 export const TIPOS_EXPEDIENTE = [
@@ -95,9 +115,14 @@ export const TIPOS_EXPEDIENTE = [
     { clave: 'demerito_leve',      label: 'Demérito leve',      icono: '⚠️', color: '#d97706', bg: '#fef3c7' },
     { clave: 'demerito_grave',     label: 'Demérito grave',     icono: '🔶', color: '#ea580c', bg: '#ffedd5' },
     { clave: 'demerito_muy_grave', label: 'Demérito muy grave', icono: '🔴', color: '#dc2626', bg: '#fee2e2' },
-    { clave: 'acta',               label: 'Acta',                icono: '📋', color: '#7c3aed', bg: '#ede9fe' },
-    { clave: 'suspension',         label: 'Suspensión',         icono: '🚫', color: '#991b1b', bg: '#fee2e2' },
-    { clave: 'reconocimiento',     label: 'Reconocimiento',     icono: '⭐', color: '#059669', bg: '#d1fae5' },
+    { clave: 'amonestacion_acta',       label: 'Acta',       icono: '📋', color: '#7c3aed', bg: '#ede9fe' },
+    { clave: 'amonestacion_ficha',      label: 'Ficha',      icono: '🗂️', color: '#0369a1', bg: '#e0f2fe' },
+    { clave: 'amonestacion_castigo',    label: 'Castigo',    icono: '⚡', color: '#b45309', bg: '#fef3c7' },
+    { clave: 'amonestacion_suspension', label: 'Suspensión', icono: '🚫', color: '#991b1b', bg: '#fee2e2' },
+    { clave: 'reconocimiento_academico',     label: 'Reconocimiento académico',     icono: '⭐', color: '#059669', bg: '#d1fae5' },
+    { clave: 'reconocimiento_deportivo',     label: 'Reconocimiento deportivo',     icono: '🏅', color: '#0891b2', bg: '#cffafe' },
+    { clave: 'reconocimiento_cultural',      label: 'Reconocimiento cultural',      icono: '🎭', color: '#7c3aed', bg: '#ede9fe' },
+    { clave: 'reconocimiento_disciplinario', label: 'Reconocimiento disciplinario', icono: '🎖️', color: '#059669', bg: '#d1fae5' },
 ];
 
 // ── Escala de consecuencias por deméritos activos (no redimidos) ────────

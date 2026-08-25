@@ -537,9 +537,13 @@ window.cambiarAlumnoExpediente = () => {
 async function cargarTimelineExpediente(alumnoId) {
     document.getElementById('exp-timeline').innerHTML = '<div class="empty-state">Cargando…</div>';
     try {
+        // `demeritos` tiene dos columnas que referencian a `usuarios` (docente_id
+        // que registró la falta, redimido_por que aplicó la redención — solo
+        // admin), así que el embed automático queda ambiguo y hay que nombrar
+        // la FK explícitamente, devolviéndola con el mismo alias de siempre.
         const [{ data: anec, error: e1 }, { data: dem, error: e2 }, { data: act, error: e3 }] = await Promise.all([
             supabase.from('anecdoticos').select('*, usuarios(nombre_completo)').eq('alumno_id', alumnoId),
-            supabase.from('demeritos').select('*, usuarios(nombre_completo)').eq('alumno_id', alumnoId),
+            supabase.from('demeritos').select('*, usuarios:usuarios!demeritos_docente_id_fkey(nombre_completo)').eq('alumno_id', alumnoId),
             supabase.from('actas').select('*, usuarios(nombre_completo)').eq('alumno_id', alumnoId),
         ]);
 
@@ -552,7 +556,9 @@ async function cargarTimelineExpediente(alumnoId) {
 
         expTimeline = [
             ...(anec || []).map(r => ({ ...r, tipoClave: 'anecdotico', registradoPor: r.usuarios?.nombre_completo || '—' })),
-            ...(dem  || []).map(r => ({ ...r, tipoClave: `demerito_${r.categoria}`, registradoPor: r.usuarios?.nombre_completo || '—' })),
+            // r.codigo (A/B/C/D) es el sistema nuevo; r.categoria (leve/grave/muy_grave)
+            // es lo que tienen los registros de antes del rediseño de deméritos.
+            ...(dem  || []).map(r => ({ ...r, tipoClave: `demerito_${r.codigo || r.categoria}`, registradoPor: r.usuarios?.nombre_completo || '—' })),
             ...(act  || []).map(r => ({ ...r, tipoClave: r.tipo, registradoPor: r.usuarios?.nombre_completo || '—' })),
         ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
@@ -592,13 +598,17 @@ function renderTimelineExpediente() {
 
 window.cambiarTipoExpediente = () => {
     const tipo = document.getElementById('exp-tipo').value;
-    document.getElementById('exp-campo-categoria').classList.toggle('hidden', tipo !== 'demerito');
+    const esDemerito = tipo === 'demerito';
+    document.getElementById('exp-campo-codigo').classList.toggle('hidden', !esDemerito);
+    document.getElementById('exp-campo-fecha-demerito').classList.toggle('hidden', !esDemerito);
     document.getElementById('exp-campo-dias').classList.toggle('hidden', tipo !== 'suspension');
+    document.getElementById('exp-label-descripcion').textContent = esDemerito ? 'Descripción adicional (opcional)' : 'Descripción';
 };
 
 function limpiarFormularioExpediente() {
     document.getElementById('exp-tipo').value = 'anecdotico';
-    document.getElementById('exp-categoria').value = 'leve';
+    document.getElementById('exp-codigo').value = 'A';
+    document.getElementById('exp-fecha-demerito').value = new Date().toISOString().slice(0, 10);
     document.getElementById('exp-dias').value = 1;
     document.getElementById('exp-descripcion').value = '';
     window.cambiarTipoExpediente();
@@ -609,7 +619,7 @@ window.guardarRegistroExpediente = async () => {
 
     const tipo = document.getElementById('exp-tipo').value;
     const descripcion = document.getElementById('exp-descripcion').value.trim();
-    if (!descripcion) { mostrarToast('Escribí una descripción', 'advertencia'); return; }
+    if (tipo !== 'demerito' && !descripcion) { mostrarToast('Escribí una descripción', 'advertencia'); return; }
 
     const btn = document.getElementById('btn-guardar-expediente');
     setBotonCargando(btn, true);
@@ -618,8 +628,9 @@ window.guardarRegistroExpediente = async () => {
     if (tipo === 'anecdotico') {
         ({ error } = await supabase.from('anecdoticos').insert([{ alumno_id: expAlumnoSel, docente_id: usuarioActual.id, descripcion }]));
     } else if (tipo === 'demerito') {
-        const categoria = document.getElementById('exp-categoria').value;
-        ({ error } = await supabase.from('demeritos').insert([{ alumno_id: expAlumnoSel, docente_id: usuarioActual.id, categoria, descripcion }]));
+        const codigo = document.getElementById('exp-codigo').value;
+        const fecha = document.getElementById('exp-fecha-demerito').value || undefined;
+        ({ error } = await supabase.from('demeritos').insert([{ alumno_id: expAlumnoSel, docente_id: usuarioActual.id, codigo, descripcion, ...(fecha ? { fecha } : {}) }]));
     } else {
         // acta | suspension | reconocimiento
         const dias = tipo === 'suspension' ? (parseInt(document.getElementById('exp-dias').value, 10) || 0) : 0;

@@ -524,9 +524,17 @@ function filaAlumnoClicableDocente(a, onclickJs) {
 }
 
 // ── DEMÉRITOS (docente) ───────────────────────
-// Igual patrón que el admin (grado → alumnos → historial + "+ Nuevo
+// Igual patrón que el admin (grado → TODOS los alumnos, incluidos los que
+// tienen 0 deméritos, cada uno con su total → historial + "+ Nuevo
 // Demérito"), SIN redención — eso es solo admin (la RLS de `demeritos`
 // tampoco le da UPDATE al docente, así que queda reforzado en la base).
+function badgeNivelDemeritoDocente(total) {
+    if (total === 0) return `<span class="badge" style="background:#f1f5f9;color:#94a3b8">Sin deméritos</span>`;
+    const nivel = NIVELES_DEMERITO.find(n => n.clave === calcularNivelDemerito(total));
+    if (nivel) return `<span class="badge" style="background:${nivel.bg};color:${nivel.color}">${nivel.icono} ${total} — ${nivel.umbral}</span>`;
+    return `<span class="badge" style="background:#fef9c3;color:#a16207">${total} demérito(s)</span>`;
+}
+
 function renderVistaDemeritoDocente() {
     const grados = gradosAsistenciaDocente();
     const empty = document.getElementById('dem-empty');
@@ -552,9 +560,29 @@ window.cambiarGradoDemeritoDocente = async () => {
     cont.innerHTML = '<div class="empty-state">Cargando…</div>';
 
     try {
-        demAlumnos = await obtenerAlumnosDeGradoDocente(gradoId);
+        const [alumnos, { data: demeritos, error: eD }] = await Promise.all([
+            obtenerAlumnosDeGradoDocente(gradoId),
+            supabase.from('demeritos').select('alumno_id').eq('redimido', false),
+        ]);
+        if (eD) throw eD;
+
+        demAlumnos = alumnos;
         if (!demAlumnos.length) { cont.innerHTML = '<div class="empty-state">Este grado no tiene alumnos matriculados.</div>'; return; }
-        cont.innerHTML = demAlumnos.map(a => filaAlumnoClicableDocente(a, `seleccionarAlumnoDemeritoDocente('${a.id}')`)).join('');
+
+        const totalPorAlumno = {};
+        (demeritos || []).forEach(d => { totalPorAlumno[d.alumno_id] = (totalPorAlumno[d.alumno_id] || 0) + 1; });
+
+        cont.innerHTML = demAlumnos.map(a => `
+            <div class="exp-resultado-item" onclick="seleccionarAlumnoDemeritoDocente('${a.id}')">
+                <div style="display:flex;align-items:center;gap:10px">
+                    ${a.foto_url
+                        ? `<img src="${a.foto_url}" class="foto-mini" alt="${a.apellidos}">`
+                        : '<div class="foto-mini foto-placeholder">?</div>'}
+                    <span>${a.apellidos}, ${a.nombres}</span>
+                </div>
+                ${badgeNivelDemeritoDocente(totalPorAlumno[a.id] || 0)}
+            </div>
+        `).join('');
     } catch (err) {
         if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => window.cambiarGradoDemeritoDocente()); return; }
         notificarError(err, 'Error cargando alumnos del grado');
@@ -662,6 +690,7 @@ window.guardarNuevoDemeritoDocente = async () => {
     mostrarToast('Demérito registrado', 'exito');
     cerrarModal('modal-nuevo-demerito');
     await cargarDrawerDemeritoDocente(alumnoId);
+    await window.cambiarGradoDemeritoDocente(); // refresca el badge de la lista de fondo
 };
 
 // ── ANECDÓTICOS / AMONESTACIONES / RECONOCIMIENTOS (docente) ──

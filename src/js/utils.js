@@ -107,28 +107,6 @@ export function puedeAccederCompetencias(gradosGuia) {
     return Array.isArray(gradosGuia) && gradosGuia.length > 0;
 }
 
-// ── Color determinístico por materia (grillas de horario) ────
-// Mismo materiaId siempre da el mismo color, sin necesidad de guardar
-// una paleta en BD ni coordinar índices entre admin.js y docente.js.
-const PALETA_MATERIAS = [
-    '#dbeafe', '#fef3c7', '#dcfce7', '#fce7f3', '#e0e7ff',
-    '#fee2e2', '#d1fae5', '#fef9c3', '#ede9fe', '#ffedd5',
-];
-export function colorPorMateria(materiaId) {
-    if (!materiaId) return '#f1f5f9';
-    let hash = 0;
-    for (let i = 0; i < materiaId.length; i++) hash = (hash * 31 + materiaId.charCodeAt(i)) >>> 0;
-    return PALETA_MATERIAS[hash % PALETA_MATERIAS.length];
-}
-
-// ── Nombre corto de docente (celdas de horario) ──────────────
-// "Alexis Antonio Cuéllar López" → "Alexis Cuéllar"
-export function nombreCortoDocente(nombreCompleto) {
-    const partes = (nombreCompleto || '').trim().split(/\s+/).filter(Boolean);
-    if (partes.length <= 2) return partes.join(' ');
-    return `${partes[0]} ${partes[partes.length - 1]}`;
-}
-
 // ── Días hábiles de un mes (reportes de asistencia) ──────────
 // Lunes a viernes únicamente. mes: 1–12. Devuelve el número de día (1..N).
 export function diasHabilesDelMes(anio, mes) {

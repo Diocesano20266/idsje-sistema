@@ -44,11 +44,11 @@ let expAdminAlumnoSel    = null;
 let expAdminTimeline     = [];
 
 // Deméritos (Módulo 1) — escala de consecuencias por nivel (ver NIVELES_DEMERITO en config.js)
-let demGradoFiltro     = null; // grado_id para filtrar tarjetas/lista, o null = todos los grados
-let demNivelSel        = null; // clave de NIVELES_DEMERITO elegida, o null = mostrando las tarjetas
-let demAlumnosNivel    = [];   // [{ alumno, grado, total }] del nivel elegido (año activo)
-let demAlumnoDrawerId  = null; // alumno_id mostrado en el drawer
-let demDrawerDemeritos = [];   // todas las filas de `demeritos` (activas + redimidas) del alumno del drawer
+let demGradoFiltro       = null; // grado_id elegido — sin grado, las tarjetas muestran el conteo de toda la escuela
+let demNivelFiltroRoster = null; // clave de NIVELES_DEMERITO para filtrar el roster, o null = mostrar a todos los alumnos del grado
+let demRosterAlumnos     = [];   // [{ alumno, total }] TODOS los alumnos de demGradoFiltro (incluidos los de total:0)
+let demAlumnoDrawerId    = null; // alumno_id mostrado en el drawer
+let demDrawerDemeritos   = [];   // todas las filas de `demeritos` (activas + redimidas) del alumno del drawer
 
 // Módulos 2/3/4 (Anecdóticos, Amonestaciones, Reconocimientos) — mismo patrón
 // grado → alumnos → historial + "+ Nuevo", nunca editable ni eliminable
@@ -1460,28 +1460,30 @@ function renderTimelineExpedienteAdmin() {
 }
 
 // ── DEMÉRITOS (Módulo 1) ──────────────────────
-// Vista escalonada por nivel de consecuencia (ver NIVELES_DEMERITO en
-// config.js): 5 tarjetas con el conteo de alumnos matriculados (año activo,
-// opcionalmente filtrado por grado) que caen HOY en cada tramo de deméritos
-// activos (no redimidos) → click en una tarjeta muestra esos alumnos →
-// click en un alumno abre el drawer con su historial completo, el
-// histórico de redenciones, "+ Nuevo Demérito" y "Aplicar Redención" (esta
-// última solo admin: la RLS de `demeritos` no le da UPDATE a los docentes,
-// así que además de ocultarlo en la UI del docente, queda reforzado en la base).
+// Elegí un grado → aparecen las 5 tarjetas (conteo por nivel de consecuencia,
+// ver NIVELES_DEMERITO en config.js) Y, siempre, el listado COMPLETO de los
+// alumnos de ese grado — incluidos los que tienen 0 deméritos activos — cada
+// uno con su total y su nivel actual. Las tarjetas son filtros sobre esa
+// misma lista (clic = filtra a ese nivel, "✕ Quitar filtro" = vuelve a
+// mostrar a todos), no una pantalla aparte. Sin grado elegido, las tarjetas
+// muestran el conteo de TODA la escuela (para tener una foto rápida antes
+// de entrar a un grado puntual). Click en un alumno (aunque tenga 0) abre el
+// drawer con su historial completo, "+ Nuevo Demérito" y "Aplicar Redención"
+// (esta última solo admin: la RLS de `demeritos` no le da UPDATE a los
+// docentes, así que además de ocultarlo en la UI del docente, queda
+// reforzado en la base).
 function renderVistaDemeritos() {
     poblarSelectGrados('dem-grado-filtro', demGradoFiltro, '— Todos los grados —');
-    demNivelSel = null;
-    document.getElementById('dem-lista-wrap').classList.add('hidden');
-    document.getElementById('dem-tarjetas-wrap').classList.remove('hidden');
+    demNivelFiltroRoster = null;
     cargarConteoNivelesDemerito();
+    actualizarRosterDemeritos();
 }
 
 window.cambiarFiltroGradoDemerito = () => {
     demGradoFiltro = document.getElementById('dem-grado-filtro').value || null;
-    demNivelSel = null;
-    document.getElementById('dem-lista-wrap').classList.add('hidden');
-    document.getElementById('dem-tarjetas-wrap').classList.remove('hidden');
+    demNivelFiltroRoster = null;
     cargarConteoNivelesDemerito();
+    actualizarRosterDemeritos();
 };
 
 async function cargarConteoNivelesDemerito() {
@@ -1516,7 +1518,7 @@ async function cargarConteoNivelesDemerito() {
     });
 
     cont.innerHTML = NIVELES_DEMERITO.map(n => `
-        <div class="dem-tarjeta" onclick="abrirNivelDemerito('${n.clave}')" style="--dem-color:${n.color};--dem-bg:${n.bg}">
+        <div class="dem-tarjeta ${demNivelFiltroRoster === n.clave ? 'activo' : ''}" onclick="abrirNivelDemerito('${n.clave}')" style="--dem-color:${n.color};--dem-bg:${n.bg}">
             <div class="dem-tarjeta-icono">${n.icono}</div>
             <div class="dem-tarjeta-umbral">${n.umbral}</div>
             <div class="dem-tarjeta-label">${n.label}</div>
@@ -1525,72 +1527,99 @@ async function cargarConteoNivelesDemerito() {
     `).join('');
 }
 
-window.abrirNivelDemerito = async (clave) => {
-    demNivelSel = clave;
-    document.getElementById('dem-tarjetas-wrap').classList.add('hidden');
-    document.getElementById('dem-lista-wrap').classList.remove('hidden');
-    const nivel = NIVELES_DEMERITO.find(n => n.clave === clave);
-    document.getElementById('dem-lista-titulo').textContent = nivel ? `${nivel.icono} ${nivel.label}` : '';
-    await cargarAlumnosNivelDemerito(clave);
-};
+// Badge de nivel reutilizado en la lista y en el drawer: gris "Sin deméritos"
+// en 0, amarillo "N demérito(s)" en 1-2 (todavía no dispara ninguna
+// consecuencia), y el color/ícono del nivel correspondiente en 3+.
+function badgeNivelDemerito(total) {
+    if (total === 0) return `<span class="badge" style="background:#f1f5f9;color:#94a3b8">Sin deméritos</span>`;
+    const nivel = NIVELES_DEMERITO.find(n => n.clave === calcularNivelDemerito(total));
+    if (nivel) return `<span class="badge" style="background:${nivel.bg};color:${nivel.color}">${nivel.icono} ${total} — ${nivel.umbral}</span>`;
+    return `<span class="badge" style="background:#fef9c3;color:#a16207">${total} demérito(s)</span>`;
+}
 
-window.volverTarjetasDemerito = () => {
-    demNivelSel = null;
-    document.getElementById('dem-lista-wrap').classList.add('hidden');
-    document.getElementById('dem-tarjetas-wrap').classList.remove('hidden');
-};
+function actualizarRosterDemeritos() {
+    const wrap = document.getElementById('dem-roster-wrap');
+    if (!demGradoFiltro) { wrap.classList.add('hidden'); return; }
+    wrap.classList.remove('hidden');
+    cargarRosterDemeritos();
+}
 
-async function cargarAlumnosNivelDemerito(clave) {
-    const cont = document.getElementById('dem-lista-alumnos');
+async function cargarRosterDemeritos() {
+    const cont = document.getElementById('dem-roster-alumnos');
     cont.innerHTML = '<div class="empty-bubbles">Cargando…</div>';
 
     if (!anioActivoCache) { cont.innerHTML = '<div class="info-box">⚠ No hay un año académico activo.</div>'; return; }
 
-    let queryMatriculas = supabase.from('matriculas').select('alumno_id, grados(id, nombre, seccion), alumnos(*)').eq('año_academico_id', anioActivoCache.id).eq('activo', true);
-    if (demGradoFiltro) queryMatriculas = queryMatriculas.eq('grado_id', demGradoFiltro);
-
     const [{ data: matriculas, error: eM }, { data: demeritos, error: eD }] = await Promise.all([
-        queryMatriculas,
+        supabase.from('matriculas').select('alumno_id, alumnos(*)').eq('grado_id', demGradoFiltro).eq('año_academico_id', anioActivoCache.id).eq('activo', true),
         supabase.from('demeritos').select('alumno_id').eq('redimido', false),
     ]);
-    if (eM && esErrorDeRed(eM)) { mostrarBannerSinConexion(() => cargarAlumnosNivelDemerito(clave)); return; }
+    if (eM && esErrorDeRed(eM)) { mostrarBannerSinConexion(() => cargarRosterDemeritos()); return; }
     ocultarBannerSinConexion();
-    if (eM) return notificarError(eM, 'Error cargando matrículas');
+    if (eM) return notificarError(eM, 'Error cargando alumnos del grado');
     if (eD) return notificarError(eD, 'Error cargando deméritos');
 
     const totalPorAlumno = {};
     (demeritos || []).forEach(d => { totalPorAlumno[d.alumno_id] = (totalPorAlumno[d.alumno_id] || 0) + 1; });
 
-    demAlumnosNivel = (matriculas || [])
+    demRosterAlumnos = (matriculas || [])
         .filter(m => m.alumnos)
-        .map(m => ({ alumno: m.alumnos, grado: m.grados, total: totalPorAlumno[m.alumno_id] || 0 }))
-        .filter(x => calcularNivelDemerito(x.total) === clave)
+        .map(m => ({ alumno: m.alumnos, total: totalPorAlumno[m.alumno_id] || 0 }))
         .sort((a, b) => b.total - a.total || (a.alumno.apellidos || '').localeCompare(b.alumno.apellidos || ''));
 
-    if (!demAlumnosNivel.length) { cont.innerHTML = '<div class="empty-bubbles">No hay alumnos en este nivel.</div>'; return; }
+    renderRosterDemeritos();
+}
 
-    cont.innerHTML = demAlumnosNivel.map(({ alumno: a, grado: g, total }) => `
+function renderRosterDemeritos() {
+    const cont = document.getElementById('dem-roster-alumnos');
+    const titulo = document.getElementById('dem-roster-titulo');
+    const btnQuitar = document.getElementById('btn-dem-quitar-filtro');
+
+    const filtrados = demNivelFiltroRoster
+        ? demRosterAlumnos.filter(x => calcularNivelDemerito(x.total) === demNivelFiltroRoster)
+        : demRosterAlumnos;
+
+    const nivelInfo = demNivelFiltroRoster ? NIVELES_DEMERITO.find(n => n.clave === demNivelFiltroRoster) : null;
+    titulo.textContent = nivelInfo
+        ? `${nivelInfo.icono} ${nivelInfo.label} (${filtrados.length})`
+        : `Todos los alumnos del grado (${filtrados.length})`;
+    btnQuitar.classList.toggle('hidden', !demNivelFiltroRoster);
+
+    if (!filtrados.length) { cont.innerHTML = '<div class="empty-bubbles">No hay alumnos que coincidan con este filtro.</div>'; return; }
+
+    cont.innerHTML = filtrados.map(({ alumno: a, total }) => `
         <div class="exp-resultado-item" onclick="abrirDrawerDemerito('${a.id}')">
             <div style="display:flex;align-items:center;gap:10px">
                 ${a.foto_url
                     ? `<img src="${a.foto_url}" class="foto-mini" alt="${a.apellidos}">`
                     : '<div class="foto-mini foto-placeholder">?</div>'}
-                <div>
-                    <div style="font-weight:600;color:#0a1628">${a.apellidos}, ${a.nombres}</div>
-                    <div class="text-muted">${g?.nombre || ''} ${g?.seccion || ''}</div>
-                </div>
+                <span>${a.apellidos}, ${a.nombres}</span>
             </div>
-            <span class="badge" style="background:#fde8e8;color:#b52828">${total} deméritos</span>
+            ${badgeNivelDemerito(total)}
         </div>
     `).join('');
 }
 
+window.abrirNivelDemerito = (clave) => {
+    if (!demGradoFiltro) { mostrarToast('Elegí un grado primero para ver el detalle de sus alumnos', 'advertencia'); return; }
+    demNivelFiltroRoster = demNivelFiltroRoster === clave ? null : clave; // clic de nuevo = quitar el filtro
+    cargarConteoNivelesDemerito(); // repinta las tarjetas para resaltar la activa
+    renderRosterDemeritos();
+};
+
+window.quitarFiltroNivelDemerito = () => {
+    demNivelFiltroRoster = null;
+    cargarConteoNivelesDemerito();
+    renderRosterDemeritos();
+};
+
 // ── Drawer de detalle + nuevo demérito + redención ────────────
 window.abrirDrawerDemerito = async (alumnoId) => {
     demAlumnoDrawerId = alumnoId;
-    const item = demAlumnosNivel.find(x => x.alumno.id === alumnoId);
+    const item = demRosterAlumnos.find(x => x.alumno.id === alumnoId);
+    const grado = gradosCache.find(g => g.id === demGradoFiltro);
     document.getElementById('dem-drawer-nombre').textContent = item ? `${item.alumno.apellidos}, ${item.alumno.nombres}` : '';
-    document.getElementById('dem-drawer-grado').textContent = item?.grado ? `${item.grado.nombre} ${item.grado.seccion}` : '';
+    document.getElementById('dem-drawer-grado').textContent = grado ? `${grado.nombre} ${grado.seccion}` : '';
     document.getElementById('demerito-drawer-overlay').classList.add('open');
     await cargarDrawerDemerito(alumnoId);
 };
@@ -1721,7 +1750,8 @@ window.guardarNuevoDemerito = async () => {
     mostrarToast('Demérito registrado', 'exito');
     cerrarModal('modal-nuevo-demerito');
     await cargarDrawerDemerito(alumnoId);
-    if (demNivelSel) await cargarAlumnosNivelDemerito(demNivelSel);
+    await cargarConteoNivelesDemerito();
+    await cargarRosterDemeritos();
 };
 
 window.abrirModalRedencion = () => {
@@ -1768,9 +1798,10 @@ window.guardarRedencion = async () => {
     mostrarToast('Redención aplicada correctamente', 'exito');
     cerrarModal('modal-redencion');
     await cargarDrawerDemerito(alumnoId);
-    // El alumno puede haber bajado de nivel (o salido de la lista) al redimir
-    // — se refresca la lista de fondo para que quede al día apenas se cierre el drawer.
-    if (demNivelSel) await cargarAlumnosNivelDemerito(demNivelSel);
+    // El alumno puede haber bajado de nivel al redimir — se refrescan las
+    // tarjetas y el roster de fondo para que queden al día apenas se cierre el drawer.
+    await cargarConteoNivelesDemerito();
+    await cargarRosterDemeritos();
 };
 
 // ── MÓDULOS 2/3/4 — Anecdóticos / Amonestaciones / Reconocimientos ──

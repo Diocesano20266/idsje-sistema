@@ -2,6 +2,7 @@
 //  IDSJE — Funciones puras (sin DOM ni Supabase)
 //  Usadas por docente.js y cubiertas por tests/utils.test.js
 // ═══════════════════════════════════════════
+import { NIVELES_DEMERITO } from './config.js';
 
 // ── Cálculo de Nota Final — fórmula IDSJE 35/35/30 ───────────
 // Entrada: promedio de cotidianas, promedio de integradoras y nota de examen,
@@ -105,6 +106,23 @@ export function colorEscala(valor) {
 // Solo puede acceder el docente que es guía de al menos un grado
 export function puedeAccederCompetencias(gradosGuia) {
     return Array.isArray(gradosGuia) && gradosGuia.length > 0;
+}
+
+// ── Escala de consecuencias por deméritos (ver NIVELES_DEMERITO) ─────
+// Cuántos deméritos de una lista siguen "activos" (no redimidos) — la
+// redención es por fila individual (ver supabase/demeritos-schema.sql),
+// así que el total siempre se recalcula contando filas, nunca un contador.
+export function contarDemeritosActivos(demeritos) {
+    return (demeritos || []).filter(d => !d.redimido).length;
+}
+
+// Dado el total de deméritos ACTIVOS de un alumno, devuelve la clave del
+// tramo de NIVELES_DEMERITO en el que cae (tramos mutuamente excluyentes,
+// no acumulativos), o null si todavía no llega al primer umbral (< 3).
+export function calcularNivelDemerito(totalActivos) {
+    const total = parseInt(totalActivos, 10) || 0;
+    const nivel = NIVELES_DEMERITO.find(n => total >= n.min && (n.max === null || total <= n.max));
+    return nivel ? nivel.clave : null;
 }
 
 // ── Días hábiles de un mes (reportes de asistencia) ──────────

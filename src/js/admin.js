@@ -2,8 +2,7 @@
 //  IDSJE — Panel Administrador
 // ═══════════════════════════════════════════
 import { supabase, verificarSesion, cerrarSesion, subirFoto } from './auth.js';
-import { CLOUDINARY_CLOUD, CLOUDINARY_PRESET, INSTITUTO, DIAS_HORARIO, BLOQUES_HORARIO, ESTADOS_ASISTENCIA, TIPOS_EXPEDIENTE, getAñoActivo } from './config.js';
-import { generarHorario, verificarConflictos } from './generador-horarios.js';
+import { CLOUDINARY_CLOUD, CLOUDINARY_PRESET, INSTITUTO, ESTADOS_ASISTENCIA, TIPOS_EXPEDIENTE, getAñoActivo } from './config.js';
 import {
     mostrarToast,
     mostrarConfirm,
@@ -15,8 +14,6 @@ import {
     mostrarErrorCampo,
     limpiarErroresFormulario,
     renderSkeletonFilas,
-    colorPorMateria,
-    nombreCortoDocente,
     diasHabilesDelMes,
     calcularTotalesAsistencia,
 } from './utils.js';
@@ -37,22 +34,6 @@ let anioActivoCache      = null;
 let aniosAcademicosCache = [];   // todos los años, para el selector "Cambiar año activo"
 let categoriasGradoCache = [];   // categorias_grado, para agrupar la vista Grados
 let matriculaAlumnosCache = [];  // catálogo completo de alumnos + su matrícula (si tiene) del año activo, para la subsección Matrícula
-
-// Horarios
-let horarioGradoSel  = null;  // grado_id actualmente elegido en la vista Horarios
-let horariosCache    = [];    // filas de `horarios` del grado elegido
-let gradoMatHorario   = [];   // grado_materia del grado elegido (para el selector de materia del modal)
-
-// Generador automático de horarios
-let genAsignaciones  = [];   // [{ id (grado_materia_id), gradoId, gradoNombre, materiaId, materiaNombre, docenteId, docenteNombre, horasPorSemana, incluida }]
-let genSinDocenteCount = 0;  // materias sin docente asignado, excluidas del formulario (solo para el aviso)
-let genDocentes      = [];   // [{ id, nombre, disponibilidad: 'completa'|'manana' }]
-let genResultado     = null; // filas generadas (sin guardar) — null si no hay resultado aún, o [] si no se pudo ubicar nada (ver genCompleto/genMateriasNoColocadas para saber si es parcial)
-let genSeed          = 1;
-let genGradoPreview  = null; // grado_id que se muestra en el grid de vista previa
-let genCompleto           = true; // false si genResultado es una solución PARCIAL (permitirParcial:true)
-let genMateriasNoColocadas = [];  // [{asignacionId, gradoId, materiaId, materiaNombre, docenteId, horasRequeridas, horasColocadas}]
-let genImposiblePorCarga  = false; // true si algún docente supera 40h/semana entre las materias incluidas — bloquea "Generar"
 
 // Expedientes disciplinarios
 let expAdminAlumnos    = []; // resultados de la búsqueda actual
@@ -167,8 +148,6 @@ const TITULOS = {
     alumnos: 'Alumnos',
     docentes: 'Docentes',
     materias: 'Materias',
-    horarios: 'Horarios',
-    generador: 'Generar Horario',
     asistencias: 'Asistencias',
     expedientes: 'Expedientes',
     configuracion: 'Configuración',
@@ -184,8 +163,6 @@ const VISTA_CONFIG = {
     alumnos:     { titulo: 'Alumnos',              accion: `<input type="file" id="excel-alumnos" accept=".xlsx,.xls" class="hidden" onchange="importarAlumnosExcel(event)"><button class="btn-secondary" onclick="document.getElementById('excel-alumnos').click()">📊 Importar Excel</button><button class="btn-secondary" onclick="imprimirMatriculaAdmin()">🖨 Reporte de matrícula</button><button class="btn-primary" onclick="abrirModalAlumno()">+ Nuevo Alumno</button>` },
     docentes:    { titulo: 'Docentes',             accion: `<button class="btn-primary" onclick="abrirModalDocente()">+ Nuevo Docente</button>` },
     materias:    { titulo: 'Materias',             accion: `<button class="btn-primary" onclick="abrirModalMateria()">+ Nueva Materia</button>` },
-    horarios:    { titulo: 'Horarios',             accion: `<button class="btn-secondary" onclick="imprimirHorarioGrado()">🖨 Imprimir horario</button>` },
-    generador:   { titulo: 'Generar Horario',      accion: '' },
     asistencias: { titulo: 'Asistencias',          accion: `<button class="btn-secondary" onclick="imprimirReporteAsistenciaAdmin()">🖨 Reporte mensual</button><button class="btn-secondary" onclick="imprimirListaBlancoAsistenciaAdmin()">📄 Lista en blanco</button>` },
     expedientes: { titulo: 'Expedientes',          accion: '' },
     configuracion: { titulo: 'Configuración',      accion: '' },
@@ -218,8 +195,6 @@ window.mostrarVista = async (vista) => {
     if (vista === 'grados')   renderGrados();
     if (vista === 'docentes') renderDocentes();
     if (vista === 'materias') renderMaterias();
-    if (vista === 'horarios') renderVistaHorarios();
-    if (vista === 'generador') renderVistaGenerador();
     if (vista === 'asistencias') renderVistaAsistencias();
     if (vista === 'expedientes') renderVistaExpedientes();
     if (vista === 'configuracion') renderVistaConfiguracion();
@@ -544,34 +519,6 @@ function nombreDocenteMateriaGrado(gm) {
     return docenteEfectivoGradoMateria(gm)?.nombre || '';
 }
 
-function renderMiniGridHorario(horarios) {
-    if (!horarios.length) return '<div class="empty-bubbles">Este grado no tiene horario generado todavía.</div>';
-
-    const porCelda = {};
-    horarios.forEach(h => { porCelda[`${h.dia}-${h.periodo}`] = h; });
-
-    let html = '<div class="gd-mini-grid">';
-    html += '<div class="gd-mini-cell gd-mini-head"></div>' +
-        DIAS_HORARIO.map(d => `<div class="gd-mini-cell gd-mini-head">${d.slice(0, 3)}</div>`).join('');
-
-    BLOQUES_HORARIO.forEach(b => {
-        if (b.tipo !== 'clase') return; // vista compacta: solo períodos de clase
-        html += `<div class="gd-mini-cell gd-mini-periodo">P${b.periodo}</div>`;
-        DIAS_HORARIO.forEach(dia => {
-            const h = porCelda[`${dia}-${b.periodo}`];
-            html += h
-                ? `<div class="gd-mini-cell gd-mini-ocupada" style="background:${colorPorMateria(h.materia_id)}">
-                       <div class="gd-mini-materia">${(h.materias?.nombre || '').slice(0, 12)}</div>
-                       <div class="gd-mini-docente">${nombreCortoDocente(h.usuarios?.nombre_completo)}</div>
-                   </div>`
-                : '<div class="gd-mini-cell"></div>';
-        });
-    });
-
-    html += '</div>';
-    return html;
-}
-
 async function renderTabDrawerGrado(tab) {
     const cont = document.getElementById('gd-tab-content');
     const g = gradosCache.find(x => x.id === gradoDrawerId);
@@ -649,17 +596,6 @@ async function renderTabDrawerGrado(tab) {
             + `<button class="gd-add-materia" onclick="gestionarMateriaGrado('${g.id}')">+ Agregar / quitar materias</button>`;
         return;
     }
-
-    if (tab === 'horario') {
-        const { data, error } = await supabase
-            .from('horarios')
-            .select('*, materias(id, nombre), usuarios(id, nombre_completo)')
-            .eq('grado_id', g.id);
-        if (error) { cont.innerHTML = '<div class="empty-bubbles">Error cargando horario</div>'; return; }
-        cont.innerHTML = renderMiniGridHorario(data || [])
-            + `<button class="gd-editar-horario" onclick="irAHorarioCompleto('${g.id}')">Editar horario completo →</button>`;
-        return;
-    }
 }
 
 window.quitarMateriaDrawerGrado = async (grado_materia_id) => {
@@ -676,12 +612,6 @@ window.verAlumnosDeGrado = async (gradoId) => {
     await mostrarVista('alumnos');
     const sel = document.getElementById('filtro-grado');
     if (sel) { sel.value = gradoId; await renderAlumnos(); }
-};
-
-window.irAHorarioCompleto = async (gradoId) => {
-    cerrarDrawerGrado();
-    horarioGradoSel = gradoId;
-    await mostrarVista('horarios');
 };
 
 window.editarGradoDesdeDrawer = () => {
@@ -1062,172 +992,7 @@ window.eliminarMateria = async (id) => {
     renderMaterias();
 };
 
-// ── HORARIOS ────────────────────────────────
-async function renderVistaHorarios() {
-    const sel = document.getElementById('horario-grado');
-    if (sel && !sel.dataset.poblado) {
-        sel.innerHTML = '<option value="">— Seleccioná un grado —</option>' +
-            gradosCache.map(g => `<option value="${g.id}">${g.nombre} ${g.modalidad} — Sección ${g.seccion}</option>`).join('');
-        sel.dataset.poblado = '1';
-    }
-    if (horarioGradoSel) {
-        sel.value = horarioGradoSel;
-        await cargarHorarioGrado(horarioGradoSel);
-    } else {
-        document.getElementById('horario-grid').innerHTML = '<div class="empty-bubbles">Seleccioná un grado para ver o editar su horario.</div>';
-    }
-}
-
-window.cambiarGradoHorario = async () => {
-    const gradoId = document.getElementById('horario-grado').value;
-    horarioGradoSel = gradoId || null;
-    if (!horarioGradoSel) {
-        document.getElementById('horario-grid').innerHTML = '<div class="empty-bubbles">Seleccioná un grado para ver o editar su horario.</div>';
-        return;
-    }
-    await cargarHorarioGrado(horarioGradoSel);
-};
-
-async function cargarHorarioGrado(gradoId) {
-    document.getElementById('horario-grid').innerHTML = '<div class="empty-bubbles">Cargando horario…</div>';
-    try {
-        const [{ data: horarios, error: eHor }, { data: gm, error: eGm }] = await Promise.all([
-            supabase.from('horarios').select('*, materias(id, nombre), usuarios(id, nombre_completo)').eq('grado_id', gradoId),
-            supabase.from('grado_materia').select('*, materias(id, nombre)').eq('grado_id', gradoId),
-        ]);
-
-        const errorDeRed = [eHor, eGm].find(e => e && esErrorDeRed(e));
-        if (errorDeRed) {
-            mostrarBannerSinConexion(() => cargarHorarioGrado(gradoId));
-            return;
-        }
-        ocultarBannerSinConexion();
-        if (eHor) return notificarError(eHor, 'Error cargando el horario');
-        if (eGm)  return notificarError(eGm, 'Error cargando materias del grado');
-
-        horariosCache   = horarios || [];
-        gradoMatHorario = gm || [];
-        renderGridHorario();
-    } catch (err) {
-        if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => cargarHorarioGrado(gradoId)); return; }
-        notificarError(err, 'Error cargando el horario');
-    }
-}
-
-function renderGridHorario() {
-    const cont = document.getElementById('horario-grid');
-    const porCelda = {};
-    horariosCache.forEach(h => { porCelda[`${h.dia}-${h.periodo}`] = h; });
-
-    let html = '<div class="hg-cell hg-head"></div>' +
-        DIAS_HORARIO.map(d => `<div class="hg-cell hg-head">${d}</div>`).join('');
-
-    BLOQUES_HORARIO.forEach(b => {
-        if (b.tipo !== 'clase') {
-            html += `<div class="hg-cell hg-periodo-label"><span class="hg-periodo-hora">${b.inicio}–${b.fin}</span></div>`;
-            html += `<div class="hg-cell hg-bloqueado" style="grid-column:2 / -1">${b.label}</div>`;
-            return;
-        }
-        html += `<div class="hg-cell hg-periodo-label"><span class="hg-periodo-num">P${b.periodo}</span><span class="hg-periodo-hora">${b.inicio}–${b.fin}</span></div>`;
-        DIAS_HORARIO.forEach(dia => {
-            const h = porCelda[`${dia}-${b.periodo}`];
-            if (h) {
-                html += `
-                <div class="hg-cell hg-ocupada-wrap">
-                    <div class="hg-ocupada" style="background:${colorPorMateria(h.materia_id)}">
-                        <button type="button" class="hg-del-btn" onclick="eliminarCeldaHorario('${h.id}')" title="Quitar">✕</button>
-                        <div class="hg-materia">${h.materias?.nombre || ''}</div>
-                        <div class="hg-docente">${nombreCortoDocente(h.usuarios?.nombre_completo)}</div>
-                    </div>
-                </div>`;
-            } else {
-                html += `
-                <div class="hg-cell hg-vacia">
-                    <button type="button" class="hg-add-btn" onclick="abrirModalCeldaHorario('${dia}', ${b.periodo})" title="Asignar">+</button>
-                </div>`;
-            }
-        });
-    });
-
-    cont.innerHTML = html;
-}
-
-window.abrirModalCeldaHorario = (dia, periodo) => {
-    if (!horarioGradoSel) return;
-    if (!gradoMatHorario.length) {
-        mostrarToast('Este grado no tiene materias asignadas todavía', 'advertencia');
-        return;
-    }
-    const bloque = BLOQUES_HORARIO.find(b => b.tipo === 'clase' && b.periodo === periodo);
-
-    document.getElementById('modal-celda-horario-title').textContent = `${dia} — Período ${periodo} (${bloque.inicio}–${bloque.fin})`;
-    document.getElementById('hcelda-grado-id').value     = horarioGradoSel;
-    document.getElementById('hcelda-dia').value          = dia;
-    document.getElementById('hcelda-periodo').value      = periodo;
-    document.getElementById('hcelda-hora-inicio').value  = bloque.inicio;
-    document.getElementById('hcelda-hora-fin').value     = bloque.fin;
-    document.getElementById('hcelda-docente-id').value   = '';
-    document.getElementById('hcelda-docente-nombre').textContent = '—';
-
-    const selMat = document.getElementById('hcelda-materia');
-    selMat.innerHTML = '<option value="">— Seleccioná una materia —</option>' +
-        gradoMatHorario.map(gm => `<option value="${gm.materia_id}" data-docente="${gm.docente_id || ''}">${gm.materias?.nombre || ''}</option>`).join('');
-    selMat.value = '';
-
-    abrirModal('modal-celda-horario');
-};
-
-window.materiaCeldaHorarioCambio = () => {
-    const selMat    = document.getElementById('hcelda-materia');
-    const docenteId = selMat.options[selMat.selectedIndex]?.dataset.docente || '';
-    const docente   = usuariosCache.find(u => u.id === docenteId);
-    document.getElementById('hcelda-docente-id').value = docenteId;
-    document.getElementById('hcelda-docente-nombre').textContent =
-        docente ? docente.nombre_completo : (selMat.value ? 'Sin docente asignado en este grado' : '—');
-};
-
-window.guardarCeldaHorario = async () => {
-    const gradoId    = document.getElementById('hcelda-grado-id').value;
-    const dia        = document.getElementById('hcelda-dia').value;
-    const periodo    = parseInt(document.getElementById('hcelda-periodo').value, 10);
-    const horaInicio = document.getElementById('hcelda-hora-inicio').value;
-    const horaFin    = document.getElementById('hcelda-hora-fin').value;
-    const materiaId  = document.getElementById('hcelda-materia').value;
-    const docenteId  = document.getElementById('hcelda-docente-id').value || null;
-
-    if (!materiaId) { mostrarToast('Seleccioná una materia', 'advertencia'); return; }
-
-    const btn = document.getElementById('btn-guardar-celda-horario');
-    setBotonCargando(btn, true);
-
-    const { error } = await supabase.from('horarios').upsert(
-        [{ grado_id: gradoId, materia_id: materiaId, docente_id: docenteId, dia, periodo, hora_inicio: horaInicio, hora_fin: horaFin }],
-        { onConflict: 'grado_id,dia,periodo' }
-    );
-
-    setBotonCargando(btn, false);
-    if (error) return notificarError(error, 'Error guardando el horario');
-
-    mostrarToast('Horario actualizado', 'exito');
-    cerrarModal('modal-celda-horario');
-    await cargarHorarioGrado(gradoId);
-};
-
-window.eliminarCeldaHorario = async (id) => {
-    const ok = await mostrarConfirm('¿Quitar esta clase del horario?', { textoConfirmar: 'Quitar' });
-    if (!ok) return;
-    const { error } = await supabase.from('horarios').delete().eq('id', id);
-    if (error) return notificarError(error, 'Error quitando la clase');
-    mostrarToast('Clase quitada del horario', 'exito');
-    await cargarHorarioGrado(horarioGradoSel);
-};
-
-window.imprimirHorarioGrado = () => {
-    if (!horarioGradoSel) { mostrarToast('Seleccioná un grado primero', 'advertencia'); return; }
-    window.open(`./horario.html?grado=${horarioGradoSel}`, '_blank');
-};
-
-// ── GENERADOR AUTOMÁTICO DE HORARIOS ─────────
+// ── DOCENTE EFECTIVO DE GRADO_MATERIA ────────
 // Docente "efectivo" de una fila de grado_materia: el asignado directamente en
 // grado_materia.docente_id, y si esa columna viene null, el docente por defecto
 // de la materia (materias.docente_id) como fallback. Sin esto, una materia cuyo
@@ -1238,387 +1003,6 @@ function docenteEfectivoGradoMateria(gm) {
     if (!id) return null;
     return { id, nombre: usuariosCache.find(u => u.id === id)?.nombre_completo || '' };
 }
-
-async function renderVistaGenerador() {
-    document.getElementById('gen-formulario').classList.remove('hidden');
-    document.getElementById('gen-resultado').classList.add('hidden');
-    document.getElementById('gen-sin-solucion').classList.add('hidden');
-    document.getElementById('gen-materias-lista').innerHTML = '<div class="empty-bubbles">Cargando…</div>';
-
-    try {
-        // Datos frescos cada vez que se abre esta vista: recarga grados/usuarios/materias
-        // (usuariosCache se usa para resolver el nombre del docente de fallback) y luego
-        // las asignaciones de grado_materia.
-        await cargarTodo();
-
-        const { data, error } = await supabase
-            .from('grado_materia')
-            .select('*, grados(id, nombre, seccion, modalidad), materias(id, nombre, docente_id)')
-            .order('grado_id');
-
-        if (error && esErrorDeRed(error)) { mostrarBannerSinConexion(() => renderVistaGenerador()); return; }
-        ocultarBannerSinConexion();
-        if (error) return notificarError(error, 'Error cargando materias asignadas');
-
-        const filas = data || [];
-        genSinDocenteCount = filas.filter(gm => !docenteEfectivoGradoMateria(gm)).length;
-
-        // Conserva las horas/disponibilidad que el admin ya haya tocado si vuelve a esta vista.
-        genAsignaciones = filas.filter(gm => docenteEfectivoGradoMateria(gm)).map(gm => {
-            const doc = docenteEfectivoGradoMateria(gm);
-            const anterior = genAsignaciones.find(a => a.id === gm.id);
-            return {
-                id: gm.id,
-                gradoId: gm.grado_id,
-                gradoNombre: `${gm.grados?.nombre || ''} ${gm.grados?.modalidad || ''} — Sección ${gm.grados?.seccion || ''}`,
-                materiaId: gm.materia_id,
-                materiaNombre: gm.materias?.nombre || '',
-                docenteId: doc.id,
-                docenteNombre: doc.nombre,
-                horasPorSemana: anterior ? anterior.horasPorSemana : 4,
-                incluida: anterior ? anterior.incluida : true,
-            };
-        });
-
-        const docenteIds = [...new Set(genAsignaciones.map(a => a.docenteId))];
-        genDocentes = docenteIds.map(id => {
-            const anterior = genDocentes.find(d => d.id === id);
-            const asign = genAsignaciones.find(a => a.docenteId === id);
-            return { id, nombre: asign?.docenteNombre || '', disponibilidad: anterior ? anterior.disponibilidad : 'completa' };
-        });
-
-        renderFormularioGenerador();
-    } catch (err) {
-        if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => renderVistaGenerador()); return; }
-        notificarError(err, 'Error cargando materias asignadas');
-    }
-}
-
-// Análisis de viabilidad por carga docente, ANTES de siquiera intentar generar.
-// 5 días × 10 períodos = 50 slots disponibles por semana es el techo físico
-// real de un docente (P1-P10, ver BLOQUES_HORARIO) — por encima de eso ningún
-// horario sin choques es posible, sin importar cuánto tiempo o cuántos
-// reintentos se le den al backtracking. El límite de "imposible" se deja en
-// 48 (no 50) porque llenarle a un docente los 50 slots exactos no deja NINGÚN
-// margen de maniobra al backtracking (tendría que acertar la única
-// combinación posible a la primera), así que en la práctica ya es
-// inviable antes de llegar al tope matemático. Entre 35 y 48h sigue siendo
-// válido pero deja muy poco margen (alto riesgo de que el generador no
-// encuentre una combinación 100% completa).
-const CARGA_MAXIMA_FISICA = 48;
-const CARGA_RIESGO_ALTO   = 35;
-const CARGA_ADVERTENCIA   = 20;
-
-function calcularCargaPorDocenteGenerador() {
-    const carga = {};
-    genAsignaciones.filter(a => a.incluida).forEach(a => {
-        const horas = Math.max(0, Math.min(10, parseInt(a.horasPorSemana, 10) || 0));
-        carga[a.docenteId] = (carga[a.docenteId] || 0) + horas;
-    });
-    return Object.entries(carga)
-        .map(([docenteId, horas]) => ({
-            docenteId, horas,
-            nombre: genAsignaciones.find(a => a.docenteId === docenteId)?.docenteNombre || docenteId,
-        }))
-        .sort((a, b) => b.horas - a.horas);
-}
-
-function renderViabilidadGenerador() {
-    let cont = document.getElementById('gen-viabilidad');
-    if (!cont) {
-        cont = document.createElement('div');
-        cont.id = 'gen-viabilidad';
-        document.getElementById('gen-materias-lista').insertAdjacentElement('beforebegin', cont);
-    }
-
-    const filas = calcularCargaPorDocenteGenerador();
-    if (!filas.length) { cont.innerHTML = ''; genImposiblePorCarga = false; return; }
-
-    const imposibles = filas.filter(f => f.horas > CARGA_MAXIMA_FISICA);
-    const riesgosas  = filas.filter(f => f.horas > CARGA_RIESGO_ALTO && f.horas <= CARGA_MAXIMA_FISICA);
-    genImposiblePorCarga = imposibles.length > 0;
-
-    const paletaDe = (horas) => {
-        if (horas > CARGA_RIESGO_ALTO) return { bg: '#fde8e8', fg: '#b52828', bd: '#f5c2c2' }; // rojo
-        if (horas > CARGA_ADVERTENCIA) return { bg: '#fef9e7', fg: '#92400e', bd: '#fde68a' }; // amarillo
-        return { bg: '#e8fdf0', fg: '#1a7a40', bd: '#bbf7d0' }; // verde
-    };
-
-    const chips = filas.map(f => {
-        const p = paletaDe(f.horas);
-        return `<span style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:100px;background:${p.bg};color:${p.fg};border:1px solid ${p.bd};font-size:11px;font-weight:600">${f.nombre} · ${f.horas}h</span>`;
-    }).join('');
-
-    const avisoImposible = imposibles.length
-        ? `<div class="info-box" style="background:#fde8e8;border-color:#f5c2c2;color:#b52828;margin-top:10px">
-            🚫 ${imposibles.length} docente(s) superan las ${CARGA_MAXIMA_FISICA} horas semanales (5 días × 10 períodos = 50 slots disponibles) —
-            es matemáticamente imposible armar un horario sin choques mientras esto no se corrija.
-            No se puede generar hasta reducir su carga o quitar/reasignar materias:
-            ${imposibles.map(f => `${f.nombre} (${f.horas}h)`).join(', ')}.
-           </div>`
-        : '';
-    const avisoRiesgo = (!imposibles.length && riesgosas.length)
-        ? `<div class="info-box" style="margin-top:10px">
-            ⚠ ${riesgosas.length} docente(s) superan las ${CARGA_RIESGO_ALTO} horas semanales — riesgo alto de que el
-            generador no encuentre una solución 100% completa: ${riesgosas.map(f => `${f.nombre} (${f.horas}h)`).join(', ')}.
-           </div>`
-        : '';
-
-    cont.innerHTML = `
-        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;margin-bottom:14px">
-            <div style="font-size:12px;font-weight:700;color:#0a1628;margin-bottom:10px;text-transform:uppercase;letter-spacing:.6px">Carga semanal por docente</div>
-            <div style="display:flex;flex-wrap:wrap;gap:8px">${chips}</div>
-            ${avisoImposible}${avisoRiesgo}
-        </div>`;
-}
-
-function renderFormularioGenerador() {
-    const avisoSinDocente = genSinDocenteCount
-        ? `<div class="info-box">⚠ ${genSinDocenteCount} materia(s) sin docente asignado no se incluyen — asignalas primero en Grados → Materias del grado.</div>`
-        : '';
-
-    if (!genAsignaciones.length) {
-        document.getElementById('gen-materias-lista').innerHTML = avisoSinDocente + '<div class="empty-bubbles">No hay materias con docente asignado todavía.</div>';
-        document.getElementById('gen-docentes-lista').innerHTML = '';
-        genImposiblePorCarga = false;
-        return;
-    }
-
-    renderViabilidadGenerador();
-
-    const gradosAgrupados = new Map();
-    genAsignaciones.forEach(a => {
-        if (!gradosAgrupados.has(a.gradoId)) gradosAgrupados.set(a.gradoId, { nombre: a.gradoNombre, materias: [] });
-        gradosAgrupados.get(a.gradoId).materias.push(a);
-    });
-
-    document.getElementById('gen-materias-lista').innerHTML = avisoSinDocente + [...gradosAgrupados.values()].map(g => `
-        <div class="gen-grado-card">
-            <div class="gen-grado-titulo">${g.nombre}</div>
-            ${g.materias.map(a => `
-                <div class="gen-materia-row ${a.incluida ? '' : 'gen-materia-excluida'}">
-                    <label class="gen-materia-check">
-                        <input type="checkbox" ${a.incluida ? 'checked' : ''} onchange="actualizarIncluidaGenerador('${a.id}', this.checked)">
-                        <span>${a.materiaNombre} <span class="text-muted">— ${a.docenteNombre}</span></span>
-                    </label>
-                    <input type="number" min="1" max="10" value="${a.horasPorSemana}" class="gen-horas-input" ${a.incluida ? '' : 'disabled'}
-                        onchange="actualizarHorasGenerador('${a.id}', this.value)">
-                </div>
-            `).join('')}
-        </div>
-    `).join('');
-
-    document.getElementById('gen-docentes-lista').innerHTML = genDocentes.map(d => `
-        <div class="gen-docente-row">
-            <span>${d.nombre}</span>
-            <select onchange="actualizarDisponibilidadGenerador('${d.id}', this.value)">
-                <option value="completa" ${d.disponibilidad === 'completa' ? 'selected' : ''}>Jornada completa (P1-P10)</option>
-                <option value="manana" ${d.disponibilidad === 'manana' ? 'selected' : ''}>Solo mañana (P1-P7)</option>
-            </select>
-        </div>
-    `).join('');
-}
-
-window.actualizarHorasGenerador = (asignacionId, valor) => {
-    const a = genAsignaciones.find(x => x.id === asignacionId);
-    if (a) a.horasPorSemana = Math.max(1, Math.min(10, parseInt(valor, 10) || 1));
-    renderViabilidadGenerador(); // la carga por docente cambió — refrescar el semáforo
-};
-
-window.actualizarIncluidaGenerador = (asignacionId, checked) => {
-    const a = genAsignaciones.find(x => x.id === asignacionId);
-    if (!a) return;
-    a.incluida = checked;
-    renderFormularioGenerador(); // re-pinta para habilitar/deshabilitar el input de horas de esa fila
-};
-
-window.actualizarDisponibilidadGenerador = (docenteId, valor) => {
-    const d = genDocentes.find(x => x.id === docenteId);
-    if (d) d.disponibilidad = valor;
-};
-
-function construirConfigGenerador() {
-    const disponibilidadDocente = {};
-    genDocentes.forEach(d => { disponibilidadDocente[d.id] = d.disponibilidad; });
-    return {
-        asignaciones: genAsignaciones.filter(a => a.incluida).map(a => ({
-            id: a.id, gradoId: a.gradoId, materiaId: a.materiaId,
-            materiaNombre: a.materiaNombre, docenteId: a.docenteId, horasPorSemana: a.horasPorSemana,
-        })),
-        disponibilidadDocente,
-    };
-}
-
-// debug:true imprime en consola (console.warn), cuando ningún intento encuentra
-// una solución completa, qué materia/docente quedó bloqueado y con cuántas
-// horas — abrí la consola del navegador (F12) antes de generar para verlo.
-// permitirParcial:true cambia el contrato de retorno de generarHorario: en vez
-// de Array|null, siempre devuelve { completo, filas, materiasNoColocadas }, así
-// que acá se desarma esa forma en las variables de módulo de siempre
-// (genResultado sigue siendo el Array de filas que usa el resto del código).
-function aplicarResultadoGenerador(resultado) {
-    genResultado = resultado.filas;
-    genCompleto = resultado.completo;
-    genMateriasNoColocadas = resultado.materiasNoColocadas;
-    mostrarResultadoGenerador();
-}
-
-window.ejecutarGenerarHorario = () => {
-    if (!genAsignaciones.some(a => a.incluida)) { mostrarToast('Marcá al menos una materia para generar el horario', 'advertencia'); return; }
-    if (genImposiblePorCarga) { mostrarToast(`Hay docente(s) con más de ${CARGA_MAXIMA_FISICA} horas semanales — corregí su carga antes de generar`, 'error'); return; }
-    genSeed = Date.now() % 100000;
-    aplicarResultadoGenerador(generarHorario(construirConfigGenerador(), genSeed, { debug: true, permitirParcial: true }));
-};
-
-window.generarOtroHorario = () => {
-    if (genImposiblePorCarga) { mostrarToast(`Hay docente(s) con más de ${CARGA_MAXIMA_FISICA} horas semanales — corregí su carga antes de generar`, 'error'); return; }
-    genSeed += 1;
-    aplicarResultadoGenerador(generarHorario(construirConfigGenerador(), genSeed, { debug: true, permitirParcial: true }));
-};
-
-function mostrarResultadoGenerador() {
-    document.getElementById('gen-formulario').classList.add('hidden');
-
-    // Con permitirParcial:true, generarHorario ya no devuelve null — un Array
-    // vacío (nada se pudo colocar en ningún grado) es el único caso "sin nada
-    // que mostrar" que queda.
-    if (!genResultado || !genResultado.length) {
-        document.getElementById('gen-sin-solucion').classList.remove('hidden');
-        document.getElementById('gen-resultado').classList.add('hidden');
-        return;
-    }
-
-    // Sanity check defensivo — el algoritmo nunca debería devolver choques,
-    // pero si algo cambia en el futuro esto lo hace visible en vez de guardarlo así.
-    const { ok } = verificarConflictos(genResultado);
-    if (!ok) {
-        genResultado = null;
-        document.getElementById('gen-sin-solucion').classList.remove('hidden');
-        document.getElementById('gen-resultado').classList.add('hidden');
-        notificarError({ message: 'El generador produjo choques internos' }, 'Error inesperado');
-        return;
-    }
-
-    document.getElementById('gen-sin-solucion').classList.add('hidden');
-    document.getElementById('gen-resultado').classList.remove('hidden');
-    renderAvisoMateriasNoColocadas();
-
-    const gradosConHoras = [...new Map(genAsignaciones.map(a => [a.gradoId, a.gradoNombre])).entries()];
-    const selPreview = document.getElementById('gen-grado-preview');
-    selPreview.innerHTML = gradosConHoras.map(([id, nombre]) => `<option value="${id}">${nombre}</option>`).join('');
-    if (!genGradoPreview || !gradosConHoras.find(([id]) => id === genGradoPreview)) {
-        genGradoPreview = gradosConHoras[0]?.[0] || null;
-    }
-    selPreview.value = genGradoPreview;
-    renderGridGenerador();
-}
-
-// Con permitirParcial:true el resultado puede ser una solución PARCIAL (no
-// todas las materias/horas se pudieron ubicar) — esto avisa cuáles, sin
-// bloquear la vista previa: el admin igual puede ver/guardar lo que sí se
-// resolvió y completar el resto a mano en Horarios. El div se crea una sola
-// vez (id fijo) y se reutiliza en cada render para no ir acumulando copias.
-function renderAvisoMateriasNoColocadas() {
-    let aviso = document.getElementById('gen-aviso-parcial');
-    if (!aviso) {
-        aviso = document.createElement('div');
-        aviso.id = 'gen-aviso-parcial';
-        aviso.className = 'info-box hidden';
-        document.getElementById('gen-resultado').prepend(aviso);
-    }
-
-    if (genCompleto || !genMateriasNoColocadas.length) {
-        aviso.classList.add('hidden');
-        return;
-    }
-
-    aviso.classList.remove('hidden');
-    const detalle = genMateriasNoColocadas.map(m => {
-        const asign = genAsignaciones.find(a => a.id === m.asignacionId);
-        return `${asign?.gradoNombre || m.gradoId} — ${m.materiaNombre || m.materiaId} (${asign?.docenteNombre || m.docenteId}): ${m.horasColocadas}/${m.horasRequeridas} horas ubicadas`;
-    }).join('<br>');
-    aviso.innerHTML = `⚠ No se encontró una solución 100% completa — se generó la mejor combinación posible, pero ${genMateriasNoColocadas.length} materia(s) quedaron con horas sin ubicar:<br>${detalle}`;
-}
-
-window.cambiarPreviewGenerador = () => {
-    genGradoPreview = document.getElementById('gen-grado-preview').value;
-    renderGridGenerador();
-};
-
-function renderGridGenerador() {
-    const cont = document.getElementById('gen-grid');
-    if (!genResultado || !genGradoPreview) { cont.innerHTML = ''; return; }
-
-    const filasGrado = genResultado.filter(f => f.grado_id === genGradoPreview);
-    const porCelda = {};
-    filasGrado.forEach(f => { porCelda[`${f.dia}-${f.periodo}`] = f; });
-
-    let html = '<div class="hg-cell hg-head"></div>' +
-        DIAS_HORARIO.map(d => `<div class="hg-cell hg-head">${d}</div>`).join('');
-
-    BLOQUES_HORARIO.forEach(b => {
-        if (b.tipo !== 'clase') {
-            html += `<div class="hg-cell hg-periodo-label"><span class="hg-periodo-hora">${b.inicio}–${b.fin}</span></div>`;
-            html += `<div class="hg-cell hg-bloqueado" style="grid-column:2 / -1">${b.label}</div>`;
-            return;
-        }
-        html += `<div class="hg-cell hg-periodo-label"><span class="hg-periodo-num">P${b.periodo}</span><span class="hg-periodo-hora">${b.inicio}–${b.fin}</span></div>`;
-        DIAS_HORARIO.forEach(dia => {
-            const f = porCelda[`${dia}-${b.periodo}`];
-            if (f) {
-                const asign = genAsignaciones.find(a => a.id === f.grado_materia_id);
-                html += `
-                <div class="hg-cell hg-ocupada-wrap">
-                    <div class="hg-ocupada" style="background:${colorPorMateria(f.materia_id)}">
-                        <div class="hg-materia">${asign?.materiaNombre || ''}</div>
-                        <div class="hg-docente">${nombreCortoDocente(asign?.docenteNombre)}</div>
-                    </div>
-                </div>`;
-            } else {
-                html += '<div class="hg-cell hg-vacia"></div>';
-            }
-        });
-    });
-
-    cont.innerHTML = html;
-}
-
-window.descartarHorarioGenerado = () => {
-    genResultado = null;
-    genCompleto = true;
-    genMateriasNoColocadas = [];
-    document.getElementById('gen-resultado').classList.add('hidden');
-    document.getElementById('gen-sin-solucion').classList.add('hidden');
-    document.getElementById('gen-formulario').classList.remove('hidden');
-};
-
-window.guardarHorarioGenerado = async () => {
-    if (!genResultado || !genResultado.length) return;
-
-    const gradoIds = [...new Set(genResultado.map(f => f.grado_id))];
-    const avisoParcial = !genCompleto
-        ? ` ⚠ Esta combinación NO está completa — ${genMateriasNoColocadas.length} materia(s) quedaron con horas sin ubicar y vas a tener que completarlas manualmente después en Horarios.`
-        : '';
-    const ok = await mostrarConfirm(
-        `Esto va a REEMPLAZAR el horario actual de ${gradoIds.length} grado(s) por el que acabás de generar.${avisoParcial} ¿Continuar?`,
-        { textoConfirmar: 'Guardar y reemplazar' }
-    );
-    if (!ok) return;
-
-    const btn = document.getElementById('btn-guardar-horario-generado');
-    setBotonCargando(btn, true, 'Guardando...');
-
-    const { error: eDel } = await supabase.from('horarios').delete().in('grado_id', gradoIds);
-    if (eDel) { setBotonCargando(btn, false); return notificarError(eDel, 'Error limpiando el horario anterior'); }
-
-    const { error: eIns } = await supabase.from('horarios').insert(genResultado);
-    setBotonCargando(btn, false);
-    if (eIns) return notificarError(eIns, 'Error guardando el horario generado');
-
-    mostrarToast('Horario generado guardado correctamente', 'exito');
-    horarioGradoSel = null; // fuerza recargar si el admin va a la vista manual de Horarios
-    window.descartarHorarioGenerado();
-};
 
 // ── ASISTENCIAS ─────────────────────────────
 function fechaHoyISO() {
@@ -2175,9 +1559,9 @@ window.abrirModalNuevoAnio = () => {
     abrirModal('modal-nuevo-anio');
 };
 
-// Clona grados + grado_materia + horarios del año anterior hacia el año nuevo.
-// Materias y docentes son catálogos globales (no están atados a un año), así
-// que no hace falta clonarlos — solo las asociaciones que sí son por-año.
+// Clona grados + grado_materia del año anterior hacia el año nuevo. Materias y
+// docentes son catálogos globales (no están atados a un año), así que no hace
+// falta clonarlos — solo las asociaciones que sí son por-año.
 async function copiarEstructuraAnio(anioAnteriorId, anioNuevoId, anioNuevoNumero) {
     const { data: gradosViejos, error: eG } = await supabase.from('grados').select('*').eq('año_academico_id', anioAnteriorId);
     if (eG) throw eG;
@@ -2200,17 +1584,6 @@ async function copiarEstructuraAnio(anioAnteriorId, anioNuevoId, anioNuevoNumero
     if (gmViejos?.length) {
         const nuevosGm = gmViejos.map(gm => ({ grado_id: mapaGrados[gm.grado_id], materia_id: gm.materia_id, docente_id: gm.docente_id }));
         const { error } = await supabase.from('grado_materia').insert(nuevosGm);
-        if (error) throw error;
-    }
-
-    const { data: horViejos, error: eHor } = await supabase.from('horarios').select('*').in('grado_id', gradoIdsViejos);
-    if (eHor) throw eHor;
-    if (horViejos?.length) {
-        const nuevosHor = horViejos.map(h => ({
-            grado_id: mapaGrados[h.grado_id], materia_id: h.materia_id, docente_id: h.docente_id,
-            dia: h.dia, periodo: h.periodo, hora_inicio: h.hora_inicio, hora_fin: h.hora_fin, año_academico_id: anioNuevoId,
-        }));
-        const { error } = await supabase.from('horarios').insert(nuevosHor);
         if (error) throw error;
     }
 }
@@ -2287,7 +1660,7 @@ window.eliminarAnioAcademico = async (id) => {
     const anio = aniosAcademicosCache.find(a => a.id === id);
     if (!anio) return;
     const escrito = window.prompt(
-        `Esta acción borra TODO lo relacionado al año ${anio.anio} (grados, horarios, notas, asistencias, competencias, criterios de evaluación, matrículas y períodos académicos). No se puede deshacer.\n\nEscribí "${anio.anio}" para confirmar:`
+        `Esta acción borra TODO lo relacionado al año ${anio.anio} (grados, notas, asistencias, competencias, criterios de evaluación, matrículas y períodos académicos). No se puede deshacer.\n\nEscribí "${anio.anio}" para confirmar:`
     );
     if (escrito !== String(anio.anio)) { mostrarToast('Cancelado', 'info'); return; }
 

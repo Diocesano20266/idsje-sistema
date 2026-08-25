@@ -1263,16 +1263,31 @@ window.buscarAlumnoExpediente = async () => {
     // La búsqueda es sobre el catálogo de alumnos (nombres/apellidos/nie ya no
     // tienen grado_id embebido). El grado que se muestra es su matrícula del
     // año activo, si tiene una — se busca aparte porque alumnos ya no tiene FK a grados.
-    const { data, error } = await supabase
-        .from('alumnos')
-        .select('*')
-        .or(`nombres.ilike.%${texto}%,apellidos.ilike.%${texto}%,nie.ilike.%${texto}%`)
-        .order('apellidos')
-        .limit(20);
+    //
+    // Tres queries .ilike() separadas (NO .or()): la sintaxis de .or() de
+    // PostgREST usa la coma como separador entre condiciones, así que un
+    // texto de búsqueda con coma (ej. "Pérez, Juan") rompía el filtro entero
+    // con un error de sintaxis del lado del servidor. .ilike() no tiene ese
+    // problema porque el valor no se re-parsea como lista de condiciones.
+    const patron = `%${texto}%`;
+    const [
+        { data: porNombres, error: e1 },
+        { data: porApellidos, error: e2 },
+        { data: porNie, error: e3 },
+    ] = await Promise.all([
+        supabase.from('alumnos').select('*').ilike('nombres', patron).limit(20),
+        supabase.from('alumnos').select('*').ilike('apellidos', patron).limit(20),
+        supabase.from('alumnos').select('*').ilike('nie', patron).limit(20),
+    ]);
 
+    const error = e1 || e2 || e3;
     if (error) { notificarError(error, 'Error buscando alumnos'); return; }
 
-    expAdminAlumnos = data || [];
+    const porId = new Map();
+    [...(porNombres || []), ...(porApellidos || []), ...(porNie || [])].forEach(a => porId.set(a.id, a));
+    expAdminAlumnos = [...porId.values()]
+        .sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || ''))
+        .slice(0, 20);
     if (!expAdminAlumnos.length) { cont.innerHTML = '<div class="empty-bubbles">Sin resultados.</div>'; return; }
 
     if (anioActivoCache && expAdminAlumnos.length) {
@@ -1302,6 +1317,7 @@ window.seleccionarAlumnoExpedienteAdmin = (alumnoId) => {
     document.getElementById('exp-admin-busqueda').value = alumno ? `${alumno.apellidos}, ${alumno.nombres}` : '';
     document.getElementById('exp-admin-detalle').classList.remove('hidden');
     document.getElementById('exp-admin-nombre').textContent = alumno ? `${alumno.apellidos}, ${alumno.nombres}` : '';
+    limpiarFormularioExpedienteAdmin();
     cargarExpedienteAdmin(alumnoId);
 };
 
@@ -1432,6 +1448,51 @@ window.eliminarRegistroExpediente = async (tabla, id) => {
     if (error) return notificarError(error, 'Error eliminando el registro');
 
     mostrarToast('Registro eliminado', 'exito');
+    await cargarExpedienteAdmin(expAdminAlumnoSel);
+};
+
+// ── Registrar nuevo (admin puede crear los 5 tipos, igual que el docente guía) ──
+window.cambiarTipoExpedienteAdmin = () => {
+    const tipo = document.getElementById('exp-admin-tipo').value;
+    document.getElementById('exp-admin-campo-categoria').classList.toggle('hidden', tipo !== 'demerito');
+    document.getElementById('exp-admin-campo-dias').classList.toggle('hidden', tipo !== 'suspension');
+};
+
+function limpiarFormularioExpedienteAdmin() {
+    document.getElementById('exp-admin-tipo').value = 'anecdotico';
+    document.getElementById('exp-admin-categoria').value = 'leve';
+    document.getElementById('exp-admin-dias').value = 1;
+    document.getElementById('exp-admin-descripcion').value = '';
+    window.cambiarTipoExpedienteAdmin();
+}
+
+window.guardarRegistroExpedienteAdmin = async () => {
+    if (!expAdminAlumnoSel) { mostrarToast('Seleccioná un alumno primero', 'advertencia'); return; }
+
+    const tipo = document.getElementById('exp-admin-tipo').value;
+    const descripcion = document.getElementById('exp-admin-descripcion').value.trim();
+    if (!descripcion) { mostrarToast('Escribí una descripción', 'advertencia'); return; }
+
+    const btn = document.getElementById('btn-guardar-expediente-admin');
+    setBotonCargando(btn, true);
+
+    let error;
+    if (tipo === 'anecdotico') {
+        ({ error } = await supabase.from('anecdoticos').insert([{ alumno_id: expAdminAlumnoSel, docente_id: usuarioActual.id, descripcion }]));
+    } else if (tipo === 'demerito') {
+        const categoria = document.getElementById('exp-admin-categoria').value;
+        ({ error } = await supabase.from('demeritos').insert([{ alumno_id: expAdminAlumnoSel, docente_id: usuarioActual.id, categoria, descripcion }]));
+    } else {
+        // acta | suspension | reconocimiento
+        const dias = tipo === 'suspension' ? (parseInt(document.getElementById('exp-admin-dias').value, 10) || 0) : 0;
+        ({ error } = await supabase.from('actas').insert([{ alumno_id: expAdminAlumnoSel, registrado_por: usuarioActual.id, tipo, dias_suspension: dias, descripcion }]));
+    }
+
+    setBotonCargando(btn, false);
+    if (error) return notificarError(error, 'Error guardando el registro');
+
+    mostrarToast('Registro guardado', 'exito');
+    limpiarFormularioExpedienteAdmin();
     await cargarExpedienteAdmin(expAdminAlumnoSel);
 };
 

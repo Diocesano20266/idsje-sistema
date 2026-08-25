@@ -635,12 +635,20 @@
             <!-- EXPEDIENTES DISCIPLINARIOS -->
             <div id="vista-expedientes" class="hidden">
                 <div class="filtros">
-                    <input type="text" id="exp-admin-busqueda" placeholder="Buscar alumno por nombre o NIE…" oninput="onInputBuscarExpediente()" style="flex:1;min-width:260px;padding:11px 14px;border:1px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;outline:none">
+                    <select id="exp-admin-grado" onchange="cambiarGradoExpedienteAdmin()">
+                        <option value="">— Seleccioná un grado —</option>
+                    </select>
                 </div>
-                <div id="exp-admin-resultados" class="exp-resultados"></div>
+
+                <div id="exp-admin-lista-wrap">
+                    <div class="exp-resultados" id="exp-admin-lista-alumnos">
+                        <div class="empty-bubbles">Seleccioná un grado para ver sus alumnos.</div>
+                    </div>
+                </div>
 
                 <div id="exp-admin-detalle" class="hidden" style="margin-top:20px">
-                    <div class="tabla-title" style="margin-bottom:12px" id="exp-admin-nombre"></div>
+                    <button class="btn-secondary" onclick="volverListaAlumnosExpediente()">← Volver</button>
+                    <div class="tabla-title" style="margin:16px 0 12px" id="exp-admin-nombre"></div>
 
                     <div class="exp-stats" id="exp-admin-resumen"></div>
 

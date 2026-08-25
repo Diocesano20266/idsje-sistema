@@ -2,7 +2,7 @@
 //  IDSJE — Panel Docente
 // ═══════════════════════════════════════════
 import { supabase, verificarSesion, cerrarSesion } from './auth.js';
-import { CONCEPTOS, ESTADOS_ASISTENCIA, TIPOS_EXPEDIENTE, getAñoActivo } from './config.js';
+import { CONCEPTOS, ESTADOS_ASISTENCIA, TIPOS_EXPEDIENTE, CODIGOS_DEMERITO, NIVELES_DEMERITO, TIPOS_AMONESTACION, TIPOS_RECONOCIMIENTO, getAñoActivo } from './config.js';
 import {
     calcularNotaFinal,
     promedioPonderado,
@@ -12,6 +12,8 @@ import {
     redistribuirPesos,
     colorEscala,
     puedeAccederCompetencias,
+    contarDemeritosActivos,
+    calcularNivelDemerito,
     mostrarToast,
     notificarError,
     esErrorDeRed,
@@ -27,11 +29,25 @@ let gradosGuiaCache = [];  // grados donde el docente es guía (docente_guia_id)
 let alumnosPorGrado = {};  // conteo de alumnos matriculados (año activo) por grado_id
 let anioActivoCache = null; // fila de `años_academicos` con activo=true, o null si no hay ninguno configurado
 
-// Expediente disciplinario
-let expAlumnos       = [];   // alumnos de los grados asignados al docente (materia o guía)
-let expAlumnoSel     = null; // alumno_id elegido
-let expEsGuia        = false; // ¿el docente es guía del grado de expAlumnoSel?
-let expTimeline      = [];   // solo si expEsGuia — registros combinados y ordenados por fecha
+// Deméritos (mismo patrón grado → alumnos → historial que el resto de los
+// módulos de disciplina, sin redención — eso es solo admin).
+let demAlumnos       = [];   // alumnos del grado elegido
+let demAlumnoSel     = null;
+let demDrawerDemeritos = []; // deméritos del alumno elegido (para el modal "+ Nuevo Demérito")
+
+// Anecdóticos / Amonestaciones / Reconocimientos — mismo patrón grado →
+// alumnos → historial + "+ Nuevo", nunca editable ni eliminable.
+let estadoModulos = {
+    anecdoticos:     { alumnos: [], alumnoSel: null },
+    amonestaciones:  { alumnos: [], alumnoSel: null },
+    reconocimientos: { alumnos: [], alumnoSel: null },
+};
+
+// Expediente (SOLO LECTURA — mezcla los 4 módulos de arriba). Solo tiene
+// datos para grados donde el docente es guía (RLS de guia_lee_* así lo exige).
+let expAlumnos   = []; // alumnos del grado elegido (dentro de gradosGuiaCache)
+let expAlumnoSel = null;
+let expTimeline  = [];
 
 // Asistencias
 let asisGradoId      = null;
@@ -147,6 +163,10 @@ const TITULOS = {
     notas: 'Registro de Notas',
     asistencias: 'Asistencias',
     reportes: 'Reportes',
+    demeritos: 'Deméritos',
+    anecdoticos: 'Anecdóticos',
+    amonestaciones: 'Amonestaciones',
+    reconocimientos: 'Reconocimientos',
     expediente: 'Expediente',
     competencias: 'Competencias Ciudadanas'
 };
@@ -167,7 +187,11 @@ window.mostrarVista = (vista) => {
     if (vista === 'notas')        initVistaNotas();
     if (vista === 'asistencias')  initVistaAsistencias();
     if (vista === 'reportes')     initVistaReportes();
-    if (vista === 'expediente')   initVistaExpediente();
+    if (vista === 'demeritos')    renderVistaDemeritoDocente();
+    if (vista === 'anecdoticos')  renderVistaModulo('anecdoticos');
+    if (vista === 'amonestaciones') renderVistaModulo('amonestaciones');
+    if (vista === 'reconocimientos') renderVistaModulo('reconocimientos');
+    if (vista === 'expediente')   renderVistaExpedienteDocente();
     if (vista === 'competencias') initVistaCompetencias();
 };
 
@@ -459,191 +483,472 @@ window.imprimirListaActividadesDocente = () => {
     window.open(`./reporte-lista-actividades.html?grado=${gradoId}&materia=${materiaId}&periodo=${periodo}&cotidianas=${cotidianas}&integradoras=${integradoras}&examenes=${examenes}`, '_blank');
 };
 
-// ── EXPEDIENTE DISCIPLINARIO ──────────────────
-// Selector de alumno: los mismos grados que Asistencias (materia asignada o guía).
-async function initVistaExpediente() {
-    const grados = gradosAsistenciaDocente();
-    const empty = document.getElementById('exp-empty');
-    const panel = document.getElementById('exp-panel');
+// ── DISCIPLINA — helpers compartidos ─────────
+// Los 5 módulos (Deméritos, Anecdóticos, Amonestaciones, Reconocimientos,
+// Expediente) navegan "elegir grado → ver sus alumnos matriculados este
+// año" de la misma forma. Deméritos/Anecdóticos/Amonestaciones/
+// Reconocimientos usan gradosAsistenciaDocente() (materia O guía — puede
+// registrar); Expediente usa gradosGuiaCache (SOLO guía — es lectura del
+// historial, y la RLS de guia_lee_* solo deja leer si sos guía).
+function poblarSelectGradosDocente(selectId, grados, valorActual) {
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    sel.innerHTML = '<option value="">— Seleccioná un grado —</option>' +
+        grados.map(g => `<option value="${g.id}">${g.nombre} ${g.modalidad} · Sección ${g.seccion}</option>`).join('');
+    sel.value = valorActual || '';
+}
 
-    if (!grados.length) {
-        empty.classList.remove('hidden');
-        panel.classList.add('hidden');
-        return;
-    }
+async function obtenerAlumnosDeGradoDocente(gradoId) {
+    if (!anioActivoCache || !gradoId) return [];
+    const { data, error } = await supabase
+        .from('matriculas')
+        .select('*, alumnos(*)')
+        .eq('grado_id', gradoId)
+        .eq('año_academico_id', anioActivoCache.id)
+        .eq('activo', true);
+    if (error) throw error;
+    return (data || []).map(m => m.alumnos).filter(Boolean).sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || ''));
+}
+
+function filaAlumnoClicableDocente(a, onclickJs) {
+    return `
+        <div class="exp-resultado-item" onclick="${onclickJs}">
+            <div style="display:flex;align-items:center;gap:10px">
+                ${a.foto_url
+                    ? `<img src="${a.foto_url}" class="foto-mini" alt="${a.apellidos}">`
+                    : '<div class="foto-mini foto-placeholder">?</div>'}
+                <span>${a.apellidos}, ${a.nombres}</span>
+            </div>
+            <span class="text-muted">NIE ${a.nie || '—'}</span>
+        </div>`;
+}
+
+// ── DEMÉRITOS (docente) ───────────────────────
+// Igual patrón que el admin (grado → alumnos → historial + "+ Nuevo
+// Demérito"), SIN redención — eso es solo admin (la RLS de `demeritos`
+// tampoco le da UPDATE al docente, así que queda reforzado en la base).
+function renderVistaDemeritoDocente() {
+    const grados = gradosAsistenciaDocente();
+    const empty = document.getElementById('dem-empty');
+    const panel = document.getElementById('dem-panel');
+    if (!grados.length) { empty.classList.remove('hidden'); panel.classList.add('hidden'); return; }
     empty.classList.add('hidden');
     panel.classList.remove('hidden');
 
-    if (!anioActivoCache) {
-        empty.classList.remove('hidden');
-        panel.classList.add('hidden');
-        return;
-    }
-
-    try {
-        const gradoIds = grados.map(g => g.id);
-        const { data, error } = await supabase
-            .from('matriculas')
-            .select('grado_id, alumnos(*)')
-            .in('grado_id', gradoIds)
-            .eq('año_academico_id', anioActivoCache.id)
-            .eq('activo', true);
-
-        if (error && esErrorDeRed(error)) { mostrarBannerSinConexion(() => initVistaExpediente()); return; }
-        ocultarBannerSinConexion();
-        if (error) return notificarError(error, 'Error cargando alumnos');
-
-        // Aplana grado_id (de la matrícula) sobre el alumno — el resto del código
-        // de expediente (ej. cambiarAlumnoExpediente) sigue usando alumno.grado_id.
-        expAlumnos = (data || [])
-            .filter(m => m.alumnos)
-            .map(m => ({ ...m.alumnos, grado_id: m.grado_id }))
-            .sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || ''));
-        const sel = document.getElementById('exp-alumno');
-        sel.innerHTML = '<option value="">— Seleccioná un alumno —</option>' +
-            expAlumnos.map(a => `<option value="${a.id}">${a.apellidos}, ${a.nombres}</option>`).join('');
-
-        if (expAlumnoSel && expAlumnos.find(a => a.id === expAlumnoSel)) {
-            sel.value = expAlumnoSel;
-            window.cambiarAlumnoExpediente();
-        } else {
-            expAlumnoSel = null;
-            document.getElementById('exp-detalle').classList.add('hidden');
-        }
-    } catch (err) {
-        if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => initVistaExpediente()); return; }
-        notificarError(err, 'Error cargando alumnos');
-    }
+    poblarSelectGradosDocente('dem-grado', grados);
+    demAlumnoSel = null;
+    document.getElementById('dem-detalle').classList.add('hidden');
+    document.getElementById('dem-lista-wrap').classList.remove('hidden');
+    document.getElementById('dem-lista-alumnos').innerHTML = '<div class="empty-state">Seleccioná un grado para ver sus alumnos.</div>';
 }
 
-window.cambiarAlumnoExpediente = () => {
-    expAlumnoSel = document.getElementById('exp-alumno').value;
-    if (!expAlumnoSel) {
-        document.getElementById('exp-detalle').classList.add('hidden');
-        return;
+window.cambiarGradoDemeritoDocente = async () => {
+    const gradoId = document.getElementById('dem-grado').value || null;
+    demAlumnoSel = null;
+    document.getElementById('dem-detalle').classList.add('hidden');
+    document.getElementById('dem-lista-wrap').classList.remove('hidden');
+    const cont = document.getElementById('dem-lista-alumnos');
+    if (!gradoId) { cont.innerHTML = '<div class="empty-state">Seleccioná un grado para ver sus alumnos.</div>'; return; }
+    cont.innerHTML = '<div class="empty-state">Cargando…</div>';
+
+    try {
+        demAlumnos = await obtenerAlumnosDeGradoDocente(gradoId);
+        if (!demAlumnos.length) { cont.innerHTML = '<div class="empty-state">Este grado no tiene alumnos matriculados.</div>'; return; }
+        cont.innerHTML = demAlumnos.map(a => filaAlumnoClicableDocente(a, `seleccionarAlumnoDemeritoDocente('${a.id}')`)).join('');
+    } catch (err) {
+        if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => window.cambiarGradoDemeritoDocente()); return; }
+        notificarError(err, 'Error cargando alumnos del grado');
     }
-
-    const alumno = expAlumnos.find(a => a.id === expAlumnoSel);
-    expEsGuia = gradosGuiaCache.some(g => g.id === alumno?.grado_id);
-
-    document.getElementById('exp-detalle').classList.remove('hidden');
-    document.getElementById('exp-timeline-wrap').classList.toggle('hidden', !expEsGuia);
-    document.getElementById('exp-solo-registro-aviso').classList.toggle('hidden', expEsGuia);
-
-    limpiarFormularioExpediente();
-    if (expEsGuia) cargarTimelineExpediente(expAlumnoSel);
 };
 
-async function cargarTimelineExpediente(alumnoId) {
-    document.getElementById('exp-timeline').innerHTML = '<div class="empty-state">Cargando…</div>';
-    try {
-        // `demeritos` tiene dos columnas que referencian a `usuarios` (docente_id
-        // que registró la falta, redimido_por que aplicó la redención — solo
-        // admin), así que el embed automático queda ambiguo y hay que nombrar
-        // la FK explícitamente, devolviéndola con el mismo alias de siempre.
-        const [{ data: anec, error: e1 }, { data: dem, error: e2 }, { data: act, error: e3 }] = await Promise.all([
-            supabase.from('anecdoticos').select('*, usuarios(nombre_completo)').eq('alumno_id', alumnoId),
-            supabase.from('demeritos').select('*, usuarios:usuarios!demeritos_docente_id_fkey(nombre_completo)').eq('alumno_id', alumnoId),
-            supabase.from('actas').select('*, usuarios(nombre_completo)').eq('alumno_id', alumnoId),
-        ]);
+window.volverListaDemeritoDocente = () => {
+    demAlumnoSel = null;
+    document.getElementById('dem-detalle').classList.add('hidden');
+    document.getElementById('dem-lista-wrap').classList.remove('hidden');
+};
 
-        const errorDeRed = [e1, e2, e3].find(e => e && esErrorDeRed(e));
-        if (errorDeRed) { mostrarBannerSinConexion(() => cargarTimelineExpediente(alumnoId)); return; }
-        ocultarBannerSinConexion();
-        if (e1) return notificarError(e1, 'Error cargando anecdóticos');
-        if (e2) return notificarError(e2, 'Error cargando deméritos');
-        if (e3) return notificarError(e3, 'Error cargando actas');
+window.seleccionarAlumnoDemeritoDocente = async (alumnoId) => {
+    demAlumnoSel = alumnoId;
+    const alumno = demAlumnos.find(a => a.id === alumnoId);
+    document.getElementById('dem-lista-wrap').classList.add('hidden');
+    document.getElementById('dem-detalle').classList.remove('hidden');
+    document.getElementById('dem-nombre').textContent = alumno ? `${alumno.apellidos}, ${alumno.nombres}` : '';
+    await cargarDrawerDemeritoDocente(alumnoId);
+};
 
-        expTimeline = [
-            ...(anec || []).map(r => ({ ...r, tipoClave: 'anecdotico', registradoPor: r.usuarios?.nombre_completo || '—' })),
-            // r.codigo (A/B/C/D) es el sistema nuevo; r.categoria (leve/grave/muy_grave)
-            // es lo que tienen los registros de antes del rediseño de deméritos.
-            ...(dem  || []).map(r => ({ ...r, tipoClave: `demerito_${r.codigo || r.categoria}`, registradoPor: r.usuarios?.nombre_completo || '—' })),
-            ...(act  || []).map(r => ({ ...r, tipoClave: r.tipo, registradoPor: r.usuarios?.nombre_completo || '—' })),
-        ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+async function cargarDrawerDemeritoDocente(alumnoId) {
+    const cont = document.getElementById('dem-drawer-content');
+    cont.innerHTML = '<div class="empty-state">Cargando…</div>';
 
-        renderTimelineExpediente();
-    } catch (err) {
-        if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => cargarTimelineExpediente(alumnoId)); return; }
-        notificarError(err, 'Error cargando el expediente');
-    }
+    // Dos FKs a `usuarios` (docente_id / redimido_por) obligan a nombrar la FK.
+    const { data, error } = await supabase
+        .from('demeritos')
+        .select('*, docente:usuarios!demeritos_docente_id_fkey(nombre_completo)')
+        .eq('alumno_id', alumnoId)
+        .order('fecha', { ascending: false });
+
+    if (error && esErrorDeRed(error)) { mostrarBannerSinConexion(() => cargarDrawerDemeritoDocente(alumnoId)); return; }
+    ocultarBannerSinConexion();
+    if (error) return notificarError(error, 'Error cargando el historial de deméritos');
+
+    demDrawerDemeritos = data || [];
+    const activos = contarDemeritosActivos(demDrawerDemeritos);
+    const infoNivel = NIVELES_DEMERITO.find(n => n.clave === calcularNivelDemerito(activos));
+    const badgeNivel = infoNivel
+        ? `<span class="badge" style="background:${infoNivel.bg};color:${infoNivel.color}">${infoNivel.icono} ${infoNivel.label}</span>`
+        : `<span class="badge" style="background:#e8fdf0;color:#1a7a40">Sin nivel activo</span>`;
+
+    const filas = demDrawerDemeritos.length
+        ? demDrawerDemeritos.map(d => {
+            const cod = CODIGOS_DEMERITO.find(c => c.codigo === d.codigo);
+            const tituloFalta = d.codigo
+                ? `Código ${d.codigo}${cod ? ' — ' + cod.descripcion : ''}`
+                : (d.categoria ? `Demérito (${d.categoria})` : 'Demérito');
+            const redimidoInfo = d.redimido
+                ? `<span class="exp-extra" style="color:#1a7a40;background:#e8fdf0">✓ Redimido${d.fecha_redencion ? ' el ' + new Date(d.fecha_redencion + 'T00:00:00').toLocaleDateString('es-SV') : ''}</span>`
+                : '';
+            return `
+            <div class="exp-item" style="--exp-color:${d.redimido ? '#94a3b8' : '#d97706'};--exp-bg:${d.redimido ? '#f1f5f9' : '#fef3c7'}${d.redimido ? ';opacity:.6' : ''}">
+                <div class="exp-item-icono">${d.codigo || '•'}</div>
+                <div class="exp-item-cuerpo">
+                    <div class="exp-item-cab">
+                        <span class="exp-item-tipo" style="${d.redimido ? 'text-decoration:line-through' : ''}">${tituloFalta}</span>
+                        <span class="exp-item-fecha">${new Date(d.fecha + 'T00:00:00').toLocaleDateString('es-SV')}</span>
+                    </div>
+                    ${d.descripcion ? `<div class="exp-item-desc">${d.descripcion}</div>` : ''}
+                    ${redimidoInfo}
+                    <div class="exp-item-registro">Registrado por ${d.docente?.nombre_completo || '—'}</div>
+                </div>
+            </div>`;
+        }).join('')
+        : '<div class="empty-state">Este alumno no tiene deméritos registrados.</div>';
+
+    cont.innerHTML = `
+        <div class="exp-stats" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px">
+            <div class="exp-stat" style="background:#fff;border-radius:10px;border:1px solid #e2e8f0;padding:14px;text-align:center">
+                <div style="font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:${infoNivel?.color || '#1a7a40'}">${activos}</div>
+                <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-top:2px">Deméritos activos</div>
+            </div>
+            <div style="background:#fff;border-radius:10px;border:1px solid #e2e8f0;padding:14px;display:flex;align-items:center;justify-content:center">${badgeNivel}</div>
+        </div>
+        <div class="exp-timeline">${filas}</div>
+    `;
 }
 
-function renderTimelineExpediente() {
-    const cont = document.getElementById('exp-timeline');
-    if (!expTimeline.length) {
-        cont.innerHTML = '<div class="empty-state">Este alumno no tiene registros en su expediente todavía.</div>';
-        return;
-    }
+window.abrirModalNuevoDemeritoDocente = () => {
+    if (!demAlumnoSel) return;
+    document.getElementById('nd-alumno-id').value = demAlumnoSel;
+    document.getElementById('nd-codigo').value = 'A';
+    document.getElementById('nd-descripcion').value = '';
+    document.getElementById('nd-fecha').value = new Date().toISOString().slice(0, 10);
+    abrirModal('modal-nuevo-demerito');
+};
 
-    cont.innerHTML = expTimeline.map(r => {
-        const info = TIPOS_EXPEDIENTE.find(t => t.clave === r.tipoClave) || {};
-        const extra = r.tipoClave === 'suspension' && r.dias_suspension
+window.guardarNuevoDemeritoDocente = async () => {
+    const alumnoId = document.getElementById('nd-alumno-id').value;
+    const codigo = document.getElementById('nd-codigo').value;
+    const descripcion = document.getElementById('nd-descripcion').value.trim();
+    const fecha = document.getElementById('nd-fecha').value || undefined;
+
+    const btn = document.getElementById('btn-guardar-nuevo-demerito');
+    setBotonCargando(btn, true);
+
+    const { error } = await supabase.from('demeritos')
+        .insert([{ alumno_id: alumnoId, docente_id: usuarioActual.id, codigo, descripcion, ...(fecha ? { fecha } : {}) }]);
+
+    setBotonCargando(btn, false);
+    if (error) return notificarError(error, 'Error guardando el demérito');
+
+    mostrarToast('Demérito registrado', 'exito');
+    cerrarModal('modal-nuevo-demerito');
+    await cargarDrawerDemeritoDocente(alumnoId);
+};
+
+// ── ANECDÓTICOS / AMONESTACIONES / RECONOCIMIENTOS (docente) ──
+// Mismo patrón grado → alumnos → historial + "+ Nuevo". Nunca editable ni
+// eliminable (registro permanente).
+const MODULOS_SIMPLES = {
+    anecdoticos: {
+        tabla: 'anecdoticos', prefijo: 'anec', campoRegistrador: 'docente_id',
+        tipos: null, tieneDias: false, tituloNuevo: 'Nuevo Anecdótico', claveBase: 'anecdotico',
+    },
+    amonestaciones: {
+        tabla: 'amonestaciones', prefijo: 'amon', campoRegistrador: 'registrado_por',
+        tipos: TIPOS_AMONESTACION, tieneDias: true, tituloNuevo: 'Nueva Amonestación', claveBase: 'amonestacion',
+    },
+    reconocimientos: {
+        tabla: 'reconocimientos', prefijo: 'reco', campoRegistrador: 'registrado_por',
+        tipos: TIPOS_RECONOCIMIENTO, tieneDias: false, tituloNuevo: 'Nuevo Reconocimiento', claveBase: 'reconocimiento',
+    },
+};
+
+function renderVistaModulo(clave) {
+    const cfg = MODULOS_SIMPLES[clave];
+    poblarSelectGradosDocente(`${cfg.prefijo}-grado`, gradosAsistenciaDocente());
+    document.getElementById(`${cfg.prefijo}-detalle`).classList.add('hidden');
+    document.getElementById(`${cfg.prefijo}-lista-wrap`).classList.remove('hidden');
+    estadoModulos[clave].alumnoSel = null;
+    document.getElementById(`${cfg.prefijo}-lista-alumnos`).innerHTML = '<div class="empty-state">Seleccioná un grado para ver sus alumnos.</div>';
+}
+
+window.cambiarGradoModulo = async (clave) => {
+    const cfg = MODULOS_SIMPLES[clave];
+    const gradoId = document.getElementById(`${cfg.prefijo}-grado`).value || null;
+    document.getElementById(`${cfg.prefijo}-detalle`).classList.add('hidden');
+    document.getElementById(`${cfg.prefijo}-lista-wrap`).classList.remove('hidden');
+    const cont = document.getElementById(`${cfg.prefijo}-lista-alumnos`);
+
+    if (!gradoId) { cont.innerHTML = '<div class="empty-state">Seleccioná un grado para ver sus alumnos.</div>'; return; }
+    cont.innerHTML = '<div class="empty-state">Cargando…</div>';
+
+    try {
+        const alumnos = await obtenerAlumnosDeGradoDocente(gradoId);
+        estadoModulos[clave].alumnos = alumnos;
+        if (!alumnos.length) { cont.innerHTML = '<div class="empty-state">Este grado no tiene alumnos matriculados.</div>'; return; }
+        cont.innerHTML = alumnos.map(a => filaAlumnoClicableDocente(a, `seleccionarAlumnoModulo('${clave}','${a.id}')`)).join('');
+    } catch (err) {
+        if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => window.cambiarGradoModulo(clave)); return; }
+        notificarError(err, 'Error cargando alumnos del grado');
+    }
+};
+
+window.volverListaModulo = (clave) => {
+    const cfg = MODULOS_SIMPLES[clave];
+    estadoModulos[clave].alumnoSel = null;
+    document.getElementById(`${cfg.prefijo}-detalle`).classList.add('hidden');
+    document.getElementById(`${cfg.prefijo}-lista-wrap`).classList.remove('hidden');
+};
+
+window.seleccionarAlumnoModulo = async (clave, alumnoId) => {
+    const cfg = MODULOS_SIMPLES[clave];
+    estadoModulos[clave].alumnoSel = alumnoId;
+    const alumno = estadoModulos[clave].alumnos.find(a => a.id === alumnoId);
+    document.getElementById(`${cfg.prefijo}-lista-wrap`).classList.add('hidden');
+    document.getElementById(`${cfg.prefijo}-detalle`).classList.remove('hidden');
+    document.getElementById(`${cfg.prefijo}-nombre`).textContent = alumno ? `${alumno.apellidos}, ${alumno.nombres}` : '';
+    await cargarTimelineModulo(clave, alumnoId);
+};
+
+async function cargarTimelineModulo(clave, alumnoId) {
+    const cfg = MODULOS_SIMPLES[clave];
+    const cont = document.getElementById(`${cfg.prefijo}-timeline`);
+    cont.innerHTML = '<div class="empty-state">Cargando…</div>';
+
+    const { data, error } = await supabase
+        .from(cfg.tabla)
+        .select(`*, usuarios:usuarios!${cfg.tabla}_${cfg.campoRegistrador}_fkey(nombre_completo)`)
+        .eq('alumno_id', alumnoId)
+        .order('fecha', { ascending: false });
+
+    if (error && esErrorDeRed(error)) { mostrarBannerSinConexion(() => cargarTimelineModulo(clave, alumnoId)); return; }
+    ocultarBannerSinConexion();
+    if (error) return notificarError(error, 'Error cargando el historial');
+
+    if (!data || !data.length) { cont.innerHTML = '<div class="empty-state">Sin registros todavía.</div>'; return; }
+
+    cont.innerHTML = data.map(r => {
+        const tipoClave = cfg.tipos ? `${cfg.claveBase}_${r.tipo}` : cfg.claveBase;
+        const info = TIPOS_EXPEDIENTE.find(t => t.clave === tipoClave) || {};
+        const extra = cfg.tieneDias && r.tipo === 'suspension' && r.dias_suspension
             ? `<span class="exp-extra">${r.dias_suspension} día(s) de suspensión</span>` : '';
         return `
         <div class="exp-item" style="--exp-color:${info.color || '#64748b'};--exp-bg:${info.bg || '#f1f5f9'}">
             <div class="exp-item-icono">${info.icono || '•'}</div>
             <div class="exp-item-cuerpo">
                 <div class="exp-item-cab">
-                    <span class="exp-item-tipo">${info.label || r.tipoClave}</span>
+                    <span class="exp-item-tipo">${info.label || tipoClave}</span>
                     <span class="exp-item-fecha">${new Date(r.fecha + 'T00:00:00').toLocaleDateString('es-SV')}</span>
                 </div>
                 <div class="exp-item-desc">${r.descripcion}</div>
                 ${extra}
-                <div class="exp-item-registro">Registrado por ${r.registradoPor}</div>
+                <div class="exp-item-registro">Registrado por ${r.usuarios?.nombre_completo || '—'}</div>
             </div>
         </div>`;
     }).join('');
 }
 
-window.cambiarTipoExpediente = () => {
-    const tipo = document.getElementById('exp-tipo').value;
-    const esDemerito = tipo === 'demerito';
-    document.getElementById('exp-campo-codigo').classList.toggle('hidden', !esDemerito);
-    document.getElementById('exp-campo-fecha-demerito').classList.toggle('hidden', !esDemerito);
-    document.getElementById('exp-campo-dias').classList.toggle('hidden', tipo !== 'suspension');
-    document.getElementById('exp-label-descripcion').textContent = esDemerito ? 'Descripción adicional (opcional)' : 'Descripción';
+window.abrirModalNuevoRegistro = (clave) => {
+    const cfg = MODULOS_SIMPLES[clave];
+    const alumnoId = estadoModulos[clave].alumnoSel;
+    if (!alumnoId) return;
+
+    document.getElementById('mnr-modulo').value = clave;
+    document.getElementById('mnr-alumno-id').value = alumnoId;
+    document.getElementById('mnr-title').textContent = cfg.tituloNuevo;
+    document.getElementById('mnr-descripcion').value = '';
+    document.getElementById('mnr-fecha').value = new Date().toISOString().slice(0, 10);
+
+    const campoTipo = document.getElementById('mnr-campo-tipo');
+    const selTipo = document.getElementById('mnr-tipo');
+    if (cfg.tipos) {
+        campoTipo.classList.remove('hidden');
+        selTipo.innerHTML = cfg.tipos.map(t => `<option value="${t.clave}">${t.label}</option>`).join('');
+        selTipo.value = cfg.tipos[0].clave;
+    } else {
+        campoTipo.classList.add('hidden');
+    }
+    window.cambiarTipoModalNuevoRegistro();
+    abrirModal('modal-nuevo-registro');
 };
 
-function limpiarFormularioExpediente() {
-    document.getElementById('exp-tipo').value = 'anecdotico';
-    document.getElementById('exp-codigo').value = 'A';
-    document.getElementById('exp-fecha-demerito').value = new Date().toISOString().slice(0, 10);
-    document.getElementById('exp-dias').value = 1;
-    document.getElementById('exp-descripcion').value = '';
-    window.cambiarTipoExpediente();
-}
+window.cambiarTipoModalNuevoRegistro = () => {
+    const clave = document.getElementById('mnr-modulo').value;
+    const cfg = MODULOS_SIMPLES[clave];
+    const tipoVal = document.getElementById('mnr-tipo').value;
+    document.getElementById('mnr-campo-dias').classList.toggle('hidden', !(cfg?.tieneDias && tipoVal === 'suspension'));
+};
 
-window.guardarRegistroExpediente = async () => {
-    if (!expAlumnoSel) { mostrarToast('Seleccioná un alumno primero', 'advertencia'); return; }
+window.guardarNuevoRegistroModulo = async () => {
+    const clave = document.getElementById('mnr-modulo').value;
+    const cfg = MODULOS_SIMPLES[clave];
+    const alumnoId = document.getElementById('mnr-alumno-id').value;
+    const descripcion = document.getElementById('mnr-descripcion').value.trim();
+    const fecha = document.getElementById('mnr-fecha').value || undefined;
+    if (!descripcion) { mostrarToast('Escribí una descripción', 'advertencia'); return; }
 
-    const tipo = document.getElementById('exp-tipo').value;
-    const descripcion = document.getElementById('exp-descripcion').value.trim();
-    if (tipo !== 'demerito' && !descripcion) { mostrarToast('Escribí una descripción', 'advertencia'); return; }
-
-    const btn = document.getElementById('btn-guardar-expediente');
-    setBotonCargando(btn, true);
-
-    let error;
-    if (tipo === 'anecdotico') {
-        ({ error } = await supabase.from('anecdoticos').insert([{ alumno_id: expAlumnoSel, docente_id: usuarioActual.id, descripcion }]));
-    } else if (tipo === 'demerito') {
-        const codigo = document.getElementById('exp-codigo').value;
-        const fecha = document.getElementById('exp-fecha-demerito').value || undefined;
-        ({ error } = await supabase.from('demeritos').insert([{ alumno_id: expAlumnoSel, docente_id: usuarioActual.id, codigo, descripcion, ...(fecha ? { fecha } : {}) }]));
-    } else {
-        // acta | suspension | reconocimiento
-        const dias = tipo === 'suspension' ? (parseInt(document.getElementById('exp-dias').value, 10) || 0) : 0;
-        ({ error } = await supabase.from('actas').insert([{ alumno_id: expAlumnoSel, registrado_por: usuarioActual.id, tipo, dias_suspension: dias, descripcion }]));
+    const payload = { alumno_id: alumnoId, [cfg.campoRegistrador]: usuarioActual.id, descripcion, ...(fecha ? { fecha } : {}) };
+    if (cfg.tipos) {
+        const tipo = document.getElementById('mnr-tipo').value;
+        payload.tipo = tipo;
+        if (cfg.tieneDias) payload.dias_suspension = tipo === 'suspension' ? (parseInt(document.getElementById('mnr-dias').value, 10) || 0) : 0;
     }
 
+    const btn = document.getElementById('btn-guardar-mnr');
+    setBotonCargando(btn, true);
+    const { error } = await supabase.from(cfg.tabla).insert([payload]);
     setBotonCargando(btn, false);
     if (error) return notificarError(error, 'Error guardando el registro');
 
     mostrarToast('Registro guardado', 'exito');
-    limpiarFormularioExpediente();
-    if (expEsGuia) await cargarTimelineExpediente(expAlumnoSel);
+    cerrarModal('modal-nuevo-registro');
+    await cargarTimelineModulo(clave, alumnoId);
 };
+
+// ── EXPEDIENTE (docente, SOLO LECTURA) ────────
+// Solo tiene sentido para grados donde el docente es guía: la RLS de
+// guia_lee_anecdoticos/demeritos/amonestaciones/reconocimientos únicamente
+// deja leer si sos guía del grado del alumno, así que el selector de grado
+// se limita directo a gradosGuiaCache (no gradosAsistenciaDocente()).
+function renderVistaExpedienteDocente() {
+    const empty = document.getElementById('exp-empty');
+    const panel = document.getElementById('exp-panel');
+    if (!gradosGuiaCache.length) { empty.classList.remove('hidden'); panel.classList.add('hidden'); return; }
+    empty.classList.add('hidden');
+    panel.classList.remove('hidden');
+
+    poblarSelectGradosDocente('exp-grado', gradosGuiaCache);
+    expAlumnoSel = null;
+    document.getElementById('exp-detalle').classList.add('hidden');
+    document.getElementById('exp-lista-wrap').classList.remove('hidden');
+    document.getElementById('exp-lista-alumnos').innerHTML = '<div class="empty-state">Seleccioná un grado para ver sus alumnos.</div>';
+}
+
+window.cambiarGradoExpedienteDocente = async () => {
+    const gradoId = document.getElementById('exp-grado').value || null;
+    expAlumnoSel = null;
+    document.getElementById('exp-detalle').classList.add('hidden');
+    document.getElementById('exp-lista-wrap').classList.remove('hidden');
+    const cont = document.getElementById('exp-lista-alumnos');
+    if (!gradoId) { cont.innerHTML = '<div class="empty-state">Seleccioná un grado para ver sus alumnos.</div>'; return; }
+    cont.innerHTML = '<div class="empty-state">Cargando…</div>';
+
+    try {
+        expAlumnos = await obtenerAlumnosDeGradoDocente(gradoId);
+        if (!expAlumnos.length) { cont.innerHTML = '<div class="empty-state">Este grado no tiene alumnos matriculados.</div>'; return; }
+        cont.innerHTML = expAlumnos.map(a => filaAlumnoClicableDocente(a, `seleccionarAlumnoExpedienteDocente('${a.id}')`)).join('');
+    } catch (err) {
+        if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => window.cambiarGradoExpedienteDocente()); return; }
+        notificarError(err, 'Error cargando alumnos del grado');
+    }
+};
+
+window.volverListaExpedienteDocente = () => {
+    expAlumnoSel = null;
+    document.getElementById('exp-detalle').classList.add('hidden');
+    document.getElementById('exp-lista-wrap').classList.remove('hidden');
+};
+
+window.seleccionarAlumnoExpedienteDocente = (alumnoId) => {
+    expAlumnoSel = alumnoId;
+    const alumno = expAlumnos.find(a => a.id === alumnoId);
+    document.getElementById('exp-lista-wrap').classList.add('hidden');
+    document.getElementById('exp-detalle').classList.remove('hidden');
+    document.getElementById('exp-nombre').textContent = alumno ? `${alumno.apellidos}, ${alumno.nombres}` : '';
+    const filtroTipo = document.getElementById('exp-filtro-tipo');
+    if (filtroTipo) filtroTipo.value = '';
+    cargarExpedienteDocente(alumnoId);
+};
+
+async function cargarExpedienteDocente(alumnoId) {
+    document.getElementById('exp-timeline').innerHTML = '<div class="empty-state">Cargando…</div>';
+    try {
+        const [
+            { data: anec, error: e1 },
+            { data: dem,  error: e2 },
+            { data: amon, error: e3 },
+            { data: reco, error: e4 },
+        ] = await Promise.all([
+            supabase.from('anecdoticos').select('*, usuarios:usuarios!anecdoticos_docente_id_fkey(nombre_completo)').eq('alumno_id', alumnoId),
+            supabase.from('demeritos').select('*, usuarios:usuarios!demeritos_docente_id_fkey(nombre_completo)').eq('alumno_id', alumnoId),
+            supabase.from('amonestaciones').select('*, usuarios:usuarios!amonestaciones_registrado_por_fkey(nombre_completo)').eq('alumno_id', alumnoId),
+            supabase.from('reconocimientos').select('*, usuarios:usuarios!reconocimientos_registrado_por_fkey(nombre_completo)').eq('alumno_id', alumnoId),
+        ]);
+
+        const errorDeRed = [e1, e2, e3, e4].find(e => e && esErrorDeRed(e));
+        if (errorDeRed) { mostrarBannerSinConexion(() => cargarExpedienteDocente(alumnoId)); return; }
+        ocultarBannerSinConexion();
+        if (e1) return notificarError(e1, 'Error cargando anecdóticos');
+        if (e2) return notificarError(e2, 'Error cargando deméritos');
+        if (e3) return notificarError(e3, 'Error cargando amonestaciones');
+        if (e4) return notificarError(e4, 'Error cargando reconocimientos');
+
+        expTimeline = [
+            ...(anec || []).map(r => ({ ...r, tabla: 'anecdoticos', tipoClave: 'anecdotico', registradoPor: r.usuarios?.nombre_completo || '—' })),
+            ...(dem  || []).map(r => ({ ...r, tabla: 'demeritos', tipoClave: `demerito_${r.codigo || r.categoria}`, registradoPor: r.usuarios?.nombre_completo || '—' })),
+            ...(amon || []).map(r => ({ ...r, tabla: 'amonestaciones', tipoClave: `amonestacion_${r.tipo}`, registradoPor: r.usuarios?.nombre_completo || '—' })),
+            ...(reco || []).map(r => ({ ...r, tabla: 'reconocimientos', tipoClave: `reconocimiento_${r.tipo}`, registradoPor: r.usuarios?.nombre_completo || '—' })),
+        ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+        renderTimelineExpedienteDocente();
+    } catch (err) {
+        if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => cargarExpedienteDocente(alumnoId)); return; }
+        notificarError(err, 'Error cargando el expediente');
+    }
+}
+
+function renderTimelineExpedienteDocente() {
+    const cont = document.getElementById('exp-timeline');
+    const filtro = document.getElementById('exp-filtro-tipo')?.value || '';
+    const filas = filtro ? expTimeline.filter(r => r.tabla === filtro) : expTimeline;
+
+    if (!filas.length) {
+        cont.innerHTML = '<div class="empty-state">Este alumno no tiene registros en su expediente todavía.</div>';
+        return;
+    }
+
+    cont.innerHTML = filas.map(r => {
+        const info = TIPOS_EXPEDIENTE.find(t => t.clave === r.tipoClave) || {};
+        const esRedimido = r.tabla === 'demeritos' && r.redimido;
+        const extraDias = r.tabla === 'amonestaciones' && r.tipo === 'suspension' && r.dias_suspension
+            ? `<span class="exp-extra">${r.dias_suspension} día(s) de suspensión</span>` : '';
+        const extraRedimido = esRedimido
+            ? `<span class="exp-extra" style="color:#1a7a40;background:#e8fdf0">✓ Redimido${r.fecha_redencion ? ' el ' + new Date(r.fecha_redencion + 'T00:00:00').toLocaleDateString('es-SV') : ''}</span>`
+            : '';
+        return `
+        <div class="exp-item" style="--exp-color:${info.color || '#64748b'};--exp-bg:${info.bg || '#f1f5f9'}${esRedimido ? ';opacity:.6' : ''}">
+            <div class="exp-item-icono">${info.icono || '•'}</div>
+            <div class="exp-item-cuerpo">
+                <div class="exp-item-cab">
+                    <span class="exp-item-tipo" style="${esRedimido ? 'text-decoration:line-through' : ''}">${info.label || r.tipoClave}</span>
+                    <span class="exp-item-fecha">${new Date(r.fecha + 'T00:00:00').toLocaleDateString('es-SV')}</span>
+                </div>
+                <div class="exp-item-desc">${r.descripcion || ''}</div>
+                ${extraDias}${extraRedimido}
+                <div class="exp-item-registro">Registrado por ${r.registradoPor}</div>
+            </div>
+        </div>`;
+    }).join('');
+}
 
 // ── REGISTRO DE NOTAS ────────────────────────
 function poblarSelectGradoNotas() {
@@ -1213,6 +1518,13 @@ window.guardarTodasLasCompetencias = async () => {
     await cargarAlumnosComp();
     mostrarToast('Competencias guardadas correctamente', 'exito');
 };
+
+// ── MODALES ("+ Nuevo Demérito" / "+ Nuevo Registro") ──
+window.abrirModal  = (id) => document.getElementById(id).classList.add('open');
+window.cerrarModal = (id) => document.getElementById(id).classList.remove('open');
+document.addEventListener('click', e => {
+    if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('open');
+});
 
 window.cerrarSesionDocente = cerrarSesion;
 

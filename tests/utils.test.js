@@ -1,254 +1,1206 @@
-import {
-    calcularNotaFinal,
-    promedioPonderado,
-    sumaPesos,
-    pesosEquitativos,
-    aplicarPesoMinimo,
-    redistribuirPesos,
-    PESO_MINIMO,
-    colorEscala,
-    puedeAccederCompetencias,
-    contarDemeritosActivos,
-    calcularNivelDemerito,
-} from '../src/js/utils.js';
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDSJE — Administración</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./src/css/ui.css">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Plus Jakarta Sans',sans-serif;background:#f0f3f9;color:#1e293b;min-height:100vh;display:flex}
 
-// ═══════════════════════════════════════════
-// 1. Cálculo de Nota Final (fórmula IDSJE 35/35/30)
-// ═══════════════════════════════════════════
-describe('calcularNotaFinal', () => {
-    test('notas perfectas (10/10/10) da NF = 10', () => {
-        expect(calcularNotaFinal(10, 10, 10)).toBe(10);
-    });
+        /* ── SIDEBAR ── */
+        .sidebar{position:fixed;top:0;left:0;width:220px;height:100vh;background:#0a1628;display:flex;flex-direction:column;z-index:200;border-right:1px solid rgba(212,175,55,.1)}
+        .sb-brand{padding:18px 16px 14px;border-bottom:1px solid rgba(212,175,55,.12)}
+        .sb-logo-row{display:flex;align-items:center;gap:10px}
+        .sb-seal{width:38px;height:38px;border-radius:50%;border:1.5px solid rgba(212,175,55,.6);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .sb-name{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:#fff}
+        .sb-tagline{font-size:8.5px;color:rgba(212,175,55,.6);letter-spacing:2px;text-transform:uppercase;margin-top:2px}
+        .sb-nav{flex:1;padding:14px 8px;overflow-y:auto}
+        .nav-group{margin-bottom:6px}
+        .nav-group-label{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:10px;font-weight:700;color:rgba(212,175,55,.4);letter-spacing:2.5px;text-transform:uppercase;padding:8px 8px 5px;margin:4px 0 0;cursor:pointer;user-select:none;border-radius:6px;transition:color .15s,background .15s}
+        .nav-group-label:hover{color:rgba(212,175,55,.7);background:rgba(255,255,255,.03)}
+        .nav-group-txt{flex:1}
+        .nav-group-chevron{font-size:9px;color:rgba(212,175,55,.4);transition:transform .2s ease;flex-shrink:0}
+        .nav-group.collapsed .nav-group-chevron{transform:rotate(-90deg)}
+        .nav-group-items{overflow:hidden;max-height:600px;opacity:1;transition:max-height .28s ease,opacity .2s ease}
+        .nav-group.collapsed .nav-group-items{max-height:0;opacity:0}
+        .nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:7px;cursor:pointer;margin-bottom:1px;position:relative;transition:all .2s}
+        .nav-item:hover{background:rgba(255,255,255,.05)}
+        .nav-item.active{background:rgba(212,175,55,.1)}
+        .nav-item.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:2.5px;height:18px;background:#d4af37;border-radius:2px}
+        .nav-ico{width:15px;height:15px;opacity:.45;flex-shrink:0}
+        .nav-item.active .nav-ico{opacity:1}
+        .nav-txt{font-size:13px;font-weight:500;color:rgba(255,255,255,.55)}
+        .nav-item.active .nav-txt{color:#fff;font-weight:600}
+        .nav-item.gold{background:rgba(212,175,55,.07);border:1px solid rgba(212,175,55,.15)}
+        .nav-item.gold .nav-txt{color:#d4af37}
+        .nav-item.gold .nav-ico{opacity:1}
+        .sb-foot{padding:12px 10px;border-top:1px solid rgba(212,175,55,.08)}
+        .user-pill{display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(255,255,255,.04);border-radius:8px;border:1px solid rgba(255,255,255,.06)}
+        .u-av{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#d4af37,#a07c0a);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#0a1628;flex-shrink:0}
+        .u-name{font-size:13px;font-weight:600;color:#fff}
+        .u-role{font-size:11px;color:rgba(212,175,55,.6);text-transform:uppercase;letter-spacing:.8px}
+        .btn-exit{width:100%;margin-top:7px;padding:7px;background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.15);border-radius:7px;color:rgba(255,120,120,.8);font-size:10px;font-weight:600;cursor:pointer;transition:all .2s}
+        .btn-exit:hover{background:rgba(239,68,68,.15)}
 
-    test('notas en 0 da NF = 0', () => {
-        expect(calcularNotaFinal(0, 0, 0)).toBe(0);
-    });
+        /* ── MAIN ── */
+        .main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh}
+        .gold-bar{height:2.5px;background:linear-gradient(90deg,#d4af37 0%,#f5d97a 40%,transparent 100%)}
+        .topbar{background:#fff;height:56px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e8ecf5;position:sticky;top:0;z-index:50}
+        .tb-title{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:#0a1628}
+        .tb-sub{font-size:10px;color:#94a3b8;margin-top:1px}
+        .topbar-actions{display:flex;gap:8px;align-items:center}
+        .btn-primary{background:#0a1628;color:#d4af37;border:1px solid rgba(212,175,55,.3);padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:5px}
+        .btn-primary:hover{background:#d4af37;color:#0a1628}
+        .btn-secondary{background:#fff;color:#475569;border:1px solid #e2e8f0;padding:7px 14px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s}
+        .btn-secondary:hover{background:#f8fafc;border-color:#cbd5e1}
 
-    test('notas mixtas aplica correctamente 35/35/30', () => {
-        // 8*0.35 + 6*0.35 + 7*0.30 = 2.8 + 2.1 + 2.1 = 7.0
-        expect(calcularNotaFinal(8, 6, 7)).toBe(7);
-    });
+        /* ── CONTENIDO ── */
+        .content{padding:22px 24px;flex:1}
+        .hidden{display:none!important}
 
-    test('NF puede caer exactamente en 6.0 (límite de aprobación)', () => {
-        // 6*0.35 + 6*0.35 + 6*0.30 = 2.1 + 2.1 + 1.8 = 6.0
-        expect(calcularNotaFinal(6, 6, 6)).toBe(6);
-    });
+        /* ── STATS ── */
+        .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px}
+        .sc{background:#fff;border-radius:10px;padding:16px;border:1px solid rgba(27,58,107,.12);position:relative;overflow:hidden}
+        .sc::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent-grad,linear-gradient(90deg,#1B3A6B,#2E5FAC))}
+        .sc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+        .sc-label{font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1.2px}
+        .sc-icon{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:var(--accent-bg,#eef2fb);flex-shrink:0}
+        .sc-icon svg{width:17px;height:17px}
+        .sc-val{font-family:'Playfair Display',serif;font-size:26px;font-weight:700;color:#0a1628;margin:0 0 3px}
+        .sc-note{font-size:12px;color:#64748b}
+        .sc-note.up{color:#1a7a40;font-weight:600}
+        .sc-note.down{color:#b52828;font-weight:600}
+        .sc-grados{--accent-bg:rgba(27,58,107,.1);--accent-grad:linear-gradient(90deg,#1B3A6B,#2E5FAC)}
+        .sc-alumnos{--accent-bg:rgba(212,175,55,.15);--accent-grad:linear-gradient(90deg,#d4af37,#f5d97a)}
+        .sc-docentes{--accent-bg:rgba(26,122,64,.1);--accent-grad:linear-gradient(90deg,#1a7a40,#4ade80)}
+        .sc-materias{--accent-bg:rgba(26,95,154,.1);--accent-grad:linear-gradient(90deg,#1a5f9a,#7dd3fc)}
 
-    test('respeta la ponderación aunque una categoría sea 0 y las otras altas', () => {
-        // 0*0.35 + 10*0.35 + 10*0.30 = 0 + 3.5 + 3.0 = 6.5
-        expect(calcularNotaFinal(0, 10, 10)).toBe(6.5);
-    });
+        /* ── DASHBOARD (INICIO) ── */
+        .dash-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-bottom:16px;align-items:start}
+        .dash-card{background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden}
+        .dash-card-header{padding:14px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f1f5fb}
+        .dash-card-title{font-size:13px;font-weight:700;color:#0a1628;display:flex;align-items:center;gap:8px}
+        .dash-card-body{padding:20px}
+        .chart-wrap{position:relative;height:260px}
+        .dash-recientes-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f7f9fc}
+        .dash-recientes-item:last-child{border-bottom:none}
+        .dr-nombre{font-size:13px;font-weight:600;color:#0a1628}
+        .dr-grado{font-size:11px;color:#94a3b8;margin-top:1px}
+        .dr-fecha{margin-left:auto;font-size:11px;color:#64748b;white-space:nowrap}
+        .grado-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+        .grado-card{background:#fff;border-radius:10px;border:1px solid #e2e8f0;padding:14px;transition:all .2s}
+        .grado-card:hover{border-color:#d4af37;box-shadow:0 6px 16px rgba(10,22,40,.08);transform:translateY(-2px)}
+        .gc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+        .gc-nombre{font-size:13px;font-weight:700;color:#0a1628;line-height:1.3}
+        .gc-seccion{font-size:10px;color:#94a3b8;margin-top:2px}
+        .gc-count{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#d4af37}
+        .gc-guia{font-size:11px;color:#64748b;padding-top:8px;border-top:1px solid #f1f5fb;display:flex;align-items:center;gap:6px}
+        @media(max-width:900px){.dash-grid{grid-template-columns:1fr}}
 
-    test('valores no numéricos se tratan como 0', () => {
-        expect(calcularNotaFinal(undefined, null, '')).toBe(0);
-        expect(calcularNotaFinal('abc', 5, 5)).toBe(calcularNotaFinal(0, 5, 5));
-    });
-});
+        /* ── GRADOS: LISTA DE CARDS ── */
+        .grados-section{background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden}
+        .gs-header{padding:14px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f1f5fb}
+        .gs-title{font-size:13px;font-weight:700;color:#0a1628;display:flex;align-items:center;gap:8px}
+        .gs-dot{width:7px;height:7px;border-radius:50%;background:#d4af37}
+        .gs-body{padding:14px 20px}
+        .badge-mod{padding:3px 9px;border-radius:100px;font-size:9px;font-weight:700;letter-spacing:.4px;flex-shrink:0}
+        .mod-gen{background:#e8f4fd;color:#1a5f9a;border:1px solid #c3ddf5}
+        .mod-tec{background:#fef3e2;color:#a06010;border:1px solid #f5ddb0}
+        .mod-voc{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
+        .empty-bubbles{padding:32px;text-align:center;color:#94a3b8;font-size:13px}
+        /* ── GRADOS: ACORDEÓN POR CATEGORÍA ── */
+        .acordeon-categoria{margin-bottom:12px;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden}
+        .acordeon-categoria:last-child{margin-bottom:0}
+        .acordeon-header{display:flex;align-items:center;gap:10px;padding:14px 16px;background:#f8fafc;cursor:pointer;transition:background .15s;user-select:none}
+        .acordeon-header:hover{background:#f1f5f9}
+        .acordeon-icono{font-size:10px;color:#94a3b8;width:14px;flex-shrink:0}
+        .acordeon-titulo{font-size:13px;font-weight:700;color:#0a1628;text-transform:uppercase;letter-spacing:.8px;flex:1}
+        .acordeon-count{background:rgba(212,175,55,.15);color:#a06010;border:1px solid rgba(212,175,55,.3);padding:2px 10px;border-radius:100px;font-size:11px;font-weight:700}
+        .acordeon-body{padding:12px 16px}
+        .acordeon-body.hidden{display:none}
+        .acordeon-body .grado-row-card:last-child{margin-bottom:0}
 
-// ═══════════════════════════════════════════
-// 2. Redistribución de pesos
-// ═══════════════════════════════════════════
-describe('redistribuirPesos', () => {
-    test.each([2, 3, 4, 5])('siempre suma exactamente 100%% con %i actividades', (n) => {
-        const inicial = pesosEquitativos(n);
-        const resultado = redistribuirPesos(inicial, 0, 55);
-        const suma = sumaPesos(resultado);
-        expect(suma).toBe(100);
-    });
+        /* ── AÑO ACADÉMICO (badge en topbar) ── */
+        .anio-activo-badge{background:rgba(27,58,107,.08);color:#1B3A6B;border:1px solid rgba(27,58,107,.2);padding:6px 14px;border-radius:100px;font-size:12px;font-weight:700;white-space:nowrap}
+        .anio-activo-badge.anio-badge-alerta{background:#fef3c7;color:#92400e;border-color:#fde68a}
 
-    test('ejemplo del enunciado: 4 actividades al 25%, C1→40% reparte 20/20/20', () => {
-        const resultado = redistribuirPesos([25, 25, 25, 25], 0, 40);
-        expect(resultado).toEqual([40, 20, 20, 20]);
-    });
+        /* ── MATRÍCULA DE ALUMNOS ── */
+        .mat-fila{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid #f7f9fc;flex-wrap:wrap}
+        .mat-fila:last-child{border-bottom:none}
+        .mat-nombre{flex:1;min-width:200px;font-size:13px;font-weight:600;color:#0a1628}
+        .mat-estado{min-width:160px;font-size:12px;color:#475569}
+        .mat-acciones{display:flex;align-items:center;gap:8px}
+        .mat-acciones select{padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;outline:none;background:#fff}
 
-    test('el último de "los demás" absorbe el residuo del redondeo', () => {
-        // Restante 40% entre 3 → 13.33 c/u → 13,13 + el último se lleva el residuo (14)
-        const resultado = redistribuirPesos([25, 25, 25, 25], 0, 60);
-        expect(resultado).toEqual([60, 13, 13, 14]);
-        expect(sumaPesos(resultado)).toBe(100);
-    });
+        .grado-row-card{display:flex;align-items:center;gap:16px;padding:14px 16px;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:10px;cursor:pointer;transition:all .18s;background:#fff}
+        .grado-row-card:last-child{margin-bottom:0}
+        .grado-row-card:hover{border-color:#d4af37;box-shadow:0 6px 16px rgba(10,22,40,.08);transform:translateY(-1px)}
+        .grc-nombre-wrap{flex:1;min-width:0}
+        .grc-nombre{font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:#0a1628;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+        .grc-seccion{font-size:11px;color:#94a3b8;margin-top:3px}
+        .grc-guia{display:flex;align-items:center;gap:6px;font-size:12px;color:#475569;min-width:150px}
+        .grc-guia-ico{width:24px;height:24px;border-radius:50%;background:#eef2fb;color:#1B3A6B;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+        .grc-alumnos{text-align:center;min-width:64px}
+        .grc-alumnos-val{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:#d4af37}
+        .grc-alumnos-lbl{font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px}
+        .grc-chevron{color:#cbd5e1;font-size:16px;flex-shrink:0}
 
-    test('ningún peso queda por debajo de PESO_MINIMO aunque casi no quede margen', () => {
-        // 98% para C1 deja solo 2% para repartir entre 5 actividades → todas se forzarían a <1%
-        const resultado = redistribuirPesos([20, 20, 20, 20, 20], 0, 98);
-        resultado.forEach(p => expect(p).toBeGreaterThanOrEqual(PESO_MINIMO));
-        expect(sumaPesos(resultado)).toBe(100);
-    });
+        /* ── DRAWER DE GRADO ── */
+        .grado-drawer-overlay{display:none;position:fixed;inset:0;background:rgba(10,22,40,.55);backdrop-filter:blur(2px);z-index:300}
+        .grado-drawer-overlay.open{display:block}
+        .grado-drawer{position:fixed;top:0;right:0;height:100vh;width:480px;max-width:100vw;background:#fff;z-index:301;box-shadow:-12px 0 40px rgba(10,22,40,.25);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1)}
+        .grado-drawer-overlay.open .grado-drawer{transform:translateX(0)}
+        .gd-header{background:#0a1628;color:#fff;padding:22px 24px 18px;flex-shrink:0}
+        .gd-header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+        .gd-nombre{font-family:'Playfair Display',serif;font-size:19px;font-weight:700;line-height:1.25;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+        .gd-close{width:30px;height:30px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:15px;cursor:pointer;flex-shrink:0;transition:all .2s}
+        .gd-close:hover{background:rgba(212,175,55,.2);border-color:#d4af37}
+        .gd-seccion{font-size:12px;color:rgba(255,255,255,.55);margin-top:4px}
+        .gd-actions{display:flex;gap:8px;margin-top:16px}
+        .gd-actions button{flex:1;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:none;transition:all .2s}
+        .gd-btn-edit{background:rgba(212,175,55,.15);color:#d4af37;border:1px solid rgba(212,175,55,.3)!important}
+        .gd-btn-edit:hover{background:#d4af37;color:#0a1628}
+        .gd-btn-del{background:rgba(239,68,68,.1);color:#f87171;border:1px solid rgba(239,68,68,.2)!important}
+        .gd-btn-del:hover{background:rgba(239,68,68,.2)}
+        .gd-tabs{display:flex;background:#f8fafc;border-bottom:1px solid #e8ecf5;flex-shrink:0}
+        .gd-tab{flex:1;padding:12px 6px;text-align:center;font-size:12px;font-weight:600;color:#94a3b8;cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;transition:all .18s}
+        .gd-tab:hover{color:#1B3A6B}
+        .gd-tab.active{color:#0a1628;border-bottom-color:#d4af37;background:#fff}
+        .gd-tab-content{flex:1;overflow-y:auto;padding:20px 24px}
+        .gd-field{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #f1f5fb}
+        .gd-field:last-child{border-bottom:none}
+        .gd-field-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#94a3b8;margin-bottom:5px}
+        .gd-field-val{font-size:14px;font-weight:600;color:#0a1628}
+        .gd-alumno-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f7f9fc}
+        .gd-alumno-row:last-child{border-bottom:none}
+        .gd-alumno-nombre{font-size:13px;font-weight:600;color:#0a1628}
+        .gd-alumno-nie{font-size:11px;color:#94a3b8}
+        .gd-ver-todos{display:block;text-align:center;margin-top:12px;padding:9px;border-radius:8px;background:#f8fafc;border:1px solid #e2e8f0;color:#1B3A6B;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s}
+        .gd-ver-todos:hover{background:#eef2fb;border-color:#1B3A6B}
+        .gd-materia-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid #f7f9fc;font-size:13px}
+        .gd-materia-row:last-child{border-bottom:none}
+        .gd-materia-nombre{font-weight:600;color:#0a1628}
+        .gd-materia-docente{font-size:11px;color:#94a3b8;margin-top:1px}
+        .gd-materia-quitar{width:24px;height:24px;border-radius:6px;border:none;background:#fde8e8;color:#b52828;font-size:12px;cursor:pointer;flex-shrink:0;transition:all .2s}
+        .gd-materia-quitar:hover{background:#fecaca}
+        .gd-add-materia{width:100%;margin-top:10px;padding:10px;border-radius:8px;border:1.5px dashed #cbd5e1;background:#fff;color:#64748b;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}
+        .gd-add-materia:hover{border-color:#1B3A6B;color:#1B3A6B;background:#eef2fb}
+        @media(max-width:560px){.grado-drawer{width:100%}}
 
-    test('caso extremo: 100% a una actividad reajusta el valor editado para respetar el mínimo', () => {
-        const resultado = redistribuirPesos([25, 25, 25, 25], 0, 100);
-        expect(resultado[0]).toBeLessThan(100); // se le quita margen para poder darle 1% a las otras 3
-        resultado.forEach(p => expect(p).toBeGreaterThanOrEqual(PESO_MINIMO));
-        expect(sumaPesos(resultado)).toBe(100);
-    });
+        /* ── TABLA GENÉRICA ── */
+        .tabla-wrap{background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden}
+        .tabla-header{padding:14px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f1f5fb}
+        .tabla-title{font-size:13px;font-weight:700;color:#0a1628;display:flex;align-items:center;gap:8px}
+        table{width:100%;border-collapse:collapse}
+        thead{background:#f8fafc}
+        th{padding:10px 16px;text-align:left;font-size:12px;font-weight:700;color:#94a3b8;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid #f1f5fb}
+        td{padding:12px 16px;font-size:14px;color:#1e293b;border-bottom:1px solid #f7f9fc;vertical-align:middle}
+        tr:last-child td{border-bottom:none}
+        tr:hover td{background:#fafbfd}
+        .btn-sm{padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all .2s;margin-right:3px}
+        .btn-edit{background:#e8f4fd;color:#1a5f9a}.btn-edit:hover{background:#bfdbfe}
+        .btn-del{background:#fde8e8;color:#b52828}.btn-del:hover{background:#fecaca}
+        .btn-info{background:#e8fdf0;color:#1a7a40}.btn-info:hover{background:#bbf7d0}
+        .badge{padding:4px 10px;border-radius:100px;font-size:12px;font-weight:600}
+        .badge-admin{background:#fef3e2;color:#a06010}
+        .badge-docente{background:#e8f4fd;color:#1a5f9a}
+        .foto-mini{width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid #e2e8f0}
+        .foto-placeholder{width:36px;height:36px;border-radius:50%;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:14px;color:#94a3b8;border:2px solid #e2e8f0}
+        .text-muted{color:#94a3b8;font-size:11px}
+        .td-bold{font-weight:600;color:#0a1628}
 
-    test('con una sola actividad, siempre queda en 100%', () => {
-        expect(redistribuirPesos([100], 0, 50)).toEqual([100]);
-    });
+        /* ── FILTROS ── */
+        .filtros{display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
+        .filtros select,.filtros input{padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;outline:none;background:#fff;transition:border-color .2s;min-width:180px}
+        .filtros select:focus,.filtros input:focus{border-color:#1B3A6B}
+        .btn-danger{background:#fde8e8;color:#b52828;border:1px solid #fecaca;padding:8px 14px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s}
+        .btn-danger:hover{background:#fecaca}
 
-    test('redistribuciones sucesivas siguen sumando 100% (sin arrastre de error)', () => {
-        let pesos = pesosEquitativos(4);
-        pesos = redistribuirPesos(pesos, 0, 40);
-        pesos = redistribuirPesos(pesos, 1, 30);
-        pesos = redistribuirPesos(pesos, 2, 15);
-        expect(sumaPesos(pesos)).toBe(100);
-    });
-});
+        /* ── OTROS REPORTES ── */
+        .reportes-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+        @media(max-width:1100px){.reportes-grid{grid-template-columns:repeat(2,1fr)}}
+        @media(max-width:700px){.reportes-grid{grid-template-columns:1fr}}
 
-describe('pesosEquitativos', () => {
-    test.each([2, 3, 4, 5])('reparte 100%% entre %i actividades y suma exacto', (n) => {
-        const pesos = pesosEquitativos(n);
-        expect(pesos).toHaveLength(n);
-        expect(sumaPesos(pesos)).toBe(100);
-    });
+        /* ── ASISTENCIAS ── */
+        .asis-banner{background:#fef9e7;border:1px solid #fde68a;border-radius:9px;padding:10px 14px;font-size:12px;color:#92400e;margin-bottom:14px}
+        .asis-lista{background:#fff;border-radius:12px 12px 0 0;border:1px solid #e2e8f0;overflow:hidden}
+        .asis-fila{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #f7f9fc}
+        .asis-fila:last-child{border-bottom:none}
+        .asis-num{width:22px;color:#94a3b8;font-size:11px;text-align:center;flex-shrink:0}
+        .asis-nombre{flex:1;font-size:13px;font-weight:600;color:#0a1628}
+        .asis-pills{display:flex;gap:6px}
+        .asis-pill{width:32px;height:32px;border-radius:50%;border:1.5px solid #e2e8f0;background:#fff;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;color:#94a3b8}
+        .asis-pill:hover{border-color:#cbd5e1}
+        .asis-pill-P.activo{background:#059669;border-color:#059669;color:#fff}
+        .asis-pill-A.activo{background:#dc2626;border-color:#dc2626;color:#fff}
+        .asis-pill-J.activo{background:#2563eb;border-color:#2563eb;color:#fff}
+        .asis-pill-T.activo{background:#d97706;border-color:#d97706;color:#fff}
 
-    test('3 actividades: la última absorbe el residuo (33/33/34)', () => {
-        expect(pesosEquitativos(3)).toEqual([33, 33, 34]);
-    });
-});
+        /* ── EXPEDIENTES DISCIPLINARIOS ── */
+        .exp-resultados{margin-top:8px;background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden}
+        .exp-resultados:empty{border:none}
+        .exp-resultado-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #f7f9fc;font-size:13px;cursor:pointer;transition:background .15s}
+        .exp-resultado-item:last-child{border-bottom:none}
+        .exp-resultado-item:hover{background:#f8fafc}
+        .exp-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+        .exp-stat{background:#fff;border-radius:10px;border:1px solid #e2e8f0;padding:14px;text-align:center}
+        .exp-stat-val{font-family:'Playfair Display',serif;font-size:22px;font-weight:700}
+        .exp-stat-label{font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-top:2px}
+        @media(max-width:900px){.exp-stats{grid-template-columns:repeat(2,1fr)}}
 
-describe('aplicarPesoMinimo', () => {
-    test('sube los pesos por debajo del mínimo y se lo quita al más grande', () => {
-        const resultado = aplicarPesoMinimo([0, 0, 100]);
-        expect(resultado).toEqual([1, 1, 98]);
-        expect(sumaPesos(resultado)).toBe(100);
-    });
+        .exp-timeline{display:flex;flex-direction:column;gap:14px}
+        .exp-item{display:flex;gap:12px;padding-left:2px}
+        .exp-item-icono{width:34px;height:34px;border-radius:50%;background:var(--exp-bg,#f1f5f9);color:var(--exp-color,#64748b);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;border:1.5px solid var(--exp-color,#e2e8f0)}
+        .exp-item-cuerpo{flex:1;padding-bottom:14px;border-bottom:1px solid #f7f9fc}
+        .exp-item:last-child .exp-item-cuerpo{border-bottom:none;padding-bottom:0}
+        .exp-item-cab{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:4px}
+        .exp-item-tipo{font-size:12px;font-weight:700;color:var(--exp-color,#0a1628)}
+        .exp-item-fecha{font-size:11px;color:#94a3b8;white-space:nowrap}
+        .exp-item-desc{font-size:13px;color:#1e293b;line-height:1.5}
+        .exp-extra{display:inline-block;margin-top:4px;font-size:11px;font-weight:600;color:var(--exp-color,#64748b);background:var(--exp-bg,#f1f5f9);padding:2px 8px;border-radius:100px}
+        .exp-item-registro{font-size:10.5px;color:#94a3b8;margin-top:6px;display:flex;align-items:center;gap:10px}
+        .exp-item-btn{border:none;background:none;font-size:10.5px;font-weight:700;cursor:pointer;color:#1a5f9a;padding:0}
+        .exp-item-btn:hover{text-decoration:underline}
+        .exp-item-btn-del{color:#b52828}
 
-    test('no modifica un arreglo que ya es válido', () => {
-        expect(aplicarPesoMinimo([25, 25, 25, 25])).toEqual([25, 25, 25, 25]);
-    });
-});
+        /* ── DEMÉRITOS ── */
+        .dem-tarjetas{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+        @media(max-width:1100px){.dem-tarjetas{grid-template-columns:repeat(3,1fr)}}
+        @media(max-width:640px){.dem-tarjetas{grid-template-columns:repeat(2,1fr)}}
+        .dem-tarjeta{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:20px 16px;text-align:center;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+        .dem-tarjeta::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--dem-color,#94a3b8)}
+        .dem-tarjeta:hover{transform:translateY(-3px);box-shadow:0 10px 26px rgba(10,22,40,.1);border-color:var(--dem-color,#d4af37)}
+        .dem-tarjeta-icono{font-size:22px;margin-bottom:6px}
+        .dem-tarjeta-umbral{font-family:'Playfair Display',serif;font-size:24px;font-weight:800;color:var(--dem-color,#0a1628)}
+        .dem-tarjeta-label{font-size:11px;color:#475569;line-height:1.4;margin:6px 0 10px;min-height:30px}
+        .dem-tarjeta-count{display:inline-block;padding:4px 12px;border-radius:100px;background:var(--dem-bg,#f1f5f9);color:var(--dem-color,#475569);font-size:12px;font-weight:700}
+        .dem-lista-header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+        .dem-lista-titulo{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:#0a1628}
 
-// ═══════════════════════════════════════════
-// 3. Promedio ponderado por categoría
-// ═══════════════════════════════════════════
-describe('promedioPonderado', () => {
-    test('pesos iguales: el promedio ponderado coincide con el promedio simple', () => {
-        const items = [
-            { nota: 8, peso: 25 },
-            { nota: 8, peso: 25 },
-            { nota: 8, peso: 25 },
-            { nota: 8, peso: 25 },
-        ];
-        expect(promedioPonderado(items)).toBe(8);
-    });
+        /* ── MATERIAS ASIGNADAS ── */
+        .materia-asignada{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#f8fafc;border-radius:8px;margin-bottom:6px;font-size:12px;border:1px solid #f1f5fb}
+        .materia-asignada span:first-child{flex:1;font-weight:500}
 
-    test('pesos desiguales: pondera según el % de cada actividad', () => {
-        // 10*0.80 + 0*0.20 = 8
-        const items = [
-            { nota: 10, peso: 80 },
-            { nota: 0,  peso: 20 },
-        ];
-        expect(promedioPonderado(items)).toBe(8);
-    });
+        /* ── MATERIAS POR GRADO (checklist) ── */
+        .mgm-row{display:flex;align-items:center;gap:12px;padding:10px 12px;background:#f8fafc;border-radius:8px;margin-bottom:6px;border:1px solid #f1f5fb}
+        .mgm-check{display:flex;align-items:center;gap:8px;flex:1;font-size:13px;font-weight:500;color:#1e293b;cursor:pointer}
+        .mgm-check input{width:16px;height:16px;accent-color:#1B3A6B;cursor:pointer}
+        .mgm-row select{width:220px;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;font-family:'Plus Jakarta Sans',sans-serif;outline:none;background:#fff}
+        .mgm-row select:focus{border-color:#1B3A6B}
+        .mgm-row select:disabled{opacity:.5;background:#f1f5f9;cursor:not-allowed}
 
-    test('una sola actividad: el promedio es la nota de esa actividad', () => {
-        expect(promedioPonderado([{ nota: 7, peso: 100 }])).toBe(7);
-    });
+        /* ── MODALES ── */
+        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(10,22,40,.6);backdrop-filter:blur(4px);z-index:350;align-items:center;justify-content:center;padding:20px}
+        .modal-overlay.open{display:flex}
+        .modal{background:#fff;border-radius:16px;padding:28px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+        .modal-title{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:#0a1628;margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid #f1f5fb}
+        .field{margin-bottom:14px}
+        .field label{display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#64748b;margin-bottom:6px}
+        .field input,.field select,.field textarea{width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:9px;font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;color:#1e293b;outline:none;transition:border-color .2s;background:#fff}
+        .field input:focus,.field select:focus{border-color:#1B3A6B}
+        .modal-actions{display:flex;gap:10px;margin-top:20px;padding-top:16px;border-top:1px solid #f1f5fb}
+        .foto-preview-wrap{text-align:center;margin-bottom:12px}
+        #alumno-foto-preview{width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid #e2e8f0;display:none}
+        .info-box{background:#fef9e7;border:1px solid #fde68a;border-radius:9px;padding:12px;font-size:11px;color:#92400e;margin-bottom:8px;line-height:1.6}
 
-    test('arreglo vacío da 0', () => {
-        expect(promedioPonderado([])).toBe(0);
-    });
-
-    test('valores no numéricos se tratan como 0', () => {
-        const items = [{ nota: '', peso: 50 }, { nota: 10, peso: 50 }];
-        expect(promedioPonderado(items)).toBe(5);
-    });
-});
-
-// ═══════════════════════════════════════════
-// 4. Validación de acceso a Competencias Ciudadanas
-// ═══════════════════════════════════════════
-describe('puedeAccederCompetencias', () => {
-    test('un docente sin grado guía NO puede acceder', () => {
-        expect(puedeAccederCompetencias([])).toBe(false);
-    });
-
-    test('un docente con al menos un grado guía SÍ puede acceder', () => {
-        expect(puedeAccederCompetencias([{ id: 'grado-1', docente_guia_id: 'docente-1' }])).toBe(true);
-    });
-
-    test('con varios grados guía también puede acceder', () => {
-        expect(puedeAccederCompetencias([{ id: 'g1' }, { id: 'g2' }])).toBe(true);
-    });
-
-    test('entradas inválidas (null/undefined) se tratan como sin acceso', () => {
-        expect(puedeAccederCompetencias(null)).toBe(false);
-        expect(puedeAccederCompetencias(undefined)).toBe(false);
-    });
-});
-
-// ═══════════════════════════════════════════
-// 5. Cálculo de color por nota
-// ═══════════════════════════════════════════
-describe('colorEscala', () => {
-    test.each([6, 6.0, 7.5, 10])('verde cuando la nota es ≥ 6 (nota=%s)', (nota) => {
-        expect(colorEscala(nota)).toBe('nivel-verde');
-    });
-
-    test.each([4, 4.0, 5, 5.9])('naranja cuando la nota está entre 4.0 y 5.9 (nota=%s)', (nota) => {
-        expect(colorEscala(nota)).toBe('nivel-naranja');
-    });
-
-    test.each([3.9, 2, 0])('rojo cuando la nota es < 4.0 (nota=%s)', (nota) => {
-        expect(colorEscala(nota)).toBe('nivel-rojo');
-    });
-});
-
-// ═══════════════════════════════════════════
-// 6. Deméritos — conteo activo y escala de consecuencias
-// ═══════════════════════════════════════════
-describe('contarDemeritosActivos', () => {
-    test('cuenta solo los deméritos con redimido:false', () => {
-        const demeritos = [{ redimido: false }, { redimido: true }, { redimido: false }, { redimido: false }];
-        expect(contarDemeritosActivos(demeritos)).toBe(3);
-    });
-
-    test('un demérito sin campo redimido (undefined) cuenta como activo', () => {
-        expect(contarDemeritosActivos([{}, { redimido: false }])).toBe(2);
-    });
-
-    test('arreglo vacío o nulo da 0', () => {
-        expect(contarDemeritosActivos([])).toBe(0);
-        expect(contarDemeritosActivos(null)).toBe(0);
-        expect(contarDemeritosActivos(undefined)).toBe(0);
-    });
-});
-
-describe('calcularNivelDemerito', () => {
-    test.each([0, 1, 2])('menos de 3 deméritos activos no tiene nivel (nivel=%i)', (total) => {
-        expect(calcularNivelDemerito(total)).toBeNull();
-    });
-
-    test.each([3, 4, 5])('3 a 5 → advertencia verbal (total=%i)', (total) => {
-        expect(calcularNivelDemerito(total)).toBe('advertencia');
-    });
-
-    test.each([6, 7, 9])('6 a 9 → comunicación a familia (total=%i)', (total) => {
-        expect(calcularNivelDemerito(total)).toBe('comunicacion');
-    });
-
-    test('exactamente 10 → suspensión de privilegios', () => {
-        expect(calcularNivelDemerito(10)).toBe('suspension');
-    });
-
-    test.each([11, 12, 14])('11 a 14 → reunión con dirección (total=%i)', (total) => {
-        expect(calcularNivelDemerito(total)).toBe('reunion');
-    });
-
-    test.each([15, 20, 100])('15 o más → no promovido de grado (total=%i)', (total) => {
-        expect(calcularNivelDemerito(total)).toBe('no_promovido');
-    });
-
-    test('los tramos son excluyentes: un alumno en un tramo no cae también en otro', () => {
-        // Sanity check contra la propia tabla: cada total de 0 a 20 tiene EXACTAMENTE un nivel (o null).
-        for (let total = 0; total <= 20; total++) {
-            expect(() => calcularNivelDemerito(total)).not.toThrow();
+        .hamburger{display:none;flex-direction:column;gap:5px;background:rgba(255,255,255,.08);border:1px solid rgba(212,175,55,.3);border-radius:8px;cursor:pointer;padding:8px;margin-right:8px}
+        .hamburger span{width:22px;height:2px;background:#d4af37;border-radius:2px;transition:all .3s;display:block}
+        .hamburger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+        .hamburger.open span:nth-child(2){opacity:0}
+        .hamburger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+        @media(max-width:768px){
+            .hamburger{display:flex!important}
+            .sidebar{transform:translateX(-100%);transition:transform .3s ease}
+            .sidebar.open{transform:translateX(0)!important}
+            .main{margin-left:0}
+            .content{padding:16px}
+            .stats{grid-template-columns:repeat(2,1fr)}
         }
-    });
+    </style>
+</head>
+<body>
 
-    test('valores no numéricos se tratan como 0 (sin nivel)', () => {
-        expect(calcularNivelDemerito(undefined)).toBeNull();
-        expect(calcularNivelDemerito('abc')).toBeNull();
-    });
-});
+    <!-- OVERLAY MÓVIL -->
+    <div id="sidebar-overlay" onclick="toggleSidebar()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:150;backdrop-filter:blur(2px)"></div>
+
+    <!-- SIDEBAR -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sb-brand" style="padding:24px 16px 20px;text-align:center;border-bottom:1px solid rgba(212,175,55,.12)">
+            <img src="https://raw.githubusercontent.com/Diocesano20266/idsje-sistema/main/logo-idsje.png"
+                 style="width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid rgba(212,175,55,.7);box-shadow:0 0 0 6px rgba(212,175,55,.08);display:block;margin:0 auto 12px;"
+                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+            <div style="display:none;width:90px;height:90px;border-radius:50%;border:3px solid rgba(212,175,55,.7);background:rgba(212,175,55,.08);align-items:center;justify-content:center;margin:0 auto 12px;">
+                <span style="font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:#d4af37">ID</span>
+            </div>
+            <div style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:#fff;letter-spacing:.5px">IDSJE</div>
+            <div style="font-size:10px;color:rgba(212,175,55,.6);letter-spacing:2px;text-transform:uppercase;margin-top:3px">Sistema Académico</div>
+        </div>
+        <div class="sb-nav">
+            <div class="nav-group" data-group="academico">
+                <div class="nav-group-label" onclick="toggleNavGroup('academico')">
+                    <span class="nav-group-txt">Académico</span>
+                    <span class="nav-group-chevron">▾</span>
+                </div>
+                <div class="nav-group-items">
+                    <div class="nav-item active" data-vista="inicio" onclick="mostrarVista('inicio')">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M2 7.5L8 2l6 5.5" stroke="rgba(255,255,255,.6)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.5 6.5V14h9V6.5" stroke="rgba(255,255,255,.6)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span class="nav-txt">Inicio</span>
+                    </div>
+                    <div class="nav-item" data-vista="grados" onclick="mostrarVista('grados')">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" fill="#d4af37"/><rect x="9" y="1" width="6" height="6" rx="1.5" fill="#d4af37" opacity=".4"/><rect x="1" y="9" width="6" height="6" rx="1.5" fill="#d4af37" opacity=".4"/><rect x="9" y="9" width="6" height="6" rx="1.5" fill="#d4af37" opacity=".4"/></svg>
+                        <span class="nav-txt">Grados y Secciones</span>
+                    </div>
+                    <div class="nav-item" data-vista="alumnos" onclick="mostrarVista('alumnos')">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5.5" r="3" stroke="rgba(255,255,255,.6)" stroke-width="1.3" fill="none"/><path d="M2 14c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" stroke="rgba(255,255,255,.6)" stroke-width="1.3" stroke-linecap="round" fill="none"/></svg>
+                        <span class="nav-txt">Alumnos</span>
+                    </div>
+                    <div class="nav-item" data-vista="matricula" onclick="mostrarVista('matricula')">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M3 3h10v10H3z" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M5.5 8l1.7 1.7L10.5 6" stroke="rgba(255,255,255,.6)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span class="nav-txt">Matrícula</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="nav-group" data-group="docentes">
+                <div class="nav-group-label" onclick="toggleNavGroup('docentes')">
+                    <span class="nav-group-txt">Docentes</span>
+                    <span class="nav-group-chevron">▾</span>
+                </div>
+                <div class="nav-group-items">
+                    <div class="nav-item" data-vista="docentes" onclick="mostrarVista('docentes')">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.3" fill="none"/><path d="M5 7h6M5 10h4" stroke="rgba(255,255,255,.6)" stroke-width="1.2"/></svg>
+                        <span class="nav-txt">Docentes</span>
+                    </div>
+                    <div class="nav-item" data-vista="materias" onclick="mostrarVista('materias')">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M8 2L9.5 6.5H14L10.3 9l1.5 4.5L8 11 4.2 13.5l1.5-4.5L2 6.5h4.5L8 2z" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/></svg>
+                        <span class="nav-txt">Materias</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="nav-group" data-group="asistencias">
+                <div class="nav-group-label" onclick="toggleNavGroup('asistencias')">
+                    <span class="nav-group-txt">Asistencias</span>
+                    <span class="nav-group-chevron">▾</span>
+                </div>
+                <div class="nav-group-items">
+                    <div class="nav-item" data-vista="asistencias" onclick="mostrarVista('asistencias')">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M5.5 8.5l2 2 3.5-4" stroke="rgba(255,255,255,.6)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="1.5" y="2.5" width="13" height="11.5" rx="1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/></svg>
+                        <span class="nav-txt">Asistencias</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="nav-group" data-group="disciplina">
+                <div class="nav-group-label" onclick="toggleNavGroup('disciplina')">
+                    <span class="nav-group-txt">Disciplina</span>
+                    <span class="nav-group-chevron">▾</span>
+                </div>
+                <div class="nav-group-items">
+                    <div class="nav-item" data-vista="demeritos" onclick="mostrarVista('demeritos')">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M8 1.5L9.7 5H14L10.6 7.4l1.3 4.1L8 9l-3.9 2.5 1.3-4.1L2 5h4.3L8 1.5z" stroke="rgba(255,255,255,.6)" stroke-width="1.1" fill="none" stroke-linejoin="round"/></svg>
+                        <span class="nav-txt">Deméritos</span>
+                    </div>
+                    <div class="nav-item" data-vista="anecdoticos" onclick="mostrarVista('anecdoticos')">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M4 1.5h6l3 3V14a.5.5 0 0 1-.5.5h-9A.5.5 0 0 1 3 14V2a.5.5 0 0 1 .5-.5H4z" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M5.5 7.5h5M5.5 10h3.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" stroke-linecap="round"/></svg>
+                        <span class="nav-txt">Anecdóticos</span>
+                    </div>
+                    <div class="nav-item" data-vista="amonestaciones" onclick="mostrarVista('amonestaciones')">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M5 5h6M5 8h6M5 11h3" stroke="rgba(255,255,255,.6)" stroke-width="1.2"/></svg>
+                        <span class="nav-txt">Amonestaciones</span>
+                    </div>
+                    <div class="nav-item" data-vista="reconocimientos" onclick="mostrarVista('reconocimientos')">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M8 1.5l1.8 3.7 4.1.6-3 2.9.7 4.1L8 11l-3.6 1.9.7-4.1-3-2.9 4.1-.6L8 1.5z" stroke="rgba(255,255,255,.6)" stroke-width="1.1" fill="none" stroke-linejoin="round"/></svg>
+                        <span class="nav-txt">Reconocimientos</span>
+                    </div>
+                    <div class="nav-item" data-vista="expedientes" onclick="mostrarVista('expedientes')">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="2.5" width="13" height="11.5" rx="1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M4.5 6h7M4.5 8.5h7M4.5 11h4" stroke="rgba(255,255,255,.6)" stroke-width="1.2" stroke-linecap="round"/></svg>
+                        <span class="nav-txt">Expedientes</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="nav-group" data-group="reportes">
+                <div class="nav-group-label" onclick="toggleNavGroup('reportes')">
+                    <span class="nav-group-txt">Reportes</span>
+                    <span class="nav-group-chevron">▾</span>
+                </div>
+                <div class="nav-group-items">
+                    <div class="nav-item gold" onclick="window.location.href='./boleta.html'">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5" fill="#d4af37" opacity=".25"/><path d="M5 5h6M5 8h6M5 11h3" stroke="#d4af37" stroke-width="1.2"/></svg>
+                        <span class="nav-txt">Generar Boletas</span>
+                    </div>
+                    <div class="nav-item" data-vista="reportes" onclick="mostrarVista('reportes')">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M5 5h6M5 8h4M5 11h5" stroke="rgba(255,255,255,.6)" stroke-width="1.2"/></svg>
+                        <span class="nav-txt">Reporte Matrícula</span>
+                    </div>
+                    <div class="nav-item" data-vista="reportes" onclick="mostrarVista('reportes')">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M5 5h6M5 8h4M5 11h5" stroke="rgba(255,255,255,.6)" stroke-width="1.2"/></svg>
+                        <span class="nav-txt">Notas Finales</span>
+                    </div>
+                    <div class="nav-item" data-vista="reportes" onclick="mostrarVista('reportes')">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M5 5h6M5 8h4M5 11h5" stroke="rgba(255,255,255,.6)" stroke-width="1.2"/></svg>
+                        <span class="nav-txt">Lista de Actividades</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="nav-group" data-group="configuracion">
+                <div class="nav-group-label" onclick="toggleNavGroup('configuracion')">
+                    <span class="nav-group-txt">Configuración</span>
+                    <span class="nav-group-chevron">▾</span>
+                </div>
+                <div class="nav-group-items">
+                    <div class="nav-item" data-vista="anio-academico" onclick="mostrarVista('anio-academico')">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="2.5" width="13" height="12" rx="1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M1.5 6h13M4.5 1.5v2M11.5 1.5v2" stroke="rgba(255,255,255,.6)" stroke-width="1.2" stroke-linecap="round"/></svg>
+                        <span class="nav-txt">Año Académico</span>
+                    </div>
+                    <div class="nav-item" data-vista="categorias-grado" onclick="mostrarVista('categorias-grado')">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="2" width="5" height="5" rx="1" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><rect x="9.5" y="2" width="5" height="5" rx="1" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><rect x="1.5" y="9" width="5" height="5" rx="1" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><rect x="9.5" y="9" width="5" height="5" rx="1" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/></svg>
+                        <span class="nav-txt">Categorías de Grado</span>
+                    </div>
+                    <div class="nav-item" data-vista="configuracion" onclick="mostrarVista('configuracion')">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M8 1.5v2M8 12.5v2M14.5 8h-2M3.5 8h-2M12.4 3.6l-1.4 1.4M5 9.6l-1.4 1.4M12.4 12.4l-1.4-1.4M5 6.4L3.6 5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" stroke-linecap="round"/></svg>
+                        <span class="nav-txt">Períodos Académicos</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="sb-foot">
+            <div class="user-pill">
+                <div class="u-av" id="admin-iniciales">AC</div>
+                <div>
+                    <div class="u-name" id="admin-nombre">Cargando...</div>
+                    <div class="u-role">Administrador</div>
+                </div>
+            </div>
+            <button class="btn-exit" onclick="cerrarSesionAdmin()">↩ Cerrar sesión</button>
+        </div>
+    </nav>
+
+    <!-- MAIN -->
+    <div class="main">
+        <div class="gold-bar"></div>
+
+        <!-- TOPBAR -->
+        <div class="topbar">
+            <button class="hamburger" onclick="toggleSidebar()" id="hamburger-btn">
+                <span></span><span></span><span></span>
+            </button>
+            <div style="display:flex;align-items:center;gap:12px">
+                <div>
+                    <div class="tb-title" id="topbar-titulo">Grados y Secciones</div>
+                    <div class="tb-sub">Instituto Diocesano San Juan Evangelista · 2026</div>
+                </div>
+                <span class="anio-activo-badge" id="anio-activo-badge">—</span>
+            </div>
+            <div class="topbar-actions" id="topbar-actions">
+                <button class="btn-primary" onclick="abrirModalGrado()">+ Nuevo Grado</button>
+            </div>
+        </div>
+
+        <!-- VISTAS -->
+        <div class="content">
+
+            <!-- INICIO / DASHBOARD -->
+            <div id="vista-inicio">
+                <div class="stats">
+                    <div class="sc sc-grados">
+                        <div class="sc-top">
+                            <div class="sc-label">Grados</div>
+                            <div class="sc-icon"><svg viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" fill="#1B3A6B"/><rect x="9" y="1" width="6" height="6" rx="1.5" fill="#1B3A6B" opacity=".4"/><rect x="1" y="9" width="6" height="6" rx="1.5" fill="#1B3A6B" opacity=".4"/><rect x="9" y="9" width="6" height="6" rx="1.5" fill="#1B3A6B" opacity=".4"/></svg></div>
+                        </div>
+                        <div class="sc-val" id="stat-grados">—</div>
+                        <div class="sc-note" id="stat-grados-note">Secciones activas</div>
+                    </div>
+                    <div class="sc sc-alumnos">
+                        <div class="sc-top">
+                            <div class="sc-label">Alumnos</div>
+                            <div class="sc-icon"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5.5" r="3" stroke="#a8841f" stroke-width="1.3" fill="none"/><path d="M2 14c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" stroke="#a8841f" stroke-width="1.3" stroke-linecap="round" fill="none"/></svg></div>
+                        </div>
+                        <div class="sc-val" id="stat-alumnos">—</div>
+                        <div class="sc-note" id="stat-alumnos-note">Matriculados</div>
+                    </div>
+                    <div class="sc sc-docentes">
+                        <div class="sc-top">
+                            <div class="sc-label">Docentes</div>
+                            <div class="sc-icon"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="#1a7a40" stroke-width="1.3" fill="none"/><path d="M5 7h6M5 10h4" stroke="#1a7a40" stroke-width="1.2"/></svg></div>
+                        </div>
+                        <div class="sc-val" id="stat-docentes">—</div>
+                        <div class="sc-note">Registrados</div>
+                    </div>
+                    <div class="sc sc-materias">
+                        <div class="sc-top">
+                            <div class="sc-label">Materias</div>
+                            <div class="sc-icon"><svg viewBox="0 0 16 16" fill="none"><path d="M8 2L9.5 6.5H14L10.3 9l1.5 4.5L8 11 4.2 13.5l1.5-4.5L2 6.5h4.5L8 2z" stroke="#1a5f9a" stroke-width="1.2" fill="none"/></svg></div>
+                        </div>
+                        <div class="sc-val" id="stat-materias">—</div>
+                        <div class="sc-note">Activas</div>
+                    </div>
+                </div>
+
+                <div class="dash-grid">
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <div class="dash-card-title"><span class="gs-dot"></span>Alumnos por grado</div>
+                        </div>
+                        <div class="dash-card-body">
+                            <div class="chart-wrap"><canvas id="chart-alumnos-grado"></canvas></div>
+                        </div>
+                    </div>
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <div class="dash-card-title"><span class="gs-dot"></span>Últimos alumnos registrados</div>
+                        </div>
+                        <div class="dash-card-body" id="dash-recientes">
+                            <div class="empty-bubbles">Sin alumnos todavía</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dash-card">
+                    <div class="dash-card-header">
+                        <div class="dash-card-title"><span class="gs-dot"></span>Grados</div>
+                    </div>
+                    <div class="dash-card-body">
+                        <div class="grado-cards" id="dash-grado-cards">
+                            <div class="empty-bubbles">No hay grados todavía.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GRADOS -->
+            <div id="vista-grados" class="hidden">
+                <div class="grados-section">
+                    <div class="gs-header">
+                        <div class="gs-title"><span class="gs-dot"></span>Secciones registradas</div>
+                    </div>
+                    <div class="gs-body" id="grados-bubbles-body">
+                        <div class="empty-bubbles">No hay grados todavía. Crea el primero con el botón de arriba.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DRAWER: DETALLE DE GRADO -->
+            <div class="grado-drawer-overlay" id="grado-drawer-overlay" onclick="if(event.target===this) cerrarDrawerGrado()">
+                <div class="grado-drawer">
+                    <div class="gd-header">
+                        <div class="gd-header-top">
+                            <div>
+                                <div class="gd-nombre" id="gd-nombre"></div>
+                                <div class="gd-seccion" id="gd-seccion"></div>
+                            </div>
+                            <button class="gd-close" onclick="cerrarDrawerGrado()">✕</button>
+                        </div>
+                        <div class="gd-actions">
+                            <button class="gd-btn-edit" id="gd-btn-editar" onclick="editarGradoDesdeDrawer()">✎ Editar</button>
+                            <button class="gd-btn-del" id="gd-btn-eliminar" onclick="eliminarGradoDesdeDrawer()">🗑 Eliminar</button>
+                        </div>
+                    </div>
+                    <div class="gd-tabs">
+                        <button class="gd-tab active" data-tab="general" onclick="cambiarTabDrawerGrado('general')">📋 General</button>
+                        <button class="gd-tab" data-tab="alumnos" onclick="cambiarTabDrawerGrado('alumnos')">👥 Alumnos</button>
+                        <button class="gd-tab" data-tab="materias" onclick="cambiarTabDrawerGrado('materias')">📚 Materias</button>
+                    </div>
+                    <div class="gd-tab-content" id="gd-tab-content"></div>
+                </div>
+            </div>
+
+            <!-- DRAWER DE DETALLE DE DEMÉRITOS -->
+            <div class="grado-drawer-overlay" id="demerito-drawer-overlay" onclick="if(event.target===this) cerrarDrawerDemerito()">
+                <div class="grado-drawer">
+                    <div class="gd-header">
+                        <div class="gd-header-top">
+                            <div>
+                                <div class="gd-nombre" id="dem-drawer-nombre"></div>
+                                <div class="gd-seccion" id="dem-drawer-grado"></div>
+                            </div>
+                            <button class="gd-close" onclick="cerrarDrawerDemerito()">✕</button>
+                        </div>
+                        <div class="gd-actions">
+                            <button class="gd-btn-edit" id="btn-abrir-nuevo-demerito" onclick="abrirModalNuevoDemerito()">+ Nuevo Demérito</button>
+                            <button class="gd-btn-edit" id="btn-abrir-redencion" onclick="abrirModalRedencion()">↩ Aplicar Redención</button>
+                        </div>
+                    </div>
+                    <div class="gd-tab-content" id="dem-drawer-content"></div>
+                </div>
+            </div>
+
+            <!-- ALUMNOS -->
+            <div id="vista-alumnos" class="hidden">
+                <div class="filtros">
+                    <select id="filtro-grado" onchange="renderAlumnos()">
+                        <option value="">— Todos los grados —</option>
+                    </select>
+                    <button class="btn-danger" onclick="eliminarAlumnosMasivo()">🗑 Eliminar sección completa</button>
+                </div>
+                <div class="tabla-wrap">
+                    <table>
+                        <thead><tr><th>Foto</th><th>Apellidos</th><th>Nombres</th><th>NIE</th><th>Grado</th><th>Acciones</th></tr></thead>
+                        <tbody id="tbody-alumnos"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- DOCENTES -->
+            <div id="vista-docentes" class="hidden">
+                <div class="tabla-wrap">
+                    <table>
+                        <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Acciones</th></tr></thead>
+                        <tbody id="tbody-docentes"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- MATERIAS -->
+            <div id="vista-materias" class="hidden">
+                <div class="tabla-wrap">
+                    <table>
+                        <thead><tr><th>Nombre</th><th>Código</th><th>Acciones</th></tr></thead>
+                        <tbody id="tbody-materias"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ASISTENCIAS -->
+            <div id="vista-asistencias" class="hidden">
+                <div class="filtros">
+                    <select id="asis-grado" onchange="cambiarGradoAsistenciaAdmin()"></select>
+                    <input type="date" id="asis-fecha" onchange="cambiarFechaAsistenciaAdmin()">
+                </div>
+                <div id="asis-banner" class="asis-banner hidden"></div>
+                <div class="asis-lista" id="lista-asistencia"></div>
+                <div class="tabla-header" style="border-radius:0 0 12px 12px;border:1px solid #e2e8f0;border-top:none;justify-content:flex-end">
+                    <button class="btn-primary" id="btn-guardar-asistencia" onclick="guardarAsistenciaAdmin()">Guardar asistencia</button>
+                </div>
+
+                <div class="tabla-wrap" style="margin-top:24px">
+                    <div class="tabla-header">
+                        <div class="tabla-title">⚠ Alumnos con más de 3 ausencias en el mes</div>
+                        <div class="filtros" style="margin-bottom:0">
+                            <select id="asis-res-grado" onchange="cambiarFiltroResumenAsistencia()"></select>
+                            <input type="month" id="asis-res-mes" onchange="cambiarFiltroResumenAsistencia()">
+                        </div>
+                    </div>
+                    <div id="asis-resumen" style="padding:4px 0"></div>
+                </div>
+            </div>
+
+            <!-- EXPEDIENTES DISCIPLINARIOS -->
+            <div id="vista-expedientes" class="hidden">
+                <div class="filtros">
+                    <select id="exp-admin-grado" onchange="cambiarGradoExpedienteAdmin()">
+                        <option value="">— Seleccioná un grado —</option>
+                    </select>
+                </div>
+
+                <div id="exp-admin-lista-wrap">
+                    <div class="exp-resultados" id="exp-admin-lista-alumnos">
+                        <div class="empty-bubbles">Seleccioná un grado para ver sus alumnos.</div>
+                    </div>
+                </div>
+
+                <div id="exp-admin-detalle" class="hidden" style="margin-top:20px">
+                    <button class="btn-secondary" onclick="volverListaAlumnosExpediente()">← Volver</button>
+                    <div class="tabla-title" style="margin:16px 0 12px" id="exp-admin-nombre"></div>
+
+                    <div class="filtros">
+                        <select id="exp-admin-filtro-tipo" onchange="renderTimelineExpedienteAdmin()">
+                            <option value="">— Todos los tipos —</option>
+                            <option value="anecdoticos">Solo anecdóticos</option>
+                            <option value="demeritos">Solo deméritos</option>
+                            <option value="amonestaciones">Solo amonestaciones</option>
+                            <option value="reconocimientos">Solo reconocimientos</option>
+                        </select>
+                    </div>
+
+                    <div class="dash-card">
+                        <div class="dash-card-header"><div class="dash-card-title"><span class="gs-dot"></span>Expediente completo (solo lectura)</div></div>
+                        <div class="dash-card-body">
+                            <div class="exp-timeline" id="exp-admin-timeline"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DEMÉRITOS -->
+            <div id="vista-demeritos" class="hidden">
+                <div class="filtros">
+                    <select id="dem-grado-filtro" onchange="cambiarFiltroGradoDemerito()">
+                        <option value="">— Todos los grados —</option>
+                    </select>
+                </div>
+                <div id="dem-tarjetas-wrap">
+                    <div class="info-box" style="background:#e8f4fd;border-color:#c3ddf5;color:#1a5f9a">
+                        Escala de consecuencias por deméritos activos (no redimidos) del alumno. Hacé clic en una tarjeta para ver los alumnos que están en ese nivel.
+                    </div>
+                    <div class="dem-tarjetas" id="dem-tarjetas">
+                        <div class="empty-bubbles">Cargando…</div>
+                    </div>
+                </div>
+
+                <div id="dem-lista-wrap" class="hidden">
+                    <div class="dem-lista-header">
+                        <button class="btn-secondary" onclick="volverTarjetasDemerito()">← Volver a niveles</button>
+                        <div class="dem-lista-titulo" id="dem-lista-titulo"></div>
+                    </div>
+                    <div class="exp-resultados" id="dem-lista-alumnos"></div>
+                </div>
+            </div>
+
+            <!-- ANECDÓTICOS -->
+            <div id="vista-anecdoticos" class="hidden">
+                <div class="filtros">
+                    <select id="anec-grado" onchange="cambiarGradoModulo('anecdoticos')">
+                        <option value="">— Seleccioná un grado —</option>
+                    </select>
+                </div>
+                <div id="anec-lista-wrap">
+                    <div class="exp-resultados" id="anec-lista-alumnos">
+                        <div class="empty-bubbles">Seleccioná un grado para ver sus alumnos.</div>
+                    </div>
+                </div>
+                <div id="anec-detalle" class="hidden" style="margin-top:20px">
+                    <button class="btn-secondary" onclick="volverListaModulo('anecdoticos')">← Volver</button>
+                    <div class="tabla-title" style="margin:16px 0 12px" id="anec-nombre"></div>
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <div class="dash-card-title"><span class="gs-dot"></span>Historial de anecdóticos</div>
+                            <button class="btn-primary" onclick="abrirModalNuevoRegistro('anecdoticos')">+ Nuevo Anecdótico</button>
+                        </div>
+                        <div class="dash-card-body"><div class="exp-timeline" id="anec-timeline"></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AMONESTACIONES -->
+            <div id="vista-amonestaciones" class="hidden">
+                <div class="filtros">
+                    <select id="amon-grado" onchange="cambiarGradoModulo('amonestaciones')">
+                        <option value="">— Seleccioná un grado —</option>
+                    </select>
+                </div>
+                <div id="amon-lista-wrap">
+                    <div class="exp-resultados" id="amon-lista-alumnos">
+                        <div class="empty-bubbles">Seleccioná un grado para ver sus alumnos.</div>
+                    </div>
+                </div>
+                <div id="amon-detalle" class="hidden" style="margin-top:20px">
+                    <button class="btn-secondary" onclick="volverListaModulo('amonestaciones')">← Volver</button>
+                    <div class="tabla-title" style="margin:16px 0 12px" id="amon-nombre"></div>
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <div class="dash-card-title"><span class="gs-dot"></span>Historial de amonestaciones</div>
+                            <button class="btn-primary" onclick="abrirModalNuevoRegistro('amonestaciones')">+ Nueva Amonestación</button>
+                        </div>
+                        <div class="dash-card-body"><div class="exp-timeline" id="amon-timeline"></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RECONOCIMIENTOS -->
+            <div id="vista-reconocimientos" class="hidden">
+                <div class="filtros">
+                    <select id="reco-grado" onchange="cambiarGradoModulo('reconocimientos')">
+                        <option value="">— Seleccioná un grado —</option>
+                    </select>
+                </div>
+                <div id="reco-lista-wrap">
+                    <div class="exp-resultados" id="reco-lista-alumnos">
+                        <div class="empty-bubbles">Seleccioná un grado para ver sus alumnos.</div>
+                    </div>
+                </div>
+                <div id="reco-detalle" class="hidden" style="margin-top:20px">
+                    <button class="btn-secondary" onclick="volverListaModulo('reconocimientos')">← Volver</button>
+                    <div class="tabla-title" style="margin:16px 0 12px" id="reco-nombre"></div>
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <div class="dash-card-title"><span class="gs-dot"></span>Historial de reconocimientos</div>
+                            <button class="btn-primary" onclick="abrirModalNuevoRegistro('reconocimientos')">+ Nuevo Reconocimiento</button>
+                        </div>
+                        <div class="dash-card-body"><div class="exp-timeline" id="reco-timeline"></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OTROS REPORTES -->
+            <div id="vista-reportes" class="hidden">
+                <div class="reportes-grid">
+                    <div class="dash-card">
+                        <div class="dash-card-header"><div class="dash-card-title"><span class="gs-dot"></span>Reporte de Matrícula</div></div>
+                        <div class="dash-card-body">
+                            <div class="field"><label>Grado</label><select id="rep-matricula-grado"></select></div>
+                            <button class="btn-primary" style="width:100%;justify-content:center;margin-top:8px" onclick="imprimirMatriculaDesdeReportes()">🖨 Imprimir</button>
+                        </div>
+                    </div>
+                    <div class="dash-card">
+                        <div class="dash-card-header"><div class="dash-card-title"><span class="gs-dot"></span>Notas Finales</div></div>
+                        <div class="dash-card-body">
+                            <div class="field"><label>Grado</label><select id="rep-notas-grado"></select></div>
+                            <div class="field"><label>Período</label>
+                                <select id="rep-notas-periodo"><option value="1">Período 1</option><option value="2">Período 2</option><option value="3">Período 3</option><option value="4">Período 4</option></select>
+                            </div>
+                            <button class="btn-primary" style="width:100%;justify-content:center;margin-top:8px" onclick="imprimirReporteNotasAdmin()">🖨 Imprimir</button>
+                        </div>
+                    </div>
+                    <div class="dash-card">
+                        <div class="dash-card-header"><div class="dash-card-title"><span class="gs-dot"></span>Lista de Actividades</div></div>
+                        <div class="dash-card-body">
+                            <div class="field"><label>Grado</label><select id="rep-act-grado" onchange="cambiarGradoActividadesAdmin()"></select></div>
+                            <div class="field"><label>Materia</label><select id="rep-act-materia"><option value="">— Elegí un grado primero —</option></select></div>
+                            <div class="field"><label>Período</label>
+                                <select id="rep-act-periodo"><option value="1">Período 1</option><option value="2">Período 2</option><option value="3">Período 3</option><option value="4">Período 4</option></select>
+                            </div>
+                            <div class="field"><label>Cotidianas (máx. 10)</label><input type="number" id="rep-act-cotidianas" value="4" min="0" max="10"></div>
+                            <div class="field"><label>Integradoras (máx. 5)</label><input type="number" id="rep-act-integradoras" value="2" min="0" max="5"></div>
+                            <div class="field"><label>Exámenes (máx. 3)</label><input type="number" id="rep-act-examenes" value="1" min="0" max="3"></div>
+                            <button class="btn-primary" style="width:100%;justify-content:center;margin-top:8px" onclick="imprimirListaActividadesAdmin()">🖨 Imprimir</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CONFIGURACIÓN -->
+            <div id="vista-configuracion" class="hidden">
+                <div class="tabla-wrap">
+                    <div class="tabla-header">
+                        <div class="tabla-title">📅 Períodos Académicos</div>
+                        <div class="filtros" style="margin-bottom:0">
+                            <label style="font-size:12px;color:#64748b;font-weight:600">Año</label>
+                            <input type="number" id="config-anio" onchange="cambiarAnioConfiguracion()" style="width:100px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px">
+                        </div>
+                    </div>
+                    <div id="periodos-academicos-tabla" style="padding:20px"></div>
+                </div>
+            </div>
+
+            <!-- AÑO ACADÉMICO -->
+            <div id="vista-anio-academico" class="hidden">
+                <div class="grados-section">
+                    <div class="gs-header">
+                        <div class="gs-title"><span class="gs-dot"></span>Años académicos configurados</div>
+                    </div>
+                    <div class="gs-body" id="anio-academico-body">
+                        <div class="empty-bubbles">Cargando…</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MATRÍCULA DE ALUMNOS -->
+            <div id="vista-matricula" class="hidden">
+                <div class="tabla-wrap">
+                    <div class="tabla-header">
+                        <div class="tabla-title">📋 Catálogo de alumnos y su matrícula del año activo</div>
+                    </div>
+                    <div id="matricula-body" style="padding:8px 20px"></div>
+                </div>
+            </div>
+
+            <!-- CATEGORÍAS DE GRADOS -->
+            <div id="vista-categorias-grado" class="hidden">
+                <div class="tabla-wrap">
+                    <table>
+                        <thead><tr><th>Nombre</th><th>Descripción</th><th>Acciones</th></tr></thead>
+                        <tbody id="tbody-categorias-grado"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- MODAL: GRADO -->
+    <div class="modal-overlay" id="modal-grado">
+        <div class="modal">
+            <div class="modal-title" id="modal-grado-title">Nuevo Grado</div>
+            <input type="hidden" id="grado-id">
+            <div class="field"><label>Nombre del grado</label><input type="text" id="grado-nombre" placeholder="Ej: PRIMER AÑO DE BACHILLERATO"></div>
+            <div class="field"><label>Sección</label><input type="text" id="grado-seccion" placeholder="A"></div>
+            <div class="field"><label>Modalidad</label>
+                <select id="grado-modalidad"><option>General</option><option>Técnico</option><option>Vocacional</option></select>
+            </div>
+            <div class="field"><label>Año</label><input type="number" id="grado-anio" value="2026"></div>
+            <div class="field"><label>Docente Guía</label><select id="grado-guia"></select></div>
+            <div class="field"><label>Categoría</label><select id="grado-categoria"></select></div>
+            <div class="modal-actions">
+                <button class="btn-primary" id="btn-guardar-grado" onclick="guardarGrado()">Guardar</button>
+                <button class="btn-secondary" onclick="cerrarModal('modal-grado')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: MATERIAS DEL GRADO -->
+    <div class="modal-overlay" id="modal-grado-materias">
+        <div class="modal" style="max-width:640px">
+            <div class="modal-title" id="mgrado-titulo">Materias del Grado</div>
+            <input type="hidden" id="mgrado-id">
+            <div id="lista-grado-materias"></div>
+            <div class="modal-actions">
+                <button class="btn-primary" id="btn-guardar-materias-grado" onclick="guardarMateriasGrado()">Guardar todo</button>
+                <button class="btn-secondary" onclick="cerrarModal('modal-grado-materias')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: DOCENTE -->
+    <div class="modal-overlay" id="modal-docente">
+        <div class="modal">
+            <div class="modal-title" id="modal-docente-title">Nuevo Docente</div>
+            <input type="hidden" id="docente-id">
+            <div class="field"><label>Nombre completo</label><input type="text" id="docente-nombre" placeholder="Ej: Juan Carlos Pérez"></div>
+            <div class="field"><label>Correo</label><input type="email" id="docente-correo" placeholder="docente@idsje.com"></div>
+            <div class="field"><label>Contraseña</label><input type="password" id="docente-pass" placeholder="Mínimo 6 caracteres"></div>
+            <div class="field"><label>Rol</label>
+                <select id="docente-rol"><option value="docente">Docente</option><option value="admin">Administrador</option></select>
+            </div>
+            <div class="info-box" style="background:#e8fdf0;border-color:#bbf7d0;color:#166534">✅ El sistema creará automáticamente la cuenta de acceso del docente. Solo completá los campos y guardá.</div>
+            <div class="modal-actions">
+                <button class="btn-primary" id="btn-guardar-docente" onclick="guardarDocente()">Guardar</button>
+                <button class="btn-secondary" onclick="cerrarModal('modal-docente')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: MATERIA -->
+    <div class="modal-overlay" id="modal-materia">
+        <div class="modal">
+            <div class="modal-title" id="modal-materia-title">Nueva Materia</div>
+            <input type="hidden" id="materia-id">
+            <div class="field"><label>Nombre</label><input type="text" id="materia-nombre" placeholder="Ej: Lenguaje y Literatura"></div>
+            <div class="field"><label>Código (opcional)</label><input type="text" id="materia-codigo" placeholder="Ej: LEN"></div>
+            <div class="field"><label>Docente por defecto</label><select id="materia-docente"></select></div>
+            <div class="modal-actions">
+                <button class="btn-primary" id="btn-guardar-materia" onclick="guardarMateria()">Guardar</button>
+                <button class="btn-secondary" onclick="cerrarModal('modal-materia')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: NUEVO DEMÉRITO -->
+    <div class="modal-overlay" id="modal-nuevo-demerito">
+        <div class="modal">
+            <div class="modal-title">Nuevo Demérito</div>
+            <input type="hidden" id="nd-alumno-id">
+            <div class="field"><label>Código de falta</label>
+                <select id="nd-codigo">
+                    <option value="A">A — No saludar al ingresar o dirigirse a docentes/compañeros</option>
+                    <option value="B">B — Omitir "por favor" en solicitudes</option>
+                    <option value="C">C — Omitir "gracias" al recibir ayuda</option>
+                    <option value="D">D — Tono grosero, desafiante o irrespetuoso</option>
+                </select>
+            </div>
+            <div class="field"><label>Descripción adicional (opcional)</label>
+                <textarea id="nd-descripcion" rows="3" placeholder="Describí lo sucedido..." style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;outline:none;resize:vertical"></textarea>
+            </div>
+            <div class="field"><label>Fecha</label><input type="date" id="nd-fecha"></div>
+            <div class="modal-actions">
+                <button class="btn-primary" id="btn-guardar-nuevo-demerito" onclick="guardarNuevoDemerito()">Guardar</button>
+                <button class="btn-secondary" onclick="cerrarModal('modal-nuevo-demerito')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: NUEVO REGISTRO (compartido por Anecdóticos / Amonestaciones / Reconocimientos) -->
+    <div class="modal-overlay" id="modal-nuevo-registro">
+        <div class="modal">
+            <div class="modal-title" id="mnr-title">Nuevo registro</div>
+            <input type="hidden" id="mnr-modulo">
+            <input type="hidden" id="mnr-alumno-id">
+            <div class="field hidden" id="mnr-campo-tipo">
+                <label>Tipo</label>
+                <select id="mnr-tipo" onchange="cambiarTipoModalNuevoRegistro()"></select>
+            </div>
+            <div class="field hidden" id="mnr-campo-dias">
+                <label>Días de suspensión</label>
+                <input type="number" id="mnr-dias" min="1" max="30" value="1">
+            </div>
+            <div class="field"><label>Descripción</label>
+                <textarea id="mnr-descripcion" rows="3" placeholder="Describí lo sucedido..." style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;outline:none;resize:vertical"></textarea>
+            </div>
+            <div class="field"><label>Fecha</label><input type="date" id="mnr-fecha"></div>
+            <div class="modal-actions">
+                <button class="btn-primary" id="btn-guardar-mnr" onclick="guardarNuevoRegistroModulo()">Guardar</button>
+                <button class="btn-secondary" onclick="cerrarModal('modal-nuevo-registro')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: APLICAR REDENCIÓN DE DEMÉRITOS -->
+    <div class="modal-overlay" id="modal-redencion">
+        <div class="modal">
+            <div class="modal-title">Aplicar Redención</div>
+            <input type="hidden" id="red-alumno-id">
+            <div class="info-box">Se marcan como redimidos los deméritos activos más antiguos del alumno, hasta completar la cantidad indicada.</div>
+            <div class="field"><label>Actividad realizada</label>
+                <textarea id="red-actividad" rows="3" placeholder="Describí la actividad de redención..." style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;outline:none;resize:vertical"></textarea>
+            </div>
+            <div class="field"><label>Cantidad de deméritos a quitar</label><input type="number" id="red-cantidad" min="1" value="1"></div>
+            <div class="field"><label>Fecha</label><input type="date" id="red-fecha"></div>
+            <div class="modal-actions">
+                <button class="btn-primary" id="btn-guardar-redencion" onclick="guardarRedencion()">Aplicar</button>
+                <button class="btn-secondary" onclick="cerrarModal('modal-redencion')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ALUMNO -->
+    <div class="modal-overlay" id="modal-alumno">
+        <div class="modal">
+            <div class="modal-title" id="modal-alumno-title">Nuevo Alumno</div>
+            <input type="hidden" id="alumno-id">
+            <div class="foto-preview-wrap"><img id="alumno-foto-preview" alt="Foto"></div>
+            <div class="field"><label>Foto del alumno</label><input type="file" id="alumno-foto" accept="image/*" onchange="previsualizarFoto(this)"></div>
+            <div class="field"><label>NIE</label><input type="text" id="alumno-nie" placeholder="Número de Identificación Estudiantil"></div>
+            <div class="field"><label>Apellidos</label><input type="text" id="alumno-apellidos" placeholder="APELLIDOS"></div>
+            <div class="field"><label>Nombres</label><input type="text" id="alumno-nombres" placeholder="NOMBRES"></div>
+            <div class="field"><label>Grado y Sección (año activo)</label><select id="alumno-grado"></select></div>
+            <div class="modal-actions">
+                <button class="btn-primary" id="btn-guardar-alumno" onclick="guardarAlumno()">Guardar</button>
+                <button class="btn-secondary" onclick="cerrarModal('modal-alumno')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: NUEVO AÑO ACADÉMICO -->
+    <div class="modal-overlay" id="modal-nuevo-anio">
+        <div class="modal">
+            <div class="modal-title">Nuevo Año Académico</div>
+            <div class="field"><label>Año</label><input type="number" id="nanio-numero" placeholder="2027"></div>
+            <div class="field"><label>Fecha de inicio</label><input type="date" id="nanio-inicio"></div>
+            <div class="field"><label>Fecha de fin</label><input type="date" id="nanio-fin"></div>
+            <div class="field" id="nanio-copiar-wrap">
+                <label class="mgm-check" style="background:#f8fafc;padding:10px 12px;border-radius:8px">
+                    <input type="checkbox" id="nanio-copiar">
+                    <span>Copiar la estructura del año activo (grados, materias asignadas y docentes)</span>
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-primary" id="btn-guardar-nuevo-anio" onclick="guardarNuevoAnio()">Crear año</button>
+                <button class="btn-secondary" onclick="cerrarModal('modal-nuevo-anio')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CAMBIAR AÑO ACTIVO -->
+    <div class="modal-overlay" id="modal-cambiar-anio">
+        <div class="modal">
+            <div class="modal-title">Cambiar Año Activo</div>
+            <div class="field"><label>Año académico</label><select id="canio-select"></select></div>
+            <div class="info-box">⚠ Todo el sistema (Grados, Alumnos matriculados, Asistencias, etc.) pasará a mostrar los datos de este año.</div>
+            <div class="modal-actions">
+                <button class="btn-primary" id="btn-guardar-cambio-anio" onclick="guardarCambioAnioActivo()">Confirmar cambio</button>
+                <button class="btn-secondary" onclick="cerrarModal('modal-cambiar-anio')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CATEGORÍA DE GRADO -->
+    <div class="modal-overlay" id="modal-categoria-grado">
+        <div class="modal">
+            <div class="modal-title" id="modal-categoria-grado-title">Nueva Categoría</div>
+            <input type="hidden" id="categoria-grado-id">
+            <div class="field"><label>Nombre</label><input type="text" id="categoria-grado-nombre" placeholder="Ej: Bachillerato Técnico"></div>
+            <div class="field"><label>Descripción (opcional)</label><input type="text" id="categoria-grado-descripcion"></div>
+            <div class="field"><label>Orden</label><input type="number" id="categoria-grado-orden" value="0"></div>
+            <div class="modal-actions">
+                <button class="btn-primary" id="btn-guardar-categoria-grado" onclick="guardarCategoriaGrado()">Guardar</button>
+                <button class="btn-secondary" onclick="cerrarModal('modal-categoria-grado')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            const btn = document.getElementById('hamburger-btn');
+            sidebar.classList.toggle('open');
+            btn.classList.toggle('open');
+            overlay.style.display = sidebar.classList.contains('open') ? 'block' : 'none';
+        }
+
+        // ── Grupos colapsables del sidebar ──
+        // Solo HTML/CSS/JS de esta página — admin.js no sabe nada de esto.
+        // Por defecto solo "académico" queda expandido; el resto arranca colapsado.
+        const NAV_GROUPS_KEY = 'idsje_admin_nav_grupos_colapsados';
+        const NAV_GROUPS_COLAPSADOS_DEFAULT = ['docentes', 'asistencias', 'disciplina', 'reportes', 'configuracion'];
+
+        function cargarNavGruposColapsados() {
+            try {
+                const guardado = JSON.parse(localStorage.getItem(NAV_GROUPS_KEY));
+                if (Array.isArray(guardado)) return new Set(guardado);
+            } catch (e) { /* localStorage corrupto o inaccesible: usar default */ }
+            return new Set(NAV_GROUPS_COLAPSADOS_DEFAULT);
+        }
+
+        let navGruposColapsados = cargarNavGruposColapsados();
+
+        function guardarNavGruposColapsados() {
+            try { localStorage.setItem(NAV_GROUPS_KEY, JSON.stringify([...navGruposColapsados])); } catch (e) { /* sin storage disponible: solo se pierde la persistencia */ }
+        }
+
+        function aplicarNavGruposColapsados() {
+            document.querySelectorAll('.nav-group').forEach(grupo => {
+                grupo.classList.toggle('collapsed', navGruposColapsados.has(grupo.dataset.group));
+            });
+        }
+
+        function toggleNavGroup(key) {
+            if (navGruposColapsados.has(key)) navGruposColapsados.delete(key);
+            else navGruposColapsados.add(key);
+            guardarNavGruposColapsados();
+            aplicarNavGruposColapsados();
+        }
+
+        // Si el item activo (el que admin.js le agrega .active en mostrarVista())
+        // queda dentro de un grupo colapsado, ese grupo se expande solo. Como no
+        // podemos tocar admin.js, se detecta reaccionando a los cambios de clase
+        // vía MutationObserver en vez de enganchar la función directamente.
+        function expandirGrupoDelActivo() {
+            const activo = document.querySelector('.nav-item.active');
+            const grupo = activo?.closest('.nav-group');
+            if (!grupo) return;
+            const key = grupo.dataset.group;
+            if (navGruposColapsados.has(key)) {
+                navGruposColapsados.delete(key);
+                guardarNavGruposColapsados();
+                aplicarNavGruposColapsados();
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            aplicarNavGruposColapsados();
+            expandirGrupoDelActivo();
+
+            const observadorActivo = new MutationObserver(expandirGrupoDelActivo);
+            document.querySelectorAll('.nav-item').forEach(item => {
+                observadorActivo.observe(item, { attributes: true, attributeFilter: ['class'] });
+            });
+        });
+
+        // Close sidebar when nav item clicked on mobile
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    if (window.innerWidth <= 768) {
+                        document.getElementById('sidebar').classList.remove('open');
+                        document.getElementById('hamburger-btn').classList.remove('open');
+                        document.getElementById('sidebar-overlay').style.display = 'none';
+                    }
+                });
+            });
+        });
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module">
+        import './src/js/admin.js';
+    </script>
+</body>
+</html>

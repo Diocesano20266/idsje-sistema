@@ -74,12 +74,41 @@ export const ESTADOS_ASISTENCIA = [
 // tabla de origen: 'anecdotico' (tabla anecdoticos), 'demerito_leve' |
 // 'demerito_grave' | 'demerito_muy_grave' (tabla demeritos + su categoria),
 // y 'acta' | 'suspension' | 'reconocimiento' (tabla actas + su tipo).
+// Las 4 categorías de falta que puede llevar un demérito. `label` es lo que
+// se muestra en el select de "Registrar nuevo" (código + descripción, tal
+// como pide el rediseño); `descripcion` se reutiliza sola en el timeline.
+export const CODIGOS_DEMERITO = [
+    { codigo: 'A', descripcion: 'No saludar al ingresar o dirigirse a docentes/compañeros' },
+    { codigo: 'B', descripcion: 'Omitir "por favor" en solicitudes' },
+    { codigo: 'C', descripcion: 'Omitir "gracias" al recibir ayuda' },
+    { codigo: 'D', descripcion: 'Tono grosero, desafiante o irrespetuoso' },
+];
+
 export const TIPOS_EXPEDIENTE = [
     { clave: 'anecdotico',         label: 'Anecdótico',        icono: '📝', color: '#2563eb', bg: '#dbeafe' },
+    { clave: 'demerito_A',         label: 'Demérito A — No saludar',          icono: 'Ⓐ', color: '#d97706', bg: '#fef3c7' },
+    { clave: 'demerito_B',         label: 'Demérito B — Sin "por favor"',     icono: 'Ⓑ', color: '#d97706', bg: '#fef3c7' },
+    { clave: 'demerito_C',         label: 'Demérito C — Sin "gracias"',       icono: 'Ⓒ', color: '#d97706', bg: '#fef3c7' },
+    { clave: 'demerito_D',         label: 'Demérito D — Tono irrespetuoso',   icono: 'Ⓓ', color: '#dc2626', bg: '#fee2e2' },
+    // Categorías viejas (leve/grave/muy_grave) — se dejan para que los
+    // registros anteriores al rediseño por código sigan mostrándose bien.
     { clave: 'demerito_leve',      label: 'Demérito leve',      icono: '⚠️', color: '#d97706', bg: '#fef3c7' },
     { clave: 'demerito_grave',     label: 'Demérito grave',     icono: '🔶', color: '#ea580c', bg: '#ffedd5' },
     { clave: 'demerito_muy_grave', label: 'Demérito muy grave', icono: '🔴', color: '#dc2626', bg: '#fee2e2' },
     { clave: 'acta',               label: 'Acta',                icono: '📋', color: '#7c3aed', bg: '#ede9fe' },
     { clave: 'suspension',         label: 'Suspensión',         icono: '🚫', color: '#991b1b', bg: '#fee2e2' },
     { clave: 'reconocimiento',     label: 'Reconocimiento',     icono: '⭐', color: '#059669', bg: '#d1fae5' },
+];
+
+// ── Escala de consecuencias por deméritos activos (no redimidos) ────────
+// Tramos MUTUAMENTE EXCLUYENTES: el nivel actual de un alumno es el tramo
+// donde cae su total, no todos los tramos que ya superó. `min`/`max` son
+// inclusive; `max: null` = sin techo. Este orden (de mayor a menor) es el
+// que espera calcularNivelDemerito() en utils.js.
+export const NIVELES_DEMERITO = [
+    { clave: 'no_promovido',  min: 15, max: null, umbral: '15',  icono: '⛔', label: 'No promovido de grado',                         color: '#7f1d1d', bg: '#fee2e2' },
+    { clave: 'reunion',       min: 11, max: 14,   umbral: '+10', icono: '🔴', label: 'Reunión con dirección y familia, última advertencia', color: '#dc2626', bg: '#fee2e2' },
+    { clave: 'suspension',    min: 10, max: 10,   umbral: '10',  icono: '🔴', label: 'Suspensión de privilegios escolares',           color: '#dc2626', bg: '#fee2e2' },
+    { clave: 'comunicacion',  min: 6,  max: 9,    umbral: '6',   icono: '🟠', label: 'Comunicación a familia y tarea correctiva',     color: '#d97706', bg: '#fef3c7' },
+    { clave: 'advertencia',   min: 3,  max: 5,    umbral: '3',   icono: '🟡', label: 'Advertencia verbal y reflexión escrita',        color: '#a16207', bg: '#fef9c3' },
 ];

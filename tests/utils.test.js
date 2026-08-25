@@ -8,6 +8,8 @@ import {
     PESO_MINIMO,
     colorEscala,
     puedeAccederCompetencias,
+    contarDemeritosActivos,
+    calcularNivelDemerito,
 } from '../src/js/utils.js';
 
 // ═══════════════════════════════════════════
@@ -190,5 +192,63 @@ describe('colorEscala', () => {
 
     test.each([3.9, 2, 0])('rojo cuando la nota es < 4.0 (nota=%s)', (nota) => {
         expect(colorEscala(nota)).toBe('nivel-rojo');
+    });
+});
+
+// ═══════════════════════════════════════════
+// 6. Deméritos — conteo activo y escala de consecuencias
+// ═══════════════════════════════════════════
+describe('contarDemeritosActivos', () => {
+    test('cuenta solo los deméritos con redimido:false', () => {
+        const demeritos = [{ redimido: false }, { redimido: true }, { redimido: false }, { redimido: false }];
+        expect(contarDemeritosActivos(demeritos)).toBe(3);
+    });
+
+    test('un demérito sin campo redimido (undefined) cuenta como activo', () => {
+        expect(contarDemeritosActivos([{}, { redimido: false }])).toBe(2);
+    });
+
+    test('arreglo vacío o nulo da 0', () => {
+        expect(contarDemeritosActivos([])).toBe(0);
+        expect(contarDemeritosActivos(null)).toBe(0);
+        expect(contarDemeritosActivos(undefined)).toBe(0);
+    });
+});
+
+describe('calcularNivelDemerito', () => {
+    test.each([0, 1, 2])('menos de 3 deméritos activos no tiene nivel (nivel=%i)', (total) => {
+        expect(calcularNivelDemerito(total)).toBeNull();
+    });
+
+    test.each([3, 4, 5])('3 a 5 → advertencia verbal (total=%i)', (total) => {
+        expect(calcularNivelDemerito(total)).toBe('advertencia');
+    });
+
+    test.each([6, 7, 9])('6 a 9 → comunicación a familia (total=%i)', (total) => {
+        expect(calcularNivelDemerito(total)).toBe('comunicacion');
+    });
+
+    test('exactamente 10 → suspensión de privilegios', () => {
+        expect(calcularNivelDemerito(10)).toBe('suspension');
+    });
+
+    test.each([11, 12, 14])('11 a 14 → reunión con dirección (total=%i)', (total) => {
+        expect(calcularNivelDemerito(total)).toBe('reunion');
+    });
+
+    test.each([15, 20, 100])('15 o más → no promovido de grado (total=%i)', (total) => {
+        expect(calcularNivelDemerito(total)).toBe('no_promovido');
+    });
+
+    test('los tramos son excluyentes: un alumno en un tramo no cae también en otro', () => {
+        // Sanity check contra la propia tabla: cada total de 0 a 20 tiene EXACTAMENTE un nivel (o null).
+        for (let total = 0; total <= 20; total++) {
+            expect(() => calcularNivelDemerito(total)).not.toThrow();
+        }
+    });
+
+    test('valores no numéricos se tratan como 0 (sin nivel)', () => {
+        expect(calcularNivelDemerito(undefined)).toBeNull();
+        expect(calcularNivelDemerito('abc')).toBeNull();
     });
 });

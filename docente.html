@@ -525,20 +525,25 @@
                                         <option value="reconocimiento">Reconocimiento</option>
                                     </select>
                                 </div>
-                                <div class="field" id="exp-campo-categoria">
-                                    <label>Categoría</label>
-                                    <select id="exp-categoria">
-                                        <option value="leve">Leve</option>
-                                        <option value="grave">Grave</option>
-                                        <option value="muy_grave">Muy grave</option>
+                                <div class="field" id="exp-campo-codigo">
+                                    <label>Código de falta</label>
+                                    <select id="exp-codigo">
+                                        <option value="A">A — No saludar al ingresar o dirigirse a docentes/compañeros</option>
+                                        <option value="B">B — Omitir "por favor" en solicitudes</option>
+                                        <option value="C">C — Omitir "gracias" al recibir ayuda</option>
+                                        <option value="D">D — Tono grosero, desafiante o irrespetuoso</option>
                                     </select>
+                                </div>
+                                <div class="field hidden" id="exp-campo-fecha-demerito">
+                                    <label>Fecha</label>
+                                    <input type="date" id="exp-fecha-demerito">
                                 </div>
                                 <div class="field hidden" id="exp-campo-dias">
                                     <label>Días de suspensión</label>
                                     <input type="number" id="exp-dias" value="1" min="1" max="30">
                                 </div>
                                 <div class="field">
-                                    <label>Descripción</label>
+                                    <label id="exp-label-descripcion">Descripción</label>
                                     <textarea id="exp-descripcion" rows="3" placeholder="Describí lo sucedido..." style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;outline:none;resize:vertical"></textarea>
                                 </div>
                                 <button class="btn-primary" id="btn-guardar-expediente" onclick="guardarRegistroExpediente()">Guardar registro</button>

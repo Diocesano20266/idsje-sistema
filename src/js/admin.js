@@ -36,10 +36,10 @@ let categoriasGradoCache = [];   // categorias_grado, para agrupar la vista Grad
 let matriculaAlumnosCache = [];  // catálogo completo de alumnos + su matrícula (si tiene) del año activo, para la subsección Matrícula
 
 // Expedientes disciplinarios
-let expAdminAlumnos    = []; // resultados de la búsqueda actual
-let expAdminAlumnoSel  = null;
-let expAdminTimeline   = [];
-let expBuscarTimeout   = null;
+let expAdminGradoSel     = null; // grado_id elegido en el selector
+let expAdminAlumnosGrado = [];   // alumnos matriculados (año activo) en expAdminGradoSel
+let expAdminAlumnoSel    = null;
+let expAdminTimeline     = [];
 
 // Asistencias
 let asisGradoId      = null;
@@ -1242,79 +1242,95 @@ window.imprimirListaBlancoAsistenciaAdmin = () => {
 };
 
 // ── EXPEDIENTES DISCIPLINARIOS ───────────────
+// Flujo: elegir grado → lista de alumnos matriculados (año activo) en ese
+// grado → click en un alumno → expediente completo (timeline + registrar
+// nuevo), con un botón "← Volver" para regresar a la lista del grado.
 function renderVistaExpedientes() {
-    document.getElementById('exp-admin-busqueda').value = '';
-    document.getElementById('exp-admin-resultados').innerHTML = '';
+    const sel = document.getElementById('exp-admin-grado');
+    const gradosDelAnio = anioActivoCache
+        ? gradosCache.filter(g => g.año_academico_id === anioActivoCache.id || !g.año_academico_id)
+        : gradosCache;
+    sel.innerHTML = '<option value="">— Seleccioná un grado —</option>' +
+        gradosDelAnio
+            .slice()
+            .sort((a, b) => a.nombre.localeCompare(b.nombre) || a.seccion.localeCompare(b.seccion))
+            .map(g => `<option value="${g.id}">${g.nombre} ${g.modalidad} — Sección ${g.seccion}</option>`).join('');
+    sel.value = expAdminGradoSel || '';
+
+    mostrarListaAlumnosExpediente();
+
+    if (expAdminGradoSel) {
+        cargarAlumnosGradoExpediente(expAdminGradoSel);
+    } else {
+        document.getElementById('exp-admin-lista-alumnos').innerHTML = '<div class="empty-bubbles">Seleccioná un grado para ver sus alumnos.</div>';
+    }
+}
+
+// Oculta el detalle del expediente y vuelve a mostrar la lista de alumnos del grado.
+function mostrarListaAlumnosExpediente() {
     document.getElementById('exp-admin-detalle').classList.add('hidden');
+    document.getElementById('exp-admin-lista-wrap').classList.remove('hidden');
     expAdminAlumnoSel = null;
 }
 
-window.onInputBuscarExpediente = () => {
-    clearTimeout(expBuscarTimeout);
-    expBuscarTimeout = setTimeout(() => window.buscarAlumnoExpediente(), 300);
+window.cambiarGradoExpedienteAdmin = () => {
+    expAdminGradoSel = document.getElementById('exp-admin-grado').value || null;
+    mostrarListaAlumnosExpediente();
+    if (expAdminGradoSel) {
+        cargarAlumnosGradoExpediente(expAdminGradoSel);
+    } else {
+        document.getElementById('exp-admin-lista-alumnos').innerHTML = '<div class="empty-bubbles">Seleccioná un grado para ver sus alumnos.</div>';
+    }
 };
 
-window.buscarAlumnoExpediente = async () => {
-    const texto = document.getElementById('exp-admin-busqueda').value.trim();
-    const cont = document.getElementById('exp-admin-resultados');
-    if (!texto) { cont.innerHTML = ''; return; }
+window.volverListaAlumnosExpediente = () => {
+    mostrarListaAlumnosExpediente();
+};
 
-    cont.innerHTML = '<div class="empty-bubbles">Buscando…</div>';
-    // La búsqueda es sobre el catálogo de alumnos (nombres/apellidos/nie ya no
-    // tienen grado_id embebido). El grado que se muestra es su matrícula del
-    // año activo, si tiene una — se busca aparte porque alumnos ya no tiene FK a grados.
-    //
-    // Tres queries .ilike() separadas (NO .or()): la sintaxis de .or() de
-    // PostgREST usa la coma como separador entre condiciones, así que un
-    // texto de búsqueda con coma (ej. "Pérez, Juan") rompía el filtro entero
-    // con un error de sintaxis del lado del servidor. .ilike() no tiene ese
-    // problema porque el valor no se re-parsea como lista de condiciones.
-    const patron = `%${texto}%`;
-    const [
-        { data: porNombres, error: e1 },
-        { data: porApellidos, error: e2 },
-        { data: porNie, error: e3 },
-    ] = await Promise.all([
-        supabase.from('alumnos').select('*').ilike('nombres', patron).limit(20),
-        supabase.from('alumnos').select('*').ilike('apellidos', patron).limit(20),
-        supabase.from('alumnos').select('*').ilike('nie', patron).limit(20),
-    ]);
+async function cargarAlumnosGradoExpediente(gradoId) {
+    const cont = document.getElementById('exp-admin-lista-alumnos');
+    cont.innerHTML = '<div class="empty-bubbles">Cargando…</div>';
 
-    const error = e1 || e2 || e3;
-    if (error) { notificarError(error, 'Error buscando alumnos'); return; }
+    if (!anioActivoCache) { cont.innerHTML = '<div class="info-box">⚠ No hay un año académico activo.</div>'; return; }
 
-    const porId = new Map();
-    [...(porNombres || []), ...(porApellidos || []), ...(porNie || [])].forEach(a => porId.set(a.id, a));
-    expAdminAlumnos = [...porId.values()]
-        .sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || ''))
-        .slice(0, 20);
-    if (!expAdminAlumnos.length) { cont.innerHTML = '<div class="empty-bubbles">Sin resultados.</div>'; return; }
+    const { data, error } = await supabase
+        .from('matriculas')
+        .select('*, alumnos(*)')
+        .eq('grado_id', gradoId)
+        .eq('año_academico_id', anioActivoCache.id)
+        .eq('activo', true);
 
-    if (anioActivoCache && expAdminAlumnos.length) {
-        const { data: matriculas } = await supabase
-            .from('matriculas')
-            .select('alumno_id, grados(nombre, seccion)')
-            .in('alumno_id', expAdminAlumnos.map(a => a.id))
-            .eq('año_academico_id', anioActivoCache.id)
-            .eq('activo', true);
-        const gradoPorAlumno = {};
-        (matriculas || []).forEach(m => { gradoPorAlumno[m.alumno_id] = m.grados; });
-        expAdminAlumnos = expAdminAlumnos.map(a => ({ ...a, grados: gradoPorAlumno[a.id] || null }));
+    if (error && esErrorDeRed(error)) { mostrarBannerSinConexion(() => cargarAlumnosGradoExpediente(gradoId)); return; }
+    ocultarBannerSinConexion();
+    if (error) return notificarError(error, 'Error cargando alumnos del grado');
+
+    expAdminAlumnosGrado = (data || [])
+        .map(m => m.alumnos)
+        .filter(Boolean)
+        .sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || ''));
+
+    if (!expAdminAlumnosGrado.length) {
+        cont.innerHTML = '<div class="empty-bubbles">Este grado no tiene alumnos matriculados.</div>';
+        return;
     }
 
-    cont.innerHTML = expAdminAlumnos.map(a => `
+    cont.innerHTML = expAdminAlumnosGrado.map(a => `
         <div class="exp-resultado-item" onclick="seleccionarAlumnoExpedienteAdmin('${a.id}')">
-            <span>${a.apellidos}, ${a.nombres}</span>
-            <span class="text-muted">NIE ${a.nie || '—'} · ${a.grados?.nombre || ''} ${a.grados?.seccion || ''}</span>
+            <div style="display:flex;align-items:center;gap:10px">
+                ${a.foto_url
+                    ? `<img src="${a.foto_url}" class="foto-mini" alt="${a.apellidos}">`
+                    : '<div class="foto-mini foto-placeholder">?</div>'}
+                <span>${a.apellidos}, ${a.nombres}</span>
+            </div>
+            <span class="text-muted">NIE ${a.nie || '—'}</span>
         </div>
     `).join('');
-};
+}
 
 window.seleccionarAlumnoExpedienteAdmin = (alumnoId) => {
     expAdminAlumnoSel = alumnoId;
-    const alumno = expAdminAlumnos.find(a => a.id === alumnoId);
-    document.getElementById('exp-admin-resultados').innerHTML = '';
-    document.getElementById('exp-admin-busqueda').value = alumno ? `${alumno.apellidos}, ${alumno.nombres}` : '';
+    const alumno = expAdminAlumnosGrado.find(a => a.id === alumnoId);
+    document.getElementById('exp-admin-lista-wrap').classList.add('hidden');
     document.getElementById('exp-admin-detalle').classList.remove('hidden');
     document.getElementById('exp-admin-nombre').textContent = alumno ? `${alumno.apellidos}, ${alumno.nombres}` : '';
     limpiarFormularioExpedienteAdmin();

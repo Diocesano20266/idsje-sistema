@@ -395,6 +395,35 @@
                 </div>
             </div>
 
+            <div class="nav-group" data-group="disciplina">
+                <div class="nav-group-label" onclick="toggleNavGroup('disciplina')">
+                    <span class="nav-group-txt">Disciplina</span>
+                    <span class="nav-group-chevron">▾</span>
+                </div>
+                <div class="nav-group-items">
+                    <div class="nav-item" data-vista="demeritos" onclick="mostrarVista('demeritos')">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M8 1.5L9.7 5H14L10.6 7.4l1.3 4.1L8 9l-3.9 2.5 1.3-4.1L2 5h4.3L8 1.5z" stroke="rgba(255,255,255,.6)" stroke-width="1.1" fill="none" stroke-linejoin="round"/></svg>
+                        <span class="nav-txt">Deméritos</span>
+                    </div>
+                    <div class="nav-item" data-vista="anecdoticos" onclick="mostrarVista('anecdoticos')">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M4 1.5h6l3 3V14a.5.5 0 0 1-.5.5h-9A.5.5 0 0 1 3 14V2a.5.5 0 0 1 .5-.5H4z" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M5.5 7.5h5M5.5 10h3.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" stroke-linecap="round"/></svg>
+                        <span class="nav-txt">Anecdóticos</span>
+                    </div>
+                    <div class="nav-item" data-vista="amonestaciones" onclick="mostrarVista('amonestaciones')">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M5 5h6M5 8h6M5 11h3" stroke="rgba(255,255,255,.6)" stroke-width="1.2"/></svg>
+                        <span class="nav-txt">Amonestaciones</span>
+                    </div>
+                    <div class="nav-item" data-vista="reconocimientos" onclick="mostrarVista('reconocimientos')">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M8 1.5l1.8 3.7 4.1.6-3 2.9.7 4.1L8 11l-3.6 1.9.7-4.1-3-2.9 4.1-.6L8 1.5z" stroke="rgba(255,255,255,.6)" stroke-width="1.1" fill="none" stroke-linejoin="round"/></svg>
+                        <span class="nav-txt">Reconocimientos</span>
+                    </div>
+                    <div class="nav-item" data-vista="expedientes" onclick="mostrarVista('expedientes')">
+                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="2.5" width="13" height="11.5" rx="1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M4.5 6h7M4.5 8.5h7M4.5 11h4" stroke="rgba(255,255,255,.6)" stroke-width="1.2" stroke-linecap="round"/></svg>
+                        <span class="nav-txt">Expedientes</span>
+                    </div>
+                </div>
+            </div>
+
             <div class="nav-group" data-group="reportes">
                 <div class="nav-group-label" onclick="toggleNavGroup('reportes')">
                     <span class="nav-group-txt">Reportes</span>
@@ -437,14 +466,6 @@
                     <div class="nav-item" data-vista="configuracion" onclick="mostrarVista('configuracion')">
                         <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M8 1.5v2M8 12.5v2M14.5 8h-2M3.5 8h-2M12.4 3.6l-1.4 1.4M5 9.6l-1.4 1.4M12.4 12.4l-1.4-1.4M5 6.4L3.6 5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" stroke-linecap="round"/></svg>
                         <span class="nav-txt">Períodos Académicos</span>
-                    </div>
-                    <div class="nav-item" data-vista="expedientes" onclick="mostrarVista('expedientes')">
-                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M4 1.5h6l3 3V14a.5.5 0 0 1-.5.5h-9A.5.5 0 0 1 3 14V2a.5.5 0 0 1 .5-.5H4z" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M5.5 7.5h5M5.5 10h3.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" stroke-linecap="round"/></svg>
-                        <span class="nav-txt">Expedientes</span>
-                    </div>
-                    <div class="nav-item" data-vista="demeritos" onclick="mostrarVista('demeritos')">
-                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M8 1.5L9.7 5H14L10.6 7.4l1.3 4.1L8 9l-3.9 2.5 1.3-4.1L2 5h4.3L8 1.5z" stroke="rgba(255,255,255,.6)" stroke-width="1.1" fill="none" stroke-linejoin="round"/></svg>
-                        <span class="nav-txt">Deméritos</span>
                     </div>
                 </div>
             </div>
@@ -602,6 +623,7 @@
                             <button class="gd-close" onclick="cerrarDrawerDemerito()">✕</button>
                         </div>
                         <div class="gd-actions">
+                            <button class="gd-btn-edit" id="btn-abrir-nuevo-demerito" onclick="abrirModalNuevoDemerito()">+ Nuevo Demérito</button>
                             <button class="gd-btn-edit" id="btn-abrir-redencion" onclick="abrirModalRedencion()">↩ Aplicar Redención</button>
                         </div>
                     </div>
@@ -687,49 +709,20 @@
                     <button class="btn-secondary" onclick="volverListaAlumnosExpediente()">← Volver</button>
                     <div class="tabla-title" style="margin:16px 0 12px" id="exp-admin-nombre"></div>
 
-                    <div class="exp-stats" id="exp-admin-resumen" style="grid-template-columns:repeat(4,1fr)"></div>
-
-                    <div class="dash-card" style="margin-top:16px">
-                        <div class="dash-card-header"><div class="dash-card-title"><span class="gs-dot"></span>Historial del expediente</div></div>
-                        <div class="dash-card-body">
-                            <div class="exp-timeline" id="exp-admin-timeline"></div>
-                        </div>
+                    <div class="filtros">
+                        <select id="exp-admin-filtro-tipo" onchange="renderTimelineExpedienteAdmin()">
+                            <option value="">— Todos los tipos —</option>
+                            <option value="anecdoticos">Solo anecdóticos</option>
+                            <option value="demeritos">Solo deméritos</option>
+                            <option value="amonestaciones">Solo amonestaciones</option>
+                            <option value="reconocimientos">Solo reconocimientos</option>
+                        </select>
                     </div>
 
-                    <div class="dash-card" style="margin-top:16px">
-                        <div class="dash-card-header"><div class="dash-card-title"><span class="gs-dot"></span>Registrar nuevo</div></div>
+                    <div class="dash-card">
+                        <div class="dash-card-header"><div class="dash-card-title"><span class="gs-dot"></span>Expediente completo (solo lectura)</div></div>
                         <div class="dash-card-body">
-                            <div class="field"><label>Tipo</label>
-                                <select id="exp-admin-tipo" onchange="cambiarTipoExpedienteAdmin()">
-                                    <option value="anecdotico">Anecdótico</option>
-                                    <option value="demerito">Demérito</option>
-                                    <option value="acta">Acta</option>
-                                    <option value="suspension">Suspensión</option>
-                                    <option value="reconocimiento">Reconocimiento</option>
-                                </select>
-                            </div>
-                            <div class="field" id="exp-admin-campo-codigo">
-                                <label>Código de falta</label>
-                                <select id="exp-admin-codigo">
-                                    <option value="A">A — No saludar al ingresar o dirigirse a docentes/compañeros</option>
-                                    <option value="B">B — Omitir "por favor" en solicitudes</option>
-                                    <option value="C">C — Omitir "gracias" al recibir ayuda</option>
-                                    <option value="D">D — Tono grosero, desafiante o irrespetuoso</option>
-                                </select>
-                            </div>
-                            <div class="field hidden" id="exp-admin-campo-fecha-demerito">
-                                <label>Fecha</label>
-                                <input type="date" id="exp-admin-fecha-demerito">
-                            </div>
-                            <div class="field hidden" id="exp-admin-campo-dias">
-                                <label>Días de suspensión</label>
-                                <input type="number" id="exp-admin-dias" value="1" min="1" max="30">
-                            </div>
-                            <div class="field">
-                                <label id="exp-admin-label-descripcion">Descripción</label>
-                                <textarea id="exp-admin-descripcion" rows="3" placeholder="Describí lo sucedido..." style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;outline:none;resize:vertical"></textarea>
-                            </div>
-                            <button class="btn-primary" id="btn-guardar-expediente-admin" onclick="guardarRegistroExpedienteAdmin()">Guardar registro</button>
+                            <div class="exp-timeline" id="exp-admin-timeline"></div>
                         </div>
                     </div>
                 </div>
@@ -737,6 +730,11 @@
 
             <!-- DEMÉRITOS -->
             <div id="vista-demeritos" class="hidden">
+                <div class="filtros">
+                    <select id="dem-grado-filtro" onchange="cambiarFiltroGradoDemerito()">
+                        <option value="">— Todos los grados —</option>
+                    </select>
+                </div>
                 <div id="dem-tarjetas-wrap">
                     <div class="info-box" style="background:#e8f4fd;border-color:#c3ddf5;color:#1a5f9a">
                         Escala de consecuencias por deméritos activos (no redimidos) del alumno. Hacé clic en una tarjeta para ver los alumnos que están en ese nivel.
@@ -752,6 +750,81 @@
                         <div class="dem-lista-titulo" id="dem-lista-titulo"></div>
                     </div>
                     <div class="exp-resultados" id="dem-lista-alumnos"></div>
+                </div>
+            </div>
+
+            <!-- ANECDÓTICOS -->
+            <div id="vista-anecdoticos" class="hidden">
+                <div class="filtros">
+                    <select id="anec-grado" onchange="cambiarGradoModulo('anecdoticos')">
+                        <option value="">— Seleccioná un grado —</option>
+                    </select>
+                </div>
+                <div id="anec-lista-wrap">
+                    <div class="exp-resultados" id="anec-lista-alumnos">
+                        <div class="empty-bubbles">Seleccioná un grado para ver sus alumnos.</div>
+                    </div>
+                </div>
+                <div id="anec-detalle" class="hidden" style="margin-top:20px">
+                    <button class="btn-secondary" onclick="volverListaModulo('anecdoticos')">← Volver</button>
+                    <div class="tabla-title" style="margin:16px 0 12px" id="anec-nombre"></div>
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <div class="dash-card-title"><span class="gs-dot"></span>Historial de anecdóticos</div>
+                            <button class="btn-primary" onclick="abrirModalNuevoRegistro('anecdoticos')">+ Nuevo Anecdótico</button>
+                        </div>
+                        <div class="dash-card-body"><div class="exp-timeline" id="anec-timeline"></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AMONESTACIONES -->
+            <div id="vista-amonestaciones" class="hidden">
+                <div class="filtros">
+                    <select id="amon-grado" onchange="cambiarGradoModulo('amonestaciones')">
+                        <option value="">— Seleccioná un grado —</option>
+                    </select>
+                </div>
+                <div id="amon-lista-wrap">
+                    <div class="exp-resultados" id="amon-lista-alumnos">
+                        <div class="empty-bubbles">Seleccioná un grado para ver sus alumnos.</div>
+                    </div>
+                </div>
+                <div id="amon-detalle" class="hidden" style="margin-top:20px">
+                    <button class="btn-secondary" onclick="volverListaModulo('amonestaciones')">← Volver</button>
+                    <div class="tabla-title" style="margin:16px 0 12px" id="amon-nombre"></div>
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <div class="dash-card-title"><span class="gs-dot"></span>Historial de amonestaciones</div>
+                            <button class="btn-primary" onclick="abrirModalNuevoRegistro('amonestaciones')">+ Nueva Amonestación</button>
+                        </div>
+                        <div class="dash-card-body"><div class="exp-timeline" id="amon-timeline"></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RECONOCIMIENTOS -->
+            <div id="vista-reconocimientos" class="hidden">
+                <div class="filtros">
+                    <select id="reco-grado" onchange="cambiarGradoModulo('reconocimientos')">
+                        <option value="">— Seleccioná un grado —</option>
+                    </select>
+                </div>
+                <div id="reco-lista-wrap">
+                    <div class="exp-resultados" id="reco-lista-alumnos">
+                        <div class="empty-bubbles">Seleccioná un grado para ver sus alumnos.</div>
+                    </div>
+                </div>
+                <div id="reco-detalle" class="hidden" style="margin-top:20px">
+                    <button class="btn-secondary" onclick="volverListaModulo('reconocimientos')">← Volver</button>
+                    <div class="tabla-title" style="margin:16px 0 12px" id="reco-nombre"></div>
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <div class="dash-card-title"><span class="gs-dot"></span>Historial de reconocimientos</div>
+                            <button class="btn-primary" onclick="abrirModalNuevoRegistro('reconocimientos')">+ Nuevo Reconocimiento</button>
+                        </div>
+                        <div class="dash-card-body"><div class="exp-timeline" id="reco-timeline"></div></div>
+                    </div>
                 </div>
             </div>
 
@@ -908,32 +981,51 @@
         </div>
     </div>
 
-    <!-- MODAL: EDITAR REGISTRO DE EXPEDIENTE -->
-    <div class="modal-overlay" id="modal-exp-editar">
+    <!-- MODAL: NUEVO DEMÉRITO -->
+    <div class="modal-overlay" id="modal-nuevo-demerito">
         <div class="modal">
-            <div class="modal-title" id="modal-exp-editar-title">Editar registro</div>
-            <input type="hidden" id="exp-edit-tabla">
-            <input type="hidden" id="exp-edit-id">
-            <div class="field hidden" id="exp-edit-campo-codigo">
-                <label>Código de falta</label>
-                <select id="exp-edit-codigo">
+            <div class="modal-title">Nuevo Demérito</div>
+            <input type="hidden" id="nd-alumno-id">
+            <div class="field"><label>Código de falta</label>
+                <select id="nd-codigo">
                     <option value="A">A — No saludar al ingresar o dirigirse a docentes/compañeros</option>
                     <option value="B">B — Omitir "por favor" en solicitudes</option>
                     <option value="C">C — Omitir "gracias" al recibir ayuda</option>
                     <option value="D">D — Tono grosero, desafiante o irrespetuoso</option>
                 </select>
             </div>
-            <div class="field hidden" id="exp-edit-campo-dias">
-                <label>Días de suspensión</label>
-                <input type="number" id="exp-edit-dias" min="1" max="30">
+            <div class="field"><label>Descripción adicional (opcional)</label>
+                <textarea id="nd-descripcion" rows="3" placeholder="Describí lo sucedido..." style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;outline:none;resize:vertical"></textarea>
             </div>
-            <div class="field">
-                <label>Descripción</label>
-                <textarea id="exp-edit-descripcion" rows="4" style="width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:9px;font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;outline:none;resize:vertical"></textarea>
-            </div>
+            <div class="field"><label>Fecha</label><input type="date" id="nd-fecha"></div>
             <div class="modal-actions">
-                <button class="btn-primary" id="btn-guardar-exp-editar" onclick="guardarEdicionExpediente()">Guardar</button>
-                <button class="btn-secondary" onclick="cerrarModal('modal-exp-editar')">Cancelar</button>
+                <button class="btn-primary" id="btn-guardar-nuevo-demerito" onclick="guardarNuevoDemerito()">Guardar</button>
+                <button class="btn-secondary" onclick="cerrarModal('modal-nuevo-demerito')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: NUEVO REGISTRO (compartido por Anecdóticos / Amonestaciones / Reconocimientos) -->
+    <div class="modal-overlay" id="modal-nuevo-registro">
+        <div class="modal">
+            <div class="modal-title" id="mnr-title">Nuevo registro</div>
+            <input type="hidden" id="mnr-modulo">
+            <input type="hidden" id="mnr-alumno-id">
+            <div class="field hidden" id="mnr-campo-tipo">
+                <label>Tipo</label>
+                <select id="mnr-tipo" onchange="cambiarTipoModalNuevoRegistro()"></select>
+            </div>
+            <div class="field hidden" id="mnr-campo-dias">
+                <label>Días de suspensión</label>
+                <input type="number" id="mnr-dias" min="1" max="30" value="1">
+            </div>
+            <div class="field"><label>Descripción</label>
+                <textarea id="mnr-descripcion" rows="3" placeholder="Describí lo sucedido..." style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;outline:none;resize:vertical"></textarea>
+            </div>
+            <div class="field"><label>Fecha</label><input type="date" id="mnr-fecha"></div>
+            <div class="modal-actions">
+                <button class="btn-primary" id="btn-guardar-mnr" onclick="guardarNuevoRegistroModulo()">Guardar</button>
+                <button class="btn-secondary" onclick="cerrarModal('modal-nuevo-registro')">Cancelar</button>
             </div>
         </div>
     </div>
@@ -1036,7 +1128,7 @@
         // Solo HTML/CSS/JS de esta página — admin.js no sabe nada de esto.
         // Por defecto solo "académico" queda expandido; el resto arranca colapsado.
         const NAV_GROUPS_KEY = 'idsje_admin_nav_grupos_colapsados';
-        const NAV_GROUPS_COLAPSADOS_DEFAULT = ['docentes', 'asistencias', 'reportes', 'configuracion'];
+        const NAV_GROUPS_COLAPSADOS_DEFAULT = ['docentes', 'asistencias', 'disciplina', 'reportes', 'configuracion'];
 
         function cargarNavGruposColapsados() {
             try {

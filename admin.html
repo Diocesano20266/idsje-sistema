@@ -189,15 +189,6 @@
         .gd-materia-quitar:hover{background:#fecaca}
         .gd-add-materia{width:100%;margin-top:10px;padding:10px;border-radius:8px;border:1.5px dashed #cbd5e1;background:#fff;color:#64748b;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}
         .gd-add-materia:hover{border-color:#1B3A6B;color:#1B3A6B;background:#eef2fb}
-        .gd-mini-grid{display:grid;grid-template-columns:44px repeat(5,1fr);gap:1px;background:#e2e8f0;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;font-size:10px}
-        .gd-mini-cell{background:#fff;min-height:34px;display:flex;align-items:center;justify-content:center;padding:2px;text-align:center}
-        .gd-mini-head{background:#1B3A6B;color:#fff;font-weight:700;min-height:24px;font-size:9px}
-        .gd-mini-periodo{background:#f8fafc;color:#1B3A6B;font-weight:700}
-        .gd-mini-ocupada{flex-direction:column;justify-content:center;line-height:1.15;padding:3px;gap:1px}
-        .gd-mini-materia{font-weight:700;color:#0a1628;font-size:8.5px}
-        .gd-mini-docente{font-size:7.5px;color:#64748b}
-        .gd-editar-horario{width:100%;margin-top:14px;padding:10px;border-radius:8px;border:1px solid rgba(27,58,107,.25);background:#eef2fb;color:#1B3A6B;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s}
-        .gd-editar-horario:hover{background:#1B3A6B;color:#fff}
         @media(max-width:560px){.grado-drawer{width:100%}}
 
         /* ── TABLA GENÉRICA ── */
@@ -228,44 +219,6 @@
         .filtros select:focus,.filtros input:focus{border-color:#1B3A6B}
         .btn-danger{background:#fde8e8;color:#b52828;border:1px solid #fecaca;padding:8px 14px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s}
         .btn-danger:hover{background:#fecaca}
-
-        /* ── HORARIOS ── */
-        .horario-grid{display:grid;grid-template-columns:110px repeat(5,1fr);gap:1px;background:#e2e8f0;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden}
-        .horario-grid .empty-bubbles{grid-column:1/-1}
-        .hg-cell{background:#fff;min-height:64px}
-        .hg-head{background:#1B3A6B;color:#fff;font-weight:700;text-align:center;display:flex;align-items:center;justify-content:center;padding:10px;font-size:12px;text-transform:uppercase;letter-spacing:.6px;min-height:auto}
-        .hg-periodo-label{background:#f8fafc;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:2px;padding:6px}
-        .hg-periodo-num{font-size:12px;font-weight:700;color:#1B3A6B}
-        .hg-periodo-hora{font-size:10px;color:#94a3b8;font-weight:500}
-        .hg-bloqueado{background:#eef1f6;color:#94a3b8;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:11px;text-transform:uppercase;letter-spacing:1.5px}
-        .hg-vacia{display:flex;align-items:center;justify-content:center}
-        .hg-add-btn{width:26px;height:26px;border-radius:7px;border:1.5px dashed #cbd5e1;background:#fff;color:#94a3b8;font-size:16px;line-height:1;cursor:pointer;transition:all .2s}
-        .hg-add-btn:hover{border-color:#1B3A6B;color:#1B3A6B;background:#eef2fb}
-        .hg-ocupada-wrap{padding:4px}
-        .hg-ocupada{position:relative;height:100%;border-radius:8px;padding:8px 20px 8px 8px}
-        .hg-materia{font-size:11px;font-weight:700;color:#0a1628;line-height:1.3;margin-bottom:2px}
-        .hg-docente{font-size:10px;color:#475569}
-        .hg-del-btn{position:absolute;top:4px;right:4px;width:17px;height:17px;border:none;border-radius:5px;background:rgba(255,255,255,.7);color:#b52828;font-size:10px;line-height:1;cursor:pointer}
-        .hg-del-btn:hover{background:#fff}
-        @media(max-width:900px){
-            .horario-grid{grid-template-columns:80px repeat(5,minmax(90px,1fr));overflow-x:auto}
-        }
-
-        /* ── GENERADOR DE HORARIOS ── */
-        .gen-grado-card{background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:14px 18px;margin-bottom:12px}
-        .gen-grado-titulo{font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:#0a1628;margin-bottom:8px}
-        .gen-materia-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #f7f9fc;font-size:13px}
-        .gen-materia-row:last-child{border-bottom:none}
-        .gen-materia-row.gen-materia-excluida{opacity:.45}
-        .gen-materia-check{display:flex;align-items:center;gap:8px;cursor:pointer}
-        .gen-materia-check input{width:15px;height:15px;accent-color:#1B3A6B;cursor:pointer}
-        .gen-horas-input{width:56px;padding:6px 8px;border:1.5px solid #e2e8f0;border-radius:7px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;text-align:center;outline:none}
-        .gen-horas-input:focus{border-color:#1B3A6B}
-        .gen-horas-input:disabled{background:#f1f5f9;cursor:not-allowed}
-        .gen-docente-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #f7f9fc;font-size:13px}
-        .gen-docente-row:last-child{border-bottom:none}
-        .gen-docente-row select{padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;outline:none;background:#fff}
-        .gen-docente-row select:focus{border-color:#1B3A6B}
 
         /* ── OTROS REPORTES ── */
         .reportes-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
@@ -411,23 +364,6 @@
                     <div class="nav-item" data-vista="materias" onclick="mostrarVista('materias')">
                         <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M8 2L9.5 6.5H14L10.3 9l1.5 4.5L8 11 4.2 13.5l1.5-4.5L2 6.5h4.5L8 2z" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/></svg>
                         <span class="nav-txt">Materias</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="nav-group" data-group="horarios">
-                <div class="nav-group-label" onclick="toggleNavGroup('horarios')">
-                    <span class="nav-group-txt">Horarios</span>
-                    <span class="nav-group-chevron">▾</span>
-                </div>
-                <div class="nav-group-items">
-                    <div class="nav-item" data-vista="horarios" onclick="mostrarVista('horarios')">
-                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="rgba(255,255,255,.6)" stroke-width="1.3" fill="none"/><path d="M8 5v3l2 1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.3" stroke-linecap="round"/></svg>
-                        <span class="nav-txt">Horarios</span>
-                    </div>
-                    <div class="nav-item" data-vista="generador" onclick="mostrarVista('generador')">
-                        <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><path d="M2 8a6 6 0 0 1 10.2-4.2M14 8a6 6 0 0 1-10.2 4.2" stroke="rgba(255,255,255,.6)" stroke-width="1.2" stroke-linecap="round"/><path d="M12.2 2.5v2.3h-2.3M3.8 13.5v-2.3h2.3" stroke="rgba(255,255,255,.6)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                        <span class="nav-txt">Generar Horario</span>
                     </div>
                 </div>
             </div>
@@ -631,7 +567,6 @@
                         <button class="gd-tab active" data-tab="general" onclick="cambiarTabDrawerGrado('general')">📋 General</button>
                         <button class="gd-tab" data-tab="alumnos" onclick="cambiarTabDrawerGrado('alumnos')">👥 Alumnos</button>
                         <button class="gd-tab" data-tab="materias" onclick="cambiarTabDrawerGrado('materias')">📚 Materias</button>
-                        <button class="gd-tab" data-tab="horario" onclick="cambiarTabDrawerGrado('horario')">🗓 Horario</button>
                     </div>
                     <div class="gd-tab-content" id="gd-tab-content"></div>
                 </div>
@@ -670,54 +605,6 @@
                         <thead><tr><th>Nombre</th><th>Código</th><th>Acciones</th></tr></thead>
                         <tbody id="tbody-materias"></tbody>
                     </table>
-                </div>
-            </div>
-
-            <!-- HORARIOS -->
-            <div id="vista-horarios" class="hidden">
-                <div class="filtros">
-                    <select id="horario-grado" onchange="cambiarGradoHorario()">
-                        <option value="">— Seleccioná un grado —</option>
-                    </select>
-                </div>
-                <div class="horario-grid" id="horario-grid">
-                    <div class="empty-bubbles">Seleccioná un grado para ver o editar su horario.</div>
-                </div>
-            </div>
-
-            <!-- GENERADOR AUTOMÁTICO DE HORARIOS -->
-            <div id="vista-generador" class="hidden">
-                <div id="gen-formulario">
-                    <div class="info-box" style="background:#e8f4fd;border-color:#c3ddf5;color:#1a5f9a">
-                        Definí las horas semanales de cada materia y la disponibilidad de cada docente, y el sistema arma un horario sin choques automáticamente. Podés generar varias opciones antes de guardar.
-                    </div>
-                    <div id="gen-materias-lista"></div>
-
-                    <div class="tabla-wrap" style="margin-top:20px">
-                        <div class="tabla-header"><div class="tabla-title">👩‍🏫 Disponibilidad de docentes</div></div>
-                        <div id="gen-docentes-lista" style="padding:16px 20px"></div>
-                    </div>
-
-                    <div style="text-align:right;margin-top:20px">
-                        <button class="btn-primary" onclick="ejecutarGenerarHorario()">⚙ Generar Horario</button>
-                    </div>
-                </div>
-
-                <div id="gen-sin-solucion" class="hidden info-box" style="background:#fde8e8;border-color:#fecaca;color:#b52828;margin-top:16px">
-                    No fue posible generar un horario sin conflictos. Revisá las restricciones (por ejemplo, un docente de media jornada con demasiadas horas asignadas entre varios grados).
-                    <div style="margin-top:10px"><button class="btn-secondary" onclick="descartarHorarioGenerado()">← Volver al formulario</button></div>
-                </div>
-
-                <div id="gen-resultado" class="hidden">
-                    <div class="filtros">
-                        <select id="gen-grado-preview" onchange="cambiarPreviewGenerador()"></select>
-                    </div>
-                    <div class="horario-grid" id="gen-grid"></div>
-                    <div class="tabla-header" style="border-radius:0 0 12px 12px;border:1px solid #e2e8f0;border-top:none;justify-content:flex-end;gap:8px">
-                        <button class="btn-secondary" onclick="generarOtroHorario()">🔄 Generar otro</button>
-                        <button class="btn-secondary" onclick="descartarHorarioGenerado()">❌ Descartar</button>
-                        <button class="btn-primary" id="btn-guardar-horario-generado" onclick="guardarHorarioGenerado()">✅ Guardar horario</button>
-                    </div>
                 </div>
             </div>
 
@@ -919,31 +806,6 @@
         </div>
     </div>
 
-    <!-- MODAL: CELDA DE HORARIO -->
-    <div class="modal-overlay" id="modal-celda-horario">
-        <div class="modal">
-            <div class="modal-title" id="modal-celda-horario-title">Asignar clase</div>
-            <input type="hidden" id="hcelda-grado-id">
-            <input type="hidden" id="hcelda-dia">
-            <input type="hidden" id="hcelda-periodo">
-            <input type="hidden" id="hcelda-hora-inicio">
-            <input type="hidden" id="hcelda-hora-fin">
-            <input type="hidden" id="hcelda-docente-id">
-            <div class="field">
-                <label>Materia</label>
-                <select id="hcelda-materia" onchange="materiaCeldaHorarioCambio()"></select>
-            </div>
-            <div class="field">
-                <label>Docente</label>
-                <div class="materia-asignada"><span id="hcelda-docente-nombre">—</span></div>
-            </div>
-            <div class="modal-actions">
-                <button class="btn-primary" id="btn-guardar-celda-horario" onclick="guardarCeldaHorario()">Guardar</button>
-                <button class="btn-secondary" onclick="cerrarModal('modal-celda-horario')">Cancelar</button>
-            </div>
-        </div>
-    </div>
-
     <!-- MODAL: EDITAR REGISTRO DE EXPEDIENTE -->
     <div class="modal-overlay" id="modal-exp-editar">
         <div class="modal">
@@ -1001,7 +863,7 @@
             <div class="field" id="nanio-copiar-wrap">
                 <label class="mgm-check" style="background:#f8fafc;padding:10px 12px;border-radius:8px">
                     <input type="checkbox" id="nanio-copiar">
-                    <span>Copiar la estructura del año activo (grados, materias asignadas, docentes y horarios)</span>
+                    <span>Copiar la estructura del año activo (grados, materias asignadas y docentes)</span>
                 </label>
             </div>
             <div class="modal-actions">
@@ -1016,7 +878,7 @@
         <div class="modal">
             <div class="modal-title">Cambiar Año Activo</div>
             <div class="field"><label>Año académico</label><select id="canio-select"></select></div>
-            <div class="info-box">⚠ Todo el sistema (Grados, Alumnos matriculados, Horarios, Asistencias, etc.) pasará a mostrar los datos de este año.</div>
+            <div class="info-box">⚠ Todo el sistema (Grados, Alumnos matriculados, Asistencias, etc.) pasará a mostrar los datos de este año.</div>
             <div class="modal-actions">
                 <button class="btn-primary" id="btn-guardar-cambio-anio" onclick="guardarCambioAnioActivo()">Confirmar cambio</button>
                 <button class="btn-secondary" onclick="cerrarModal('modal-cambiar-anio')">Cancelar</button>
@@ -1053,7 +915,7 @@
         // Solo HTML/CSS/JS de esta página — admin.js no sabe nada de esto.
         // Por defecto solo "académico" queda expandido; el resto arranca colapsado.
         const NAV_GROUPS_KEY = 'idsje_admin_nav_grupos_colapsados';
-        const NAV_GROUPS_COLAPSADOS_DEFAULT = ['docentes', 'horarios', 'asistencias', 'reportes', 'configuracion'];
+        const NAV_GROUPS_COLAPSADOS_DEFAULT = ['docentes', 'asistencias', 'reportes', 'configuracion'];
 
         function cargarNavGruposColapsados() {
             try {

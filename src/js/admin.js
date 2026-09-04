@@ -2413,7 +2413,22 @@ window.renderAlumnos = async function renderAlumnos() {
         })
         .sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || ''));
 
-    document.getElementById('tbody-alumnos').innerHTML = alumnosCache.map(a => `
+    renderTablaAlumnos();
+}
+
+// Repinta la tabla de alumnos a partir de alumnosCache (ya cargado por
+// renderAlumnos) aplicando el filtro de búsqueda de #buscar-alumno — no
+// vuelve a consultar Supabase, así que puede llamarse en cada tecleo.
+function renderTablaAlumnos() {
+    const busqueda = (document.getElementById('buscar-alumno')?.value || '').trim().toLowerCase();
+    const alumnosFiltrados = busqueda
+        ? alumnosCache.filter(a =>
+            (a.nombres || '').toLowerCase().includes(busqueda) ||
+            (a.apellidos || '').toLowerCase().includes(busqueda) ||
+            (a.nie || '').toLowerCase().includes(busqueda))
+        : alumnosCache;
+
+    document.getElementById('tbody-alumnos').innerHTML = alumnosFiltrados.map(a => `
         <tr>
             <td>
                 ${a.foto_url
@@ -2429,8 +2444,10 @@ window.renderAlumnos = async function renderAlumnos() {
                 <button class="btn-sm btn-del" onclick="eliminarAlumno('${a.id}')">Eliminar</button>
             </td>
         </tr>
-    `).join('') || '<tr><td colspan="6" class="text-center text-muted">Sin alumnos</td></tr>';
+    `).join('') || `<tr><td colspan="6" class="text-center text-muted">${busqueda ? 'Sin alumnos que coincidan con la búsqueda' : 'Sin alumnos'}</td></tr>`;
 }
+
+window.filtrarAlumnosBusqueda = () => renderTablaAlumnos();
 
 const CAMPOS_ALUMNO = ['alumno-nie', 'alumno-nombres', 'alumno-apellidos', 'alumno-grado'];
 

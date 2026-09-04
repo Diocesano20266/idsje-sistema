@@ -2639,7 +2639,25 @@ window.importarAlumnosExcel = async (event) => {
 
             // 1. Crear en el catálogo `alumnos` (ya no lleva grado_id/activo/anio_ingreso).
             const { data: alumnosCreados, error } = await supabase.from('alumnos').insert(nuevos).select();
-            if (error) { notificarError(error, 'Error importando alumnos'); return; }
+            if (error) {
+                // Violación de unique constraint en `alumnos.nie` (código 23505 de
+                // Postgres) — el inserto es atómico, así que si un solo NIE ya
+                // existe, toda la tanda falla. Postgres devuelve el valor
+                // problemático en error.details: "Key (nie)=(20260001) already exists."
+                if (error.code === '23505') {
+                    const match = (error.details || error.message || '').match(/\(nie\)=\(([^)]+)\)/);
+                    const nieDuplicado = match ? match[1] : null;
+                    mostrarToast(
+                        nieDuplicado
+                            ? `Error: El NIE ${nieDuplicado} ya existe en el sistema.`
+                            : 'Error: Hay un NIE duplicado en el archivo o que ya existe en el sistema.',
+                        'error'
+                    );
+                } else {
+                    notificarError(error, 'Error importando alumnos');
+                }
+                return;
+            }
 
             // 2. Matricularlos a todos en el grado del filtro, para el año activo.
             const matriculasNuevas = (alumnosCreados || []).map(a => ({

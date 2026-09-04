@@ -2583,9 +2583,9 @@ window.continuarImportarExcel = () => {
     document.getElementById('excel-alumnos').click();
 };
 
-// Genera plantilla-alumnos.xlsx con los encabezados NIE | APELLIDOS | NOMBRES,
-// 3 filas de ejemplo, y la fila de encabezado protegida (bloqueada) para que
-// no se borre por error — el resto de la hoja queda editable.
+// Genera plantilla-alumnos.xlsx con los encabezados NIE | APELLIDOS | NOMBRES
+// y 3 filas de ejemplo. Sin protección de hoja — el archivo queda totalmente
+// editable para que el admin pueda llenar los datos de los alumnos.
 window.descargarPlantillaAlumnos = () => {
     const datos = [
         ['NIE', 'APELLIDOS', 'NOMBRES'],
@@ -2595,16 +2595,6 @@ window.descargarPlantillaAlumnos = () => {
     ];
     const ws = XLSX.utils.aoa_to_sheet(datos);
     ws['!cols'] = [{ wch: 14 }, { wch: 24 }, { wch: 24 }];
-
-    // Desbloquea todas las celdas y vuelve a bloquear solo la fila de
-    // encabezado (fila 1) — así, al activar la protección de hoja, Excel
-    // solo impide editar/borrar los encabezados.
-    Object.keys(ws).forEach(key => {
-        if (key.startsWith('!')) return;
-        const filaNum = parseInt(key.replace(/[^0-9]/g, ''), 10);
-        ws[key].s = { protection: { locked: filaNum === 1 } };
-    });
-    ws['!protect'] = { selectLockedCells: true, selectUnlockedCells: true };
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Alumnos');

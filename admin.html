@@ -1047,6 +1047,25 @@
         </div>
     </div>
 
+    <!-- MODAL: INSTRUCCIONES PARA IMPORTAR EXCEL -->
+    <div class="modal-overlay" id="modal-importar-excel">
+        <div class="modal">
+            <div class="modal-title">Importar alumnos desde Excel</div>
+            <div class="info-box" style="background:#e8f4fd;border-color:#c3ddf5;color:#1a5f9a;line-height:1.7">
+                El archivo debe tener <b>3 columnas</b>, en este orden: <b>NIE</b>, <b>Apellidos</b>, <b>Nombres</b>.<br>
+                La <b>primera fila</b> debe ser el encabezado — no se importa como alumno.<br>
+                Podés descargar la plantilla oficial acá abajo si todavía no tenés el archivo listo.
+            </div>
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="descargarPlantillaAlumnos()">📥 Descargar Plantilla</button>
+                <button class="btn-primary" onclick="continuarImportarExcel()">📊 Seleccionar archivo</button>
+            </div>
+            <div style="text-align:center;margin-top:12px">
+                <button class="btn-secondary" style="border:none;background:none;color:#94a3b8" onclick="cerrarModal('modal-importar-excel')">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL: ALUMNO -->
     <div class="modal-overlay" id="modal-alumno">
         <div class="modal">

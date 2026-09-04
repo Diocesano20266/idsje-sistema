@@ -638,6 +638,7 @@
                     <select id="filtro-grado" onchange="renderAlumnos()">
                         <option value="">— Todos los grados —</option>
                     </select>
+                    <input type="text" id="buscar-alumno" placeholder="🔍 Buscar por nombre, apellido o NIE..." oninput="filtrarAlumnosBusqueda()" style="min-width:260px">
                     <button class="btn-danger" onclick="eliminarAlumnosMasivo()">🗑 Eliminar sección completa</button>
                 </div>
                 <div class="tabla-wrap">

@@ -182,7 +182,7 @@ const TITULOS = {
 const VISTA_CONFIG = {
     inicio:      { titulo: 'Inicio',               accion: `<button class="btn-primary" onclick="mostrarVista('grados')">Ver Grados</button>` },
     grados:      { titulo: 'Grados y Secciones',  accion: `<button class="btn-primary" onclick="abrirModalGrado()">+ Nuevo Grado</button>` },
-    alumnos:     { titulo: 'Alumnos',              accion: `<input type="file" id="excel-alumnos" accept=".xlsx,.xls" class="hidden" onchange="importarAlumnosExcel(event)"><button class="btn-secondary" onclick="document.getElementById('excel-alumnos').click()">📊 Importar Excel</button><button class="btn-secondary" onclick="imprimirMatriculaAdmin()">🖨 Reporte de matrícula</button><button class="btn-primary" onclick="abrirModalAlumno()">+ Nuevo Alumno</button>` },
+    alumnos:     { titulo: 'Alumnos',              accion: `<input type="file" id="excel-alumnos" accept=".xlsx,.xls" class="hidden" onchange="importarAlumnosExcel(event)"><button class="btn-secondary" onclick="descargarPlantillaAlumnos()">📥 Descargar Plantilla</button><button class="btn-secondary" onclick="abrirModalImportarExcel()">📊 Importar Excel</button><button class="btn-secondary" onclick="imprimirMatriculaAdmin()">🖨 Reporte de matrícula</button><button class="btn-primary" onclick="abrirModalAlumno()">+ Nuevo Alumno</button>` },
     docentes:    { titulo: 'Docentes',             accion: `<button class="btn-primary" onclick="abrirModalDocente()">+ Nuevo Docente</button>` },
     materias:    { titulo: 'Materias',             accion: `<button class="btn-primary" onclick="abrirModalMateria()">+ Nueva Materia</button>` },
     asistencias: { titulo: 'Asistencias',          accion: `<button class="btn-secondary" onclick="imprimirReporteAsistenciaAdmin()">🖨 Reporte mensual</button><button class="btn-secondary" onclick="imprimirListaBlancoAsistenciaAdmin()">📄 Lista en blanco</button>` },
@@ -2567,6 +2567,50 @@ window.cerrarSesionAdmin = cerrarSesion;
 init();
 
 // ── IMPORTAR ALUMNOS DESDE EXCEL ─────────────
+// Antes de abrir el selector de archivo, se muestra un modal con las
+// instrucciones (formato esperado + botón para descargar la plantilla
+// oficial) — las validaciones de grado/año activo se hacen acá también,
+// para no mostrar el modal si de entrada la importación va a fallar.
+window.abrirModalImportarExcel = () => {
+    const gradoId = document.getElementById('filtro-grado')?.value;
+    if (!gradoId) { mostrarToast('Seleccioná un grado en el filtro antes de importar', 'advertencia'); return; }
+    if (!anioActivoCache) { mostrarToast('No hay un año académico activo — configuralo primero en "Año Académico"', 'advertencia'); return; }
+    abrirModal('modal-importar-excel');
+};
+
+window.continuarImportarExcel = () => {
+    cerrarModal('modal-importar-excel');
+    document.getElementById('excel-alumnos').click();
+};
+
+// Genera plantilla-alumnos.xlsx con los encabezados NIE | APELLIDOS | NOMBRES,
+// 3 filas de ejemplo, y la fila de encabezado protegida (bloqueada) para que
+// no se borre por error — el resto de la hoja queda editable.
+window.descargarPlantillaAlumnos = () => {
+    const datos = [
+        ['NIE', 'APELLIDOS', 'NOMBRES'],
+        ['20260001', 'PÉREZ GARCÍA', 'JUAN CARLOS'],
+        ['20260002', 'LÓPEZ MARTÍNEZ', 'MARÍA FERNANDA'],
+        ['20260003', 'HERNÁNDEZ RIVAS', 'CARLOS ALBERTO'],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(datos);
+    ws['!cols'] = [{ wch: 14 }, { wch: 24 }, { wch: 24 }];
+
+    // Desbloquea todas las celdas y vuelve a bloquear solo la fila de
+    // encabezado (fila 1) — así, al activar la protección de hoja, Excel
+    // solo impide editar/borrar los encabezados.
+    Object.keys(ws).forEach(key => {
+        if (key.startsWith('!')) return;
+        const filaNum = parseInt(key.replace(/[^0-9]/g, ''), 10);
+        ws[key].s = { protection: { locked: filaNum === 1 } };
+    });
+    ws['!protect'] = { selectLockedCells: true, selectUnlockedCells: true };
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Alumnos');
+    XLSX.writeFile(wb, 'plantilla-alumnos.xlsx');
+};
+
 window.importarAlumnosExcel = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -2590,8 +2634,10 @@ window.importarAlumnosExcel = async (event) => {
             const ws   = wb.Sheets[wb.SheetNames[0]];
             const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
 
+            // La primera fila es el encabezado (NIE | APELLIDOS | NOMBRES) —
+            // se descarta siempre, nunca se importa como alumno.
             const nuevos = [];
-            for (const row of rows) {
+            for (const row of rows.slice(1)) {
                 const nie       = (row[0] || '').toString().trim();
                 const apellidos = (row[1] || '').toString().trim().toUpperCase();
                 const nombres   = (row[2] || '').toString().trim().toUpperCase();

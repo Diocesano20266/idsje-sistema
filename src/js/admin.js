@@ -2583,6 +2583,11 @@ window.continuarImportarExcel = () => {
     document.getElementById('excel-alumnos').click();
 };
 
+// Fila(s) del Excel que quedaron pendientes de una decisión del admin (NIEs
+// que ya existen en el catálogo) — se retoma en confirmarImportActualizar/
+// confirmarImportSaltar según lo que elija en #modal-import-duplicados.
+let importExcelPendiente = null;
+
 // Genera plantilla-alumnos.xlsx con los encabezados NIE | APELLIDOS | NOMBRES
 // y 3 filas de ejemplo. Sin protección de hoja — el archivo queda totalmente
 // editable para que el admin pueda llenar los datos de los alumnos.
@@ -2637,37 +2642,24 @@ window.importarAlumnosExcel = async (event) => {
 
             if (!nuevos.length) { mostrarToast('No se encontraron alumnos en el archivo', 'advertencia'); return; }
 
-            // 1. Crear en el catálogo `alumnos` (ya no lleva grado_id/activo/anio_ingreso).
-            const { data: alumnosCreados, error } = await supabase.from('alumnos').insert(nuevos).select();
-            if (error) {
-                // Violación de unique constraint en `alumnos.nie` (código 23505 de
-                // Postgres) — el inserto es atómico, así que si un solo NIE ya
-                // existe, toda la tanda falla. Postgres devuelve el valor
-                // problemático en error.details: "Key (nie)=(20260001) already exists."
-                if (error.code === '23505') {
-                    const match = (error.details || error.message || '').match(/\(nie\)=\(([^)]+)\)/);
-                    const nieDuplicado = match ? match[1] : null;
-                    mostrarToast(
-                        nieDuplicado
-                            ? `Error: El NIE ${nieDuplicado} ya existe en el sistema.`
-                            : 'Error: Hay un NIE duplicado en el archivo o que ya existe en el sistema.',
-                        'error'
-                    );
-                } else {
-                    notificarError(error, 'Error importando alumnos');
-                }
+            // Antes de insertar, revisamos qué NIEs del archivo ya existen en el
+            // catálogo — si hay alguno, se le pregunta al admin si quiere
+            // actualizar esos alumnos (upsert por NIE) o saltarlos y solo
+            // importar los que son realmente nuevos.
+            const nies = nuevos.map(n => n.nie);
+            const { data: existentes, error: eEx } = await supabase.from('alumnos').select('nie').in('nie', nies);
+            if (eEx) { notificarError(eEx, 'Error verificando NIEs existentes'); return; }
+
+            const nieExistentes = new Set((existentes || []).map(x => x.nie));
+            if (nieExistentes.size) {
+                importExcelPendiente = { nuevos, gradoId };
+                document.getElementById('import-dup-lista').innerHTML =
+                    `Los siguientes NIEs ya existen: <b>${[...nieExistentes].join(', ')}</b> — ¿Querés actualizarlos o saltarlos?`;
+                abrirModal('modal-import-duplicados');
                 return;
             }
 
-            // 2. Matricularlos a todos en el grado del filtro, para el año activo.
-            const matriculasNuevas = (alumnosCreados || []).map(a => ({
-                alumno_id: a.id, grado_id: gradoId, año_academico_id: anioActivoCache.id, activo: true,
-            }));
-            const { error: errorMat } = await supabase.from('matriculas').insert(matriculasNuevas);
-            if (errorMat) { notificarError(errorMat, 'Los alumnos se crearon, pero no se pudieron matricular'); return; }
-
-            mostrarToast(`${nuevos.length} alumno(s) importado(s) y matriculado(s) correctamente`, 'exito');
-            await renderAlumnos();
+            await ejecutarImportacionAlumnos(nuevos, gradoId, { actualizar: false });
         } catch (err) {
             notificarError(err, 'Error leyendo el archivo');
         }
@@ -2675,3 +2667,72 @@ window.importarAlumnosExcel = async (event) => {
     reader.readAsBinaryString(file);
     event.target.value = '';
 };
+
+window.confirmarImportActualizar = async () => {
+    if (!importExcelPendiente) return;
+    const { nuevos, gradoId } = importExcelPendiente;
+    importExcelPendiente = null;
+    cerrarModal('modal-import-duplicados');
+    await ejecutarImportacionAlumnos(nuevos, gradoId, { actualizar: true });
+};
+
+window.confirmarImportSaltar = async () => {
+    if (!importExcelPendiente) return;
+    const { nuevos, gradoId } = importExcelPendiente;
+    importExcelPendiente = null;
+    cerrarModal('modal-import-duplicados');
+
+    const { data: existentes, error: eEx } = await supabase.from('alumnos').select('nie').in('nie', nuevos.map(n => n.nie));
+    if (eEx) { notificarError(eEx, 'Error verificando NIEs existentes'); return; }
+    const nieExistentes = new Set((existentes || []).map(x => x.nie));
+    const soloNuevos = nuevos.filter(n => !nieExistentes.has(n.nie));
+
+    if (!soloNuevos.length) { mostrarToast('Todos los alumnos del archivo ya existían — no se importó ninguno', 'advertencia'); return; }
+    await ejecutarImportacionAlumnos(soloNuevos, gradoId, { actualizar: false });
+};
+
+window.cancelarImportDuplicados = () => {
+    importExcelPendiente = null;
+    cerrarModal('modal-import-duplicados');
+};
+
+// Inserta (o actualiza por NIE, si actualizar=true) el catálogo `alumnos` y
+// matricula a todos en gradoId para el año activo. Compartida por el flujo
+// sin duplicados y por las dos decisiones del modal de NIEs existentes.
+async function ejecutarImportacionAlumnos(nuevos, gradoId, { actualizar }) {
+    const { data: alumnosCreados, error } = actualizar
+        ? await supabase.from('alumnos').upsert(nuevos, { onConflict: 'nie' }).select()
+        : await supabase.from('alumnos').insert(nuevos).select();
+
+    if (error) {
+        // Violación de unique constraint en `alumnos.nie` (código 23505 de
+        // Postgres) — puede pasar igual por una condición de carrera entre la
+        // verificación previa y este insert. Postgres devuelve el valor
+        // problemático en error.details: "Key (nie)=(20260001) already exists."
+        if (error.code === '23505') {
+            const match = (error.details || error.message || '').match(/\(nie\)=\(([^)]+)\)/);
+            const nieDuplicado = match ? match[1] : null;
+            mostrarToast(
+                nieDuplicado
+                    ? `Error: El NIE ${nieDuplicado} ya existe en el sistema.`
+                    : 'Error: Hay un NIE duplicado en el archivo o que ya existe en el sistema.',
+                'error'
+            );
+        } else {
+            notificarError(error, 'Error importando alumnos');
+        }
+        return;
+    }
+
+    // Matricularlos a todos en el grado del filtro, para el año activo —
+    // tanto los recién creados como los que se actualizaron quedan matriculados ahí.
+    const matriculasNuevas = (alumnosCreados || []).map(a => ({
+        alumno_id: a.id, grado_id: gradoId, año_academico_id: anioActivoCache.id, activo: true,
+    }));
+    const { error: errorMat } = await supabase.from('matriculas')
+        .upsert(matriculasNuevas, { onConflict: 'alumno_id,año_academico_id' });
+    if (errorMat) { notificarError(errorMat, 'Los alumnos se guardaron, pero no se pudieron matricular'); return; }
+
+    mostrarToast(`${nuevos.length} alumno(s) ${actualizar ? 'importado(s)/actualizado(s)' : 'importado(s)'} y matriculado(s) correctamente`, 'exito');
+    await renderAlumnos();
+}

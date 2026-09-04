@@ -2642,6 +2642,20 @@ window.importarAlumnosExcel = async (event) => {
 
             if (!nuevos.length) { mostrarToast('No se encontraron alumnos en el archivo', 'advertencia'); return; }
 
+            // Si el mismo NIE aparece más de una vez DENTRO del archivo (typo o
+            // fila duplicada), el insert masivo igual viola la unique constraint
+            // aunque ese NIE no exista todavía en el sistema — la verificación de
+            // abajo (contra la base de datos) no lo detecta porque ninguna de las
+            // dos filas existe previamente. Se corta acá para que el admin corrija
+            // el archivo, en vez de mostrar el error genérico de Postgres.
+            const conteoNieArchivo = {};
+            nuevos.forEach(n => { conteoNieArchivo[n.nie] = (conteoNieArchivo[n.nie] || 0) + 1; });
+            const duplicadosEnArchivo = Object.keys(conteoNieArchivo).filter(nie => conteoNieArchivo[nie] > 1);
+            if (duplicadosEnArchivo.length) {
+                mostrarToast(`El archivo tiene el NIE ${duplicadosEnArchivo.join(', ')} repetido en más de una fila. Corregilo y volvé a intentar.`, 'error');
+                return;
+            }
+
             // Antes de insertar, revisamos qué NIEs del archivo ya existen en el
             // catálogo — si hay alguno, se le pregunta al admin si quiere
             // actualizar esos alumnos (upsert por NIE) o saltarlos y solo
@@ -2710,8 +2724,10 @@ async function ejecutarImportacionAlumnos(nuevos, gradoId, { actualizar }) {
         // verificación previa y este insert. Postgres devuelve el valor
         // problemático en error.details: "Key (nie)=(20260001) already exists."
         if (error.code === '23505') {
-            const match = (error.details || error.message || '').match(/\(nie\)=\(([^)]+)\)/);
-            const nieDuplicado = match ? match[1] : null;
+            // Regex genérica "Key (columna)=(valor)" — no asume que la columna
+            // en el mensaje de Postgres se llame literalmente "nie".
+            const match = (error.details || error.message || '').match(/Key \(([^)]+)\)=\(([^)]+)\)/i);
+            const nieDuplicado = match ? match[2] : null;
             mostrarToast(
                 nieDuplicado
                     ? `Error: El NIE ${nieDuplicado} ya existe en el sistema.`

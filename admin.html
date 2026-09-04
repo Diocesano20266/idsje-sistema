@@ -1066,6 +1066,21 @@
         </div>
     </div>
 
+    <!-- MODAL: NIEs DUPLICADOS AL IMPORTAR EXCEL -->
+    <div class="modal-overlay" id="modal-import-duplicados">
+        <div class="modal">
+            <div class="modal-title">NIEs ya existentes</div>
+            <div class="info-box" style="background:#fef3c7;border-color:#fde68a;color:#92400e;line-height:1.7" id="import-dup-lista"></div>
+            <div class="modal-actions">
+                <button class="btn-primary" onclick="confirmarImportActualizar()">🔄 Actualizar existentes</button>
+                <button class="btn-secondary" onclick="confirmarImportSaltar()">⏭ Saltar duplicados</button>
+            </div>
+            <div style="text-align:center;margin-top:12px">
+                <button class="btn-secondary" style="border:none;background:none;color:#94a3b8" onclick="cancelarImportDuplicados()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL: ALUMNO -->
     <div class="modal-overlay" id="modal-alumno">
         <div class="modal">

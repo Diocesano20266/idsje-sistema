@@ -239,7 +239,7 @@ window.mostrarVista = async (vista) => {
         const sel = document.getElementById('filtro-grado');
         if (sel) {
             sel.innerHTML = '<option value="">— Todos los grados —</option>' +
-                (data || []).map(g => `<option value="${g.id}">${g.nombre} ${g.seccion}</option>`).join('');
+                (data || []).map(g => `<option value="${g.id}">${g.nombre} ${g.modalidad} — Sección ${g.seccion}</option>`).join('');
         }
         renderAlumnos();
     }

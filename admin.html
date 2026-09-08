@@ -57,6 +57,12 @@
         .btn-primary:hover{background:#d4af37;color:#0a1628}
         .btn-secondary{background:#fff;color:#475569;border:1px solid #e2e8f0;padding:7px 14px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s}
         .btn-secondary:hover{background:#f8fafc;border-color:#cbd5e1}
+        .btn-secondary:disabled{opacity:.4;cursor:not-allowed}
+        .btn-secondary:disabled:hover{background:#fff;border-color:#e2e8f0}
+
+        /* ── PAGINACIÓN ── */
+        .paginacion{display:flex;align-items:center;justify-content:center;gap:14px;padding:16px 0}
+        .paginacion span{font-size:12px;color:#64748b;font-weight:600}
 
         /* ── CONTENIDO ── */
         .content{padding:22px 24px;flex:1}
@@ -97,7 +103,9 @@
         .gc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
         .gc-nombre{font-size:13px;font-weight:700;color:#0a1628;line-height:1.3}
         .gc-seccion{font-size:10px;color:#94a3b8;margin-top:2px}
-        .gc-count{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#d4af37}
+        .gc-count-wrap{text-align:right}
+        .gc-count{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#d4af37;line-height:1}
+        .gc-count-lbl{font-size:8.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px;margin-top:2px}
         .gc-guia{font-size:11px;color:#64748b;padding-top:8px;border-top:1px solid #f1f5fb;display:flex;align-items:center;gap:6px}
         @media(max-width:900px){.dash-grid{grid-template-columns:1fr}}
 
@@ -647,6 +655,11 @@
                         <tbody id="tbody-alumnos"></tbody>
                     </table>
                 </div>
+                <div class="paginacion">
+                    <button class="btn-secondary" id="btn-alumnos-prev" onclick="cambiarPaginaAlumnos(-1)">← Anterior</button>
+                    <span id="alumnos-pagina-info">Página 1 de 1</span>
+                    <button class="btn-secondary" id="btn-alumnos-next" onclick="cambiarPaginaAlumnos(1)">Siguiente →</button>
+                </div>
             </div>
 
             <!-- DOCENTES -->
@@ -898,6 +911,11 @@
                         <div class="tabla-title">📋 Catálogo de alumnos y su matrícula del año activo</div>
                     </div>
                     <div id="matricula-body" style="padding:8px 20px"></div>
+                    <div class="paginacion">
+                        <button class="btn-secondary" id="btn-matricula-prev" onclick="cambiarPaginaMatricula(-1)">← Anterior</button>
+                        <span id="matricula-pagina-info">Página 1 de 1</span>
+                        <button class="btn-secondary" id="btn-matricula-next" onclick="cambiarPaginaMatricula(1)">Siguiente →</button>
+                    </div>
                 </div>
             </div>
 

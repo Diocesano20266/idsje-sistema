@@ -35,7 +35,7 @@ let dashChart     = null;
 let anioActivoCache      = null;
 let aniosAcademicosCache = [];   // todos los años, para el selector "Cambiar año activo"
 let categoriasGradoCache = [];   // categorias_grado, para agrupar la vista Grados
-let matriculaAlumnosCache = [];  // catálogo completo de alumnos + su matrícula (si tiene) del año activo, para la subsección Matrícula
+let matriculaAlumnosCache = [];  // alumnos matriculados (año activo) en matGradoSel — página actual de la subsección Matrícula
 
 // Expedientes disciplinarios (Módulo 5 — SOLO LECTURA, mezcla los 4 módulos)
 let expAdminGradoSel     = null; // grado_id elegido en el selector
@@ -2217,69 +2217,82 @@ window.eliminarAnioAcademico = async (id) => {
 };
 
 // ── MATRÍCULA DE ALUMNOS ─────────────────────
-// Paginado igual que Alumnos: 25 filas por página con .range(), en vez de
-// traer el catálogo completo de una sola vez.
+// Elegí un grado arriba → aparece (paginada, 25/página) la lista de alumnos
+// YA matriculados en ese grado este año, cada uno con "Desmatricular". El
+// buscador, aparte, busca en TODO el catálogo (no solo la página cargada) por
+// nombre/apellido/NIE, y cada resultado trae su propio selector de grado +
+// botón "Matricular"/"Cambiar" — así se puede matricular a un alumno sin
+// necesidad de tenerlo ya visible en la lista paginada de ningún grado.
 const MATRICULA_POR_PAGINA = 25;
 let matriculaPagina = 1;
 let matriculaTotalCount = 0;
+let matGradoSel = null; // grado_id elegido en #mat-grado-filtro
 
 async function renderVistaMatricula() {
+    poblarSelectGrados('mat-grado-filtro', matGradoSel, '— Seleccioná un grado —');
+    const buscador = document.getElementById('mat-buscador');
+    if (buscador) buscador.value = '';
+    const resultados = document.getElementById('mat-resultados-busqueda');
+    if (resultados) resultados.innerHTML = '';
     matriculaPagina = 1;
     await cargarPaginaMatricula();
 }
 
+window.cambiarGradoMatricula = async () => {
+    matGradoSel = document.getElementById('mat-grado-filtro').value || null;
+    matriculaPagina = 1;
+    await cargarPaginaMatricula();
+};
+
 async function cargarPaginaMatricula() {
     const cont = document.getElementById('matricula-body');
+    const titulo = document.getElementById('mat-lista-titulo');
     if (!cont) return;
-    cont.innerHTML = '<div class="empty-bubbles">Cargando…</div>';
 
     if (!anioActivoCache) {
         cont.innerHTML = '<div class="info-box">⚠ No hay un año académico activo — configuralo en "Año Académico" antes de matricular alumnos.</div>';
         return;
     }
+    if (!matGradoSel) {
+        if (titulo) titulo.textContent = '📋 Alumnos matriculados';
+        cont.innerHTML = '<div class="empty-bubbles">Seleccioná un grado para ver sus alumnos matriculados.</div>';
+        matriculaTotalCount = 0;
+        renderPaginacionMatricula();
+        return;
+    }
+
+    cont.innerHTML = '<div class="empty-bubbles">Cargando…</div>';
+    const grado = gradosCache.find(g => g.id === matGradoSel);
+    if (titulo) titulo.textContent = grado ? `📋 Alumnos matriculados en ${grado.nombre} ${grado.seccion}` : '📋 Alumnos matriculados';
 
     const inicio = (matriculaPagina - 1) * MATRICULA_POR_PAGINA;
     const fin = inicio + MATRICULA_POR_PAGINA - 1;
 
-    const { data: alumnos, error: eAl, count } = await supabase.from('alumnos')
-        .select('*', { count: 'exact' }).order('apellidos').range(inicio, fin);
-    if (eAl) return notificarError(eAl, 'Error cargando el catálogo de alumnos');
+    const { data, error, count } = await supabase.from('matriculas')
+        .select('*, alumnos(*)', { count: 'exact' })
+        .eq('grado_id', matGradoSel).eq('año_academico_id', anioActivoCache.id).eq('activo', true)
+        .order('apellidos', { foreignTable: 'alumnos' })
+        .range(inicio, fin);
+    if (error) return notificarError(error, 'Error cargando alumnos matriculados');
 
     matriculaTotalCount = count || 0;
     const totalPaginas = Math.max(1, Math.ceil(matriculaTotalCount / MATRICULA_POR_PAGINA));
     if (matriculaPagina > totalPaginas) { matriculaPagina = totalPaginas; return cargarPaginaMatricula(); }
 
-    // Las matrículas del año activo se piden solo para los alumnos de esta
-    // página (no el catálogo completo).
-    const alumnoIds = (alumnos || []).map(a => a.id);
-    let matriculas = [];
-    if (alumnoIds.length) {
-        const { data: matData, error: eMat } = await supabase.from('matriculas').select('*')
-            .eq('año_academico_id', anioActivoCache.id).eq('activo', true).in('alumno_id', alumnoIds);
-        if (eMat) return notificarError(eMat, 'Error cargando las matrículas');
-        matriculas = matData || [];
-    }
+    matriculaAlumnosCache = (data || []).filter(m => m.alumnos).map(m => ({ ...m.alumnos, matriculaId: m.id }));
 
-    const matriculaPorAlumno = {};
-    matriculas.forEach(m => { matriculaPorAlumno[m.alumno_id] = m; });
-    matriculaAlumnosCache = (alumnos || []).map(a => ({ ...a, matricula: matriculaPorAlumno[a.id] || null }));
-
-    cont.innerHTML = matriculaAlumnosCache.map(a => {
-        const grado = a.matricula ? gradosCache.find(g => g.id === a.matricula.grado_id) : null;
-        return `
-        <div class="mat-fila">
-            <div class="mat-nombre">${a.apellidos}, ${a.nombres} <span class="text-muted">NIE ${a.nie || '—'}</span></div>
-            <div class="mat-estado">${grado ? `${grado.nombre} ${grado.seccion}` : '<span class="text-muted">No matriculado este año</span>'}</div>
-            <div class="mat-acciones">
-                <select id="mat-grado-${a.id}">
-                    <option value="">— Elegir grado —</option>
-                    ${gradosCache.map(g => `<option value="${g.id}" ${g.id === a.matricula?.grado_id ? 'selected' : ''}>${g.nombre} ${g.seccion}</option>`).join('')}
-                </select>
-                <button class="btn-sm btn-info" onclick="matricularAlumno('${a.id}')">${a.matricula ? 'Cambiar' : 'Matricular'}</button>
-                ${a.matricula ? `<button class="btn-sm btn-del" onclick="desmatricularAlumno('${a.matricula.id}')">Desmatricular</button>` : ''}
-            </div>
-        </div>`;
-    }).join('') || '<div class="empty-bubbles">No hay alumnos en el catálogo todavía.</div>';
+    cont.innerHTML = matriculaAlumnosCache.length
+        ? matriculaAlumnosCache.map(a => `
+            <div class="mat-fila">
+                ${a.foto_url
+                    ? `<img src="${a.foto_url}" class="foto-mini" alt="${a.apellidos}">`
+                    : '<div class="foto-mini foto-placeholder">?</div>'}
+                <div class="mat-nombre">${a.apellidos}, ${a.nombres} <span class="text-muted">NIE ${a.nie || '—'}</span></div>
+                <div class="mat-acciones">
+                    <button class="btn-sm btn-del" onclick="desmatricularAlumno('${a.matriculaId}')">Desmatricular</button>
+                </div>
+            </div>`).join('')
+        : '<div class="empty-bubbles">Este grado no tiene alumnos matriculados todavía.</div>';
 
     renderPaginacionMatricula();
 }
@@ -2302,8 +2315,77 @@ window.cambiarPaginaMatricula = async (delta) => {
     await cargarPaginaMatricula();
 };
 
-window.matricularAlumno = async (alumnoId) => {
-    const gradoId = document.getElementById(`mat-grado-${alumnoId}`).value;
+// Buscador de matrícula: recorre TODO el catálogo de alumnos (no la página
+// cargada arriba) por nombres, apellidos o NIE. Usa 3 queries .ilike()
+// paralelas en vez de un solo .or() — un .or() de PostgREST se rompe si el
+// texto buscado contiene una coma (mismo problema ya resuelto antes en el
+// buscador de Expedientes).
+window.buscarAlumnosMatricula = async () => {
+    const cont = document.getElementById('mat-resultados-busqueda');
+    if (!cont) return;
+    const q = document.getElementById('mat-buscador').value.trim();
+    if (!q) { cont.innerHTML = ''; return; }
+    if (!anioActivoCache) { cont.innerHTML = '<div class="info-box">⚠ No hay un año académico activo.</div>'; return; }
+
+    cont.innerHTML = '<div class="empty-bubbles">Buscando…</div>';
+
+    try {
+        const patron = `%${q}%`;
+        const [{ data: porNombre, error: e1 }, { data: porApellido, error: e2 }, { data: porNie, error: e3 }] = await Promise.all([
+            supabase.from('alumnos').select('*').ilike('nombres', patron).limit(20),
+            supabase.from('alumnos').select('*').ilike('apellidos', patron).limit(20),
+            supabase.from('alumnos').select('*').ilike('nie', patron).limit(20),
+        ]);
+        const errorDeRed = [e1, e2, e3].find(e => e && esErrorDeRed(e));
+        if (errorDeRed) { mostrarBannerSinConexion(() => window.buscarAlumnosMatricula()); return; }
+        if (e1 || e2 || e3) { notificarError(e1 || e2 || e3, 'Error buscando alumnos'); return; }
+
+        const porId = new Map();
+        [...(porNombre || []), ...(porApellido || []), ...(porNie || [])].forEach(a => porId.set(a.id, a));
+        const resultados = [...porId.values()].sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || ''));
+
+        if (!resultados.length) { cont.innerHTML = '<div class="empty-bubbles">Sin resultados para esa búsqueda.</div>'; return; }
+
+        // Estado de matrícula (año activo) de cada resultado, para mostrar
+        // "Matriculado en X" o "No matriculado este año" junto a cada uno.
+        const { data: matriculasRes, error: eMat } = await supabase.from('matriculas')
+            .select('*, grados(nombre, seccion)')
+            .eq('año_academico_id', anioActivoCache.id).eq('activo', true)
+            .in('alumno_id', resultados.map(a => a.id));
+        if (eMat) { notificarError(eMat, 'Error verificando matrículas'); return; }
+
+        const matriculaPorAlumno = {};
+        (matriculasRes || []).forEach(m => { matriculaPorAlumno[m.alumno_id] = m; });
+
+        cont.innerHTML = resultados.map(a => {
+            const mat = matriculaPorAlumno[a.id];
+            const estado = mat
+                ? `<span class="badge" style="background:#e8fdf0;color:#1a7a40">Matriculado en ${mat.grados?.nombre || ''} ${mat.grados?.seccion || ''}</span>`
+                : `<span class="badge" style="background:#f1f5f9;color:#94a3b8">No matriculado este año</span>`;
+            return `
+            <div class="mat-fila">
+                ${a.foto_url
+                    ? `<img src="${a.foto_url}" class="foto-mini" alt="${a.apellidos}">`
+                    : '<div class="foto-mini foto-placeholder">?</div>'}
+                <div class="mat-nombre">${a.apellidos}, ${a.nombres} <span class="text-muted">NIE ${a.nie || '—'}</span></div>
+                <div class="mat-estado">${estado}</div>
+                <div class="mat-acciones">
+                    <select id="mat-buscar-grado-${a.id}">
+                        <option value="">— Elegir grado —</option>
+                        ${gradosDelAnioActivo().map(g => `<option value="${g.id}" ${g.id === mat?.grado_id ? 'selected' : ''}>${g.nombre} ${g.seccion}</option>`).join('')}
+                    </select>
+                    <button class="btn-sm btn-info" onclick="matricularDesdeBusqueda('${a.id}')">${mat ? 'Cambiar' : 'Matricular'}</button>
+                </div>
+            </div>`;
+        }).join('');
+    } catch (err) {
+        if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => window.buscarAlumnosMatricula()); return; }
+        notificarError(err, 'Error buscando alumnos');
+    }
+};
+
+window.matricularDesdeBusqueda = async (alumnoId) => {
+    const gradoId = document.getElementById(`mat-buscar-grado-${alumnoId}`).value;
     if (!gradoId) { mostrarToast('Elegí un grado', 'advertencia'); return; }
     const { error } = await supabase.from('matriculas').upsert(
         [{ alumno_id: alumnoId, grado_id: gradoId, año_academico_id: anioActivoCache.id, activo: true }],
@@ -2311,7 +2393,8 @@ window.matricularAlumno = async (alumnoId) => {
     );
     if (error) return notificarError(error, 'Error matriculando al alumno');
     mostrarToast('Alumno matriculado', 'exito');
-    await cargarPaginaMatricula();
+    await window.buscarAlumnosMatricula();
+    if (matGradoSel === gradoId) await cargarPaginaMatricula();
 };
 
 window.desmatricularAlumno = async (matriculaId) => {
@@ -2321,6 +2404,7 @@ window.desmatricularAlumno = async (matriculaId) => {
     if (error) return notificarError(error, 'Error desmatriculando al alumno');
     mostrarToast('Alumno desmatriculado', 'exito');
     await cargarPaginaMatricula();
+    if (document.getElementById('mat-buscador')?.value.trim()) await window.buscarAlumnosMatricula();
 };
 
 // ── CATEGORÍAS DE GRADOS ─────────────────────

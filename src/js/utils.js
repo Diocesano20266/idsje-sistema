@@ -138,9 +138,9 @@ export function diasHabilesDelMes(anio, mes) {
 }
 
 // ── Totales de asistencia (P/A/J/T) ──────────────────────────
-// registros: [{ estado: 'P'|'A'|'J'|'T' }, ...]
+// registros: [{ estado: 'P'|'A'|'M'|'T' }, ...]
 export function calcularTotalesAsistencia(registros) {
-    const totales = { P: 0, A: 0, J: 0, T: 0 };
+    const totales = { P: 0, A: 0, M: 0, T: 0 };
     (registros || []).forEach(r => { if (totales[r.estado] !== undefined) totales[r.estado]++; });
     return totales;
 }

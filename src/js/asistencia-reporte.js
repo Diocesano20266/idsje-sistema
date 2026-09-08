@@ -87,13 +87,19 @@ function fechaISO(anio, mes, dia) {
 }
 
 function generarHTML(titulo, alumnos, anio, mesNum, dias, porAlumno, blanco) {
+    // La clase de color sigue clavada por `codigo` (lo que hay en la BD), pero
+    // la letra que se ve es `simbolo` — para Permiso son distintos a propósito
+    // (se guarda 'M', se muestra "P"), ver ESTADOS_ASISTENCIA en config.js.
+    const simboloPorCodigo = {};
+    ESTADOS_ASISTENCIA.forEach(e => { simboloPorCodigo[e.codigo] = e.simbolo; });
+
     const filasAlumnos = alumnos.map((al, idx) => {
         const registrosAlumno = [];
         const celdas = dias.map(d => {
             if (blanco) return '<td></td>';
             const estado = porAlumno[al.id]?.[fechaISO(anio, mesNum, d)] || '';
             if (estado) registrosAlumno.push({ estado });
-            return estado ? `<td class="td-dia td-dia-${estado}">${estado}</td>` : '<td></td>';
+            return estado ? `<td class="td-dia td-dia-${estado}">${simboloPorCodigo[estado] || estado}</td>` : '<td></td>';
         }).join('');
 
         const totales = blanco
@@ -113,8 +119,8 @@ function generarHTML(titulo, alumnos, anio, mesNum, dias, porAlumno, blanco) {
     }).join('');
 
     const headerDias = dias.map(d => `<th rowspan="2">${d}</th>`).join('');
-    const headerTotalesSub = ESTADOS_ASISTENCIA.map(e => `<th class="th-tot th-tot-${e.codigo}">${e.codigo}</th>`).join('');
-    const leyenda = blanco ? '' : `<div class="leyenda-asis">${ESTADOS_ASISTENCIA.map(e => `<b>${e.codigo}</b> ${e.label}`).join('&nbsp;&nbsp;·&nbsp;&nbsp;')}</div>`;
+    const headerTotalesSub = ESTADOS_ASISTENCIA.map(e => `<th class="th-tot th-tot-${e.codigo}">${e.simbolo}</th>`).join('');
+    const leyenda = blanco ? '' : `<div class="leyenda-asis">${ESTADOS_ASISTENCIA.map(e => `<b>${e.simbolo}</b> ${e.label}`).join('&nbsp;&nbsp;·&nbsp;&nbsp;')}</div>`;
 
     return `
     <div class="boleta-page">

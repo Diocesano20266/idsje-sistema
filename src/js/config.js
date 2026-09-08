@@ -62,11 +62,16 @@ export const BLOQUES_HORARIO = [
 ];
 
 // ── Asistencias ───────────────────────────────
+// `codigo` es lo que se guarda en `asistencias.estado` (ver
+// supabase/asistencias-schema.sql); `simbolo` es solo el glifo que se
+// muestra en pantalla (pill de asistencia, reportes) — para Permiso son
+// distintos a propósito: se guarda 'M' para no chocar con la 'P' de
+// Presente en la base, pero visualmente se muestra como "P" de Permiso.
 export const ESTADOS_ASISTENCIA = [
-    { codigo: 'P', label: 'Presente', color: '#059669', bg: '#d1fae5' },
-    { codigo: 'A', label: 'Ausente',  color: '#dc2626', bg: '#fee2e2' },
-    { codigo: 'M', label: 'Permiso',  color: '#2563eb', bg: '#dbeafe' },
-    { codigo: 'T', label: 'Tardanza', color: '#a16207', bg: '#fef3c7' },
+    { codigo: 'P', label: 'Presente', simbolo: '✓', color: '#059669', bg: '#d1fae5' },
+    { codigo: 'A', label: 'Ausente',  simbolo: '✗', color: '#dc2626', bg: '#fee2e2' },
+    { codigo: 'M', label: 'Permiso',  simbolo: 'P', color: '#2563eb', bg: '#dbeafe' },
+    { codigo: 'T', label: 'Tardanza', simbolo: 'T', color: '#a16207', bg: '#fef3c7' },
 ];
 
 // ── Expediente disciplinario (módulos independientes) ────────

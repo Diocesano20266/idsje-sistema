@@ -906,9 +906,25 @@
 
             <!-- MATRÍCULA DE ALUMNOS -->
             <div id="vista-matricula" class="hidden">
+                <div class="filtros">
+                    <select id="mat-grado-filtro" onchange="cambiarGradoMatricula()">
+                        <option value="">— Seleccioná un grado —</option>
+                    </select>
+                </div>
+
                 <div class="tabla-wrap">
                     <div class="tabla-header">
-                        <div class="tabla-title">📋 Catálogo de alumnos y su matrícula del año activo</div>
+                        <div class="tabla-title">🔍 Buscar alumno para matricular</div>
+                    </div>
+                    <div style="padding:14px 20px 6px">
+                        <input type="text" id="mat-buscador" placeholder="Buscar en todo el catálogo por nombre, apellido o NIE..." oninput="buscarAlumnosMatricula()" style="width:100%;max-width:420px">
+                    </div>
+                    <div id="mat-resultados-busqueda"></div>
+                </div>
+
+                <div class="tabla-wrap" style="margin-top:20px">
+                    <div class="tabla-header">
+                        <div class="tabla-title" id="mat-lista-titulo">📋 Alumnos matriculados</div>
                     </div>
                     <div id="matricula-body" style="padding:8px 20px"></div>
                     <div class="paginacion">

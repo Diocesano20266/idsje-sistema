@@ -236,10 +236,21 @@ window.mostrarVista = async (vista) => {
         // Poblar filtro grado
         const { data, error } = await supabase.from('grados').select('*').order('nombre');
         if (error) { notificarError(error, 'Error cargando grados'); return; }
+
+        // Conteo de alumnos matriculados por grado (año activo) para mostrar
+        // junto a cada opción del selector — un SELECT liviano (solo grado_id)
+        // agrupado del lado del cliente, en vez de una query pesada por grado.
+        const conteoPorGrado = {};
+        if (anioActivoCache) {
+            const { data: matriculasConteo } = await supabase.from('matriculas').select('grado_id')
+                .eq('año_academico_id', anioActivoCache.id).eq('activo', true);
+            (matriculasConteo || []).forEach(m => { if (m.grado_id) conteoPorGrado[m.grado_id] = (conteoPorGrado[m.grado_id] || 0) + 1; });
+        }
+
         const sel = document.getElementById('filtro-grado');
         if (sel) {
             sel.innerHTML = '<option value="">— Todos los grados —</option>' +
-                (data || []).map(g => `<option value="${g.id}">${g.nombre} ${g.modalidad} — Sección ${g.seccion}</option>`).join('');
+                (data || []).map(g => `<option value="${g.id}">${g.nombre} ${g.modalidad} — Sección ${g.seccion} (${conteoPorGrado[g.id] || 0} alumnos)</option>`).join('');
         }
         renderAlumnos();
     }
@@ -387,7 +398,10 @@ async function renderDashboard() {
                         <div class="gc-nombre">${g.nombre}</div>
                         <div class="gc-seccion">Sección ${g.seccion}</div>
                     </div>
-                    <div class="gc-count">${conteoPorGrado[g.id] || 0}</div>
+                    <div class="gc-count-wrap">
+                        <div class="gc-count">${conteoPorGrado[g.id] || 0}</div>
+                        <div class="gc-count-lbl">Alumnos</div>
+                    </div>
                 </div>
                 <div class="gc-guia">👤 ${guia?.nombre_completo || 'Sin docente guía'}</div>
             </div>
@@ -2203,7 +2217,18 @@ window.eliminarAnioAcademico = async (id) => {
 };
 
 // ── MATRÍCULA DE ALUMNOS ─────────────────────
+// Paginado igual que Alumnos: 25 filas por página con .range(), en vez de
+// traer el catálogo completo de una sola vez.
+const MATRICULA_POR_PAGINA = 25;
+let matriculaPagina = 1;
+let matriculaTotalCount = 0;
+
 async function renderVistaMatricula() {
+    matriculaPagina = 1;
+    await cargarPaginaMatricula();
+}
+
+async function cargarPaginaMatricula() {
     const cont = document.getElementById('matricula-body');
     if (!cont) return;
     cont.innerHTML = '<div class="empty-bubbles">Cargando…</div>';
@@ -2213,15 +2238,30 @@ async function renderVistaMatricula() {
         return;
     }
 
-    const [{ data: alumnos, error: eAl }, { data: matriculas, error: eMat }] = await Promise.all([
-        supabase.from('alumnos').select('*').order('apellidos'),
-        supabase.from('matriculas').select('*').eq('año_academico_id', anioActivoCache.id).eq('activo', true),
-    ]);
-    if (eAl)  return notificarError(eAl, 'Error cargando el catálogo de alumnos');
-    if (eMat) return notificarError(eMat, 'Error cargando las matrículas');
+    const inicio = (matriculaPagina - 1) * MATRICULA_POR_PAGINA;
+    const fin = inicio + MATRICULA_POR_PAGINA - 1;
+
+    const { data: alumnos, error: eAl, count } = await supabase.from('alumnos')
+        .select('*', { count: 'exact' }).order('apellidos').range(inicio, fin);
+    if (eAl) return notificarError(eAl, 'Error cargando el catálogo de alumnos');
+
+    matriculaTotalCount = count || 0;
+    const totalPaginas = Math.max(1, Math.ceil(matriculaTotalCount / MATRICULA_POR_PAGINA));
+    if (matriculaPagina > totalPaginas) { matriculaPagina = totalPaginas; return cargarPaginaMatricula(); }
+
+    // Las matrículas del año activo se piden solo para los alumnos de esta
+    // página (no el catálogo completo).
+    const alumnoIds = (alumnos || []).map(a => a.id);
+    let matriculas = [];
+    if (alumnoIds.length) {
+        const { data: matData, error: eMat } = await supabase.from('matriculas').select('*')
+            .eq('año_academico_id', anioActivoCache.id).eq('activo', true).in('alumno_id', alumnoIds);
+        if (eMat) return notificarError(eMat, 'Error cargando las matrículas');
+        matriculas = matData || [];
+    }
 
     const matriculaPorAlumno = {};
-    (matriculas || []).forEach(m => { matriculaPorAlumno[m.alumno_id] = m; });
+    matriculas.forEach(m => { matriculaPorAlumno[m.alumno_id] = m; });
     matriculaAlumnosCache = (alumnos || []).map(a => ({ ...a, matricula: matriculaPorAlumno[a.id] || null }));
 
     cont.innerHTML = matriculaAlumnosCache.map(a => {
@@ -2240,7 +2280,27 @@ async function renderVistaMatricula() {
             </div>
         </div>`;
     }).join('') || '<div class="empty-bubbles">No hay alumnos en el catálogo todavía.</div>';
+
+    renderPaginacionMatricula();
 }
+
+function renderPaginacionMatricula() {
+    const totalPaginas = Math.max(1, Math.ceil(matriculaTotalCount / MATRICULA_POR_PAGINA));
+    const info = document.getElementById('matricula-pagina-info');
+    if (info) info.textContent = `Página ${matriculaPagina} de ${totalPaginas}`;
+    const btnPrev = document.getElementById('btn-matricula-prev');
+    const btnNext = document.getElementById('btn-matricula-next');
+    if (btnPrev) btnPrev.disabled = matriculaPagina <= 1;
+    if (btnNext) btnNext.disabled = matriculaPagina >= totalPaginas;
+}
+
+window.cambiarPaginaMatricula = async (delta) => {
+    const totalPaginas = Math.max(1, Math.ceil(matriculaTotalCount / MATRICULA_POR_PAGINA));
+    const nueva = matriculaPagina + delta;
+    if (nueva < 1 || nueva > totalPaginas) return;
+    matriculaPagina = nueva;
+    await cargarPaginaMatricula();
+};
 
 window.matricularAlumno = async (alumnoId) => {
     const gradoId = document.getElementById(`mat-grado-${alumnoId}`).value;
@@ -2251,7 +2311,7 @@ window.matricularAlumno = async (alumnoId) => {
     );
     if (error) return notificarError(error, 'Error matriculando al alumno');
     mostrarToast('Alumno matriculado', 'exito');
-    await renderVistaMatricula();
+    await cargarPaginaMatricula();
 };
 
 window.desmatricularAlumno = async (matriculaId) => {
@@ -2260,7 +2320,7 @@ window.desmatricularAlumno = async (matriculaId) => {
     const { error } = await supabase.from('matriculas').update({ activo: false }).eq('id', matriculaId);
     if (error) return notificarError(error, 'Error desmatriculando al alumno');
     mostrarToast('Alumno desmatriculado', 'exito');
-    await renderVistaMatricula();
+    await cargarPaginaMatricula();
 };
 
 // ── CATEGORÍAS DE GRADOS ─────────────────────
@@ -2386,23 +2446,49 @@ window.imprimirListaActividadesAdmin = () => {
 // editar (abrirModalAlumno) sin hacer una query extra por cada click en Editar.
 let matriculaPorAlumnoCache = {};
 
+// Paginado: 25 alumnos por página vía .range(), en vez de traer de una vez
+// todos los matriculados del grado/año filtrado.
+const ALUMNOS_POR_PAGINA = 25;
+let alumnosPagina = 1;
+let alumnosTotalCount = 0;
+
+// Entrada pública (onchange del filtro de grado, entrada a la vista, etc.) —
+// siempre vuelve a la página 1 porque cambia el conjunto de resultados.
 window.renderAlumnos = async function renderAlumnos() {
+    alumnosPagina = 1;
+    await cargarPaginaAlumnos();
+}
+
+// Carga la página actual (alumnosPagina) sin resetearla — la usan los
+// botones de paginación y los refrescos tras crear/editar/eliminar un alumno,
+// para no devolver al admin a la página 1 cada vez.
+async function cargarPaginaAlumnos() {
     renderSkeletonFilas('tbody-alumnos', 6, 6);
 
     if (!anioActivoCache) {
         document.getElementById('tbody-alumnos').innerHTML =
             '<tr><td colspan="6"><div class="info-box">⚠ No hay un año académico activo — configuralo en "Año Académico".</div></td></tr>';
         alumnosCache = [];
+        alumnosTotalCount = 0;
+        renderPaginacionAlumnos();
         return;
     }
 
     const gradoFiltro = document.getElementById('filtro-grado')?.value || '';
-    let query = supabase.from('matriculas').select('*, alumnos(*), grados(nombre, seccion)')
+    const inicio = (alumnosPagina - 1) * ALUMNOS_POR_PAGINA;
+    const fin = inicio + ALUMNOS_POR_PAGINA - 1;
+
+    let query = supabase.from('matriculas').select('*, alumnos(*), grados(nombre, seccion)', { count: 'exact' })
         .eq('año_academico_id', anioActivoCache.id).eq('activo', true);
     if (gradoFiltro) query = query.eq('grado_id', gradoFiltro);
-    const { data, error } = await query;
+    query = query.order('apellidos', { foreignTable: 'alumnos' }).range(inicio, fin);
 
+    const { data, error, count } = await query;
     if (error) { notificarError(error, 'Error cargando alumnos'); return; }
+
+    alumnosTotalCount = count || 0;
+    const totalPaginas = Math.max(1, Math.ceil(alumnosTotalCount / ALUMNOS_POR_PAGINA));
+    if (alumnosPagina > totalPaginas) { alumnosPagina = totalPaginas; return cargarPaginaAlumnos(); }
 
     matriculaPorAlumnoCache = {};
     alumnosCache = (data || [])
@@ -2410,15 +2496,36 @@ window.renderAlumnos = async function renderAlumnos() {
         .map(m => {
             matriculaPorAlumnoCache[m.alumnos.id] = m;
             return { ...m.alumnos, grados: m.grados };
-        })
-        .sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || ''));
+        });
 
     renderTablaAlumnos();
+    renderPaginacionAlumnos();
 }
 
-// Repinta la tabla de alumnos a partir de alumnosCache (ya cargado por
-// renderAlumnos) aplicando el filtro de búsqueda de #buscar-alumno — no
-// vuelve a consultar Supabase, así que puede llamarse en cada tecleo.
+function renderPaginacionAlumnos() {
+    const totalPaginas = Math.max(1, Math.ceil(alumnosTotalCount / ALUMNOS_POR_PAGINA));
+    const info = document.getElementById('alumnos-pagina-info');
+    if (info) info.textContent = `Página ${alumnosPagina} de ${totalPaginas}`;
+    const btnPrev = document.getElementById('btn-alumnos-prev');
+    const btnNext = document.getElementById('btn-alumnos-next');
+    if (btnPrev) btnPrev.disabled = alumnosPagina <= 1;
+    if (btnNext) btnNext.disabled = alumnosPagina >= totalPaginas;
+}
+
+window.cambiarPaginaAlumnos = async (delta) => {
+    const totalPaginas = Math.max(1, Math.ceil(alumnosTotalCount / ALUMNOS_POR_PAGINA));
+    const nueva = alumnosPagina + delta;
+    if (nueva < 1 || nueva > totalPaginas) return;
+    alumnosPagina = nueva;
+    await cargarPaginaAlumnos();
+};
+
+// Repinta la tabla de alumnos a partir de alumnosCache (la página ya cargada
+// por cargarPaginaAlumnos) aplicando el filtro de búsqueda de #buscar-alumno
+// — no vuelve a consultar Supabase, así que puede llamarse en cada tecleo.
+// Nota: al buscar solo dentro de la página cargada (no en todo el listado),
+// para encontrar un alumno que no esté en la página actual hay que
+// paginar hasta encontrarlo o quitar el filtro de grado.
 function renderTablaAlumnos() {
     const busqueda = (document.getElementById('buscar-alumno')?.value || '').trim().toLowerCase();
     const alumnosFiltrados = busqueda
@@ -2522,8 +2629,8 @@ window.guardarAlumno = async () => {
 
     mostrarToast(id ? 'Alumno actualizado' : 'Alumno creado', 'exito');
     cerrarModal('modal-alumno');
-    if (vistaActual === 'matricula') await renderVistaMatricula();
-    else await renderAlumnos();
+    if (vistaActual === 'matricula') await cargarPaginaMatricula();
+    else await cargarPaginaAlumnos();
 };
 
 window.eliminarAlumno = async (id) => {
@@ -2532,7 +2639,7 @@ window.eliminarAlumno = async (id) => {
     const { error } = await supabase.from('alumnos').delete().eq('id', id);
     if (error) return notificarError(error, 'Error eliminando el alumno');
     mostrarToast('Alumno eliminado', 'exito');
-    await renderAlumnos();
+    await cargarPaginaAlumnos();
 };
 
 window.eliminarAlumnosMasivo = async () => {
@@ -2552,11 +2659,11 @@ window.eliminarAlumnosMasivo = async () => {
     if (eMat) return notificarError(eMat, 'Error buscando los alumnos del grado');
 
     const alumnoIds = (matriculas || []).map(m => m.alumno_id);
-    if (!alumnoIds.length) { await renderAlumnos(); return; }
+    if (!alumnoIds.length) { await cargarPaginaAlumnos(); return; }
 
     const { error } = await supabase.from('alumnos').delete().in('id', alumnoIds);
     if (error) return notificarError(error, 'Error eliminando alumnos');
-    await renderAlumnos();
+    await cargarPaginaAlumnos();
     mostrarToast('Alumnos eliminados', 'exito');
 };
 

@@ -71,6 +71,17 @@ let asisRegistroInfo  = null; // { nombre, hora } si ya hay asistencia guardada 
 let configAnioSel           = null;
 let periodosAcademicosCache = []; // filas de `periodos_academicos` del año elegido
 
+// Retrasa la ejecución de fn hasta que pasen `delay`ms sin nuevas llamadas —
+// usado en los buscadores (oninput) para no disparar una query a Supabase
+// por cada tecla.
+function debounce(fn, delay) {
+    let timer = null;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), delay);
+    };
+}
+
 // Llama al endpoint serverless que gestiona usuarios con la service key
 async function llamarApiAdmin(action, datos) {
     const { data: { session } } = await supabase.auth.getSession();
@@ -2316,11 +2327,14 @@ window.cambiarPaginaMatricula = async (delta) => {
 };
 
 // Buscador de matrícula: recorre TODO el catálogo de alumnos (no la página
-// cargada arriba) por nombres, apellidos o NIE. Usa 3 queries .ilike()
-// paralelas en vez de un solo .or() — un .or() de PostgREST se rompe si el
-// texto buscado contiene una coma (mismo problema ya resuelto antes en el
-// buscador de Expedientes).
-window.buscarAlumnosMatricula = async () => {
+// cargada arriba) por nombres, apellidos o NIE, contra Supabase (no en
+// memoria). Usa 3 queries .ilike() paralelas en vez de un solo .or() — un
+// .or() de PostgREST se rompe si el texto buscado contiene una coma (mismo
+// problema ya resuelto antes en el buscador de Expedientes). La versión
+// expuesta a #mat-buscador (oninput) va debounced 300ms para no disparar una
+// query por cada tecla; ejecutarBusquedaMatricula queda sin debounce para
+// los refrescos directos post-acción (matricular/desmatricular).
+async function ejecutarBusquedaMatricula() {
     const cont = document.getElementById('mat-resultados-busqueda');
     if (!cont) return;
     const q = document.getElementById('mat-buscador').value.trim();
@@ -2332,12 +2346,12 @@ window.buscarAlumnosMatricula = async () => {
     try {
         const patron = `%${q}%`;
         const [{ data: porNombre, error: e1 }, { data: porApellido, error: e2 }, { data: porNie, error: e3 }] = await Promise.all([
-            supabase.from('alumnos').select('*').ilike('nombres', patron).limit(20),
-            supabase.from('alumnos').select('*').ilike('apellidos', patron).limit(20),
-            supabase.from('alumnos').select('*').ilike('nie', patron).limit(20),
+            supabase.from('alumnos').select('*').ilike('nombres', patron).limit(25),
+            supabase.from('alumnos').select('*').ilike('apellidos', patron).limit(25),
+            supabase.from('alumnos').select('*').ilike('nie', patron).limit(25),
         ]);
         const errorDeRed = [e1, e2, e3].find(e => e && esErrorDeRed(e));
-        if (errorDeRed) { mostrarBannerSinConexion(() => window.buscarAlumnosMatricula()); return; }
+        if (errorDeRed) { mostrarBannerSinConexion(() => ejecutarBusquedaMatricula()); return; }
         if (e1 || e2 || e3) { notificarError(e1 || e2 || e3, 'Error buscando alumnos'); return; }
 
         const porId = new Map();
@@ -2379,10 +2393,12 @@ window.buscarAlumnosMatricula = async () => {
             </div>`;
         }).join('');
     } catch (err) {
-        if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => window.buscarAlumnosMatricula()); return; }
+        if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => ejecutarBusquedaMatricula()); return; }
         notificarError(err, 'Error buscando alumnos');
     }
-};
+}
+
+window.buscarAlumnosMatricula = debounce(ejecutarBusquedaMatricula, 300);
 
 window.matricularDesdeBusqueda = async (alumnoId) => {
     const gradoId = document.getElementById(`mat-buscar-grado-${alumnoId}`).value;
@@ -2393,7 +2409,7 @@ window.matricularDesdeBusqueda = async (alumnoId) => {
     );
     if (error) return notificarError(error, 'Error matriculando al alumno');
     mostrarToast('Alumno matriculado', 'exito');
-    await window.buscarAlumnosMatricula();
+    await ejecutarBusquedaMatricula();
     if (matGradoSel === gradoId) await cargarPaginaMatricula();
 };
 
@@ -2404,7 +2420,7 @@ window.desmatricularAlumno = async (matriculaId) => {
     if (error) return notificarError(error, 'Error desmatriculando al alumno');
     mostrarToast('Alumno desmatriculado', 'exito');
     await cargarPaginaMatricula();
-    if (document.getElementById('mat-buscador')?.value.trim()) await window.buscarAlumnosMatricula();
+    if (document.getElementById('mat-buscador')?.value.trim()) await ejecutarBusquedaMatricula();
 };
 
 // ── CATEGORÍAS DE GRADOS ─────────────────────
@@ -2537,9 +2553,21 @@ let alumnosPagina = 1;
 let alumnosTotalCount = 0;
 
 // Entrada pública (onchange del filtro de grado, entrada a la vista, etc.) —
-// siempre vuelve a la página 1 porque cambia el conjunto de resultados.
+// siempre vuelve a la página 1 porque cambia el conjunto de resultados. Si
+// hay texto en #buscar-alumno, respeta la búsqueda activa en vez de mostrar
+// la lista paginada normal (por ejemplo, al cambiar de grado con una
+// búsqueda en curso).
 window.renderAlumnos = async function renderAlumnos() {
     alumnosPagina = 1;
+    await recargarVistaAlumnos();
+}
+
+// Recarga lo que corresponda según haya o no texto en el buscador — usada
+// tanto por renderAlumnos como por los refrescos post-acción (crear/editar/
+// eliminar alumno), para no perder una búsqueda en curso.
+async function recargarVistaAlumnos() {
+    const texto = document.getElementById('buscar-alumno')?.value.trim();
+    if (texto) { await cargarBusquedaAlumnos(texto); return; }
     await cargarPaginaAlumnos();
 }
 
@@ -2604,22 +2632,12 @@ window.cambiarPaginaAlumnos = async (delta) => {
     await cargarPaginaAlumnos();
 };
 
-// Repinta la tabla de alumnos a partir de alumnosCache (la página ya cargada
-// por cargarPaginaAlumnos) aplicando el filtro de búsqueda de #buscar-alumno
-// — no vuelve a consultar Supabase, así que puede llamarse en cada tecleo.
-// Nota: al buscar solo dentro de la página cargada (no en todo el listado),
-// para encontrar un alumno que no esté en la página actual hay que
-// paginar hasta encontrarlo o quitar el filtro de grado.
+// Pinta la tabla de alumnos a partir de alumnosCache — ya sea la página
+// cargada por cargarPaginaAlumnos o los resultados de cargarBusquedaAlumnos.
 function renderTablaAlumnos() {
-    const busqueda = (document.getElementById('buscar-alumno')?.value || '').trim().toLowerCase();
-    const alumnosFiltrados = busqueda
-        ? alumnosCache.filter(a =>
-            (a.nombres || '').toLowerCase().includes(busqueda) ||
-            (a.apellidos || '').toLowerCase().includes(busqueda) ||
-            (a.nie || '').toLowerCase().includes(busqueda))
-        : alumnosCache;
+    const busqueda = !!document.getElementById('buscar-alumno')?.value.trim();
 
-    document.getElementById('tbody-alumnos').innerHTML = alumnosFiltrados.map(a => `
+    document.getElementById('tbody-alumnos').innerHTML = alumnosCache.map(a => `
         <tr>
             <td>
                 ${a.foto_url
@@ -2638,7 +2656,77 @@ function renderTablaAlumnos() {
     `).join('') || `<tr><td colspan="6" class="text-center text-muted">${busqueda ? 'Sin alumnos que coincidan con la búsqueda' : 'Sin alumnos'}</td></tr>`;
 }
 
-window.filtrarAlumnosBusqueda = () => renderTablaAlumnos();
+// Buscador de Alumnos: consulta Supabase de verdad (3 queries .ilike()
+// paralelas sobre nombres/apellidos/nie, igual que el buscador de
+// Matrícula — un solo .or() se rompe si el texto tiene una coma) en vez de
+// filtrar alumnosCache en memoria, que antes solo cubría los 25 de la
+// página cargada. Solo se muestran los que están matriculados este año (y,
+// si hay un grado elegido en el filtro, en ese grado en particular), porque
+// esta vista es de alumnos activos, no del catálogo entero. Los resultados
+// no se paginan (ya vienen acotados a 25 por columna buscada).
+async function cargarBusquedaAlumnos(texto) {
+    renderSkeletonFilas('tbody-alumnos', 6, 6);
+
+    if (!anioActivoCache) {
+        document.getElementById('tbody-alumnos').innerHTML =
+            '<tr><td colspan="6"><div class="info-box">⚠ No hay un año académico activo — configuralo en "Año Académico".</div></td></tr>';
+        alumnosCache = [];
+        alumnosTotalCount = 0;
+        renderPaginacionAlumnos();
+        return;
+    }
+
+    try {
+        const patron = `%${texto}%`;
+        const [{ data: porNombre, error: e1 }, { data: porApellido, error: e2 }, { data: porNie, error: e3 }] = await Promise.all([
+            supabase.from('alumnos').select('*').ilike('nombres', patron).limit(25),
+            supabase.from('alumnos').select('*').ilike('apellidos', patron).limit(25),
+            supabase.from('alumnos').select('*').ilike('nie', patron).limit(25),
+        ]);
+        const errorDeRed = [e1, e2, e3].find(e => e && esErrorDeRed(e));
+        if (errorDeRed) { mostrarBannerSinConexion(() => cargarBusquedaAlumnos(texto)); return; }
+        if (e1 || e2 || e3) { notificarError(e1 || e2 || e3, 'Error buscando alumnos'); return; }
+
+        const porId = new Map();
+        [...(porNombre || []), ...(porApellido || []), ...(porNie || [])].forEach(a => porId.set(a.id, a));
+        const encontrados = [...porId.values()];
+
+        const gradoFiltro = document.getElementById('filtro-grado')?.value || '';
+        const matriculaPorAlumno = {};
+        if (encontrados.length) {
+            let queryMat = supabase.from('matriculas').select('*, grados(nombre, seccion)')
+                .eq('año_academico_id', anioActivoCache.id).eq('activo', true)
+                .in('alumno_id', encontrados.map(a => a.id));
+            if (gradoFiltro) queryMat = queryMat.eq('grado_id', gradoFiltro);
+            const { data: matriculasRes, error: eMat } = await queryMat;
+            if (eMat) { notificarError(eMat, 'Error verificando matrículas'); return; }
+            (matriculasRes || []).forEach(m => { matriculaPorAlumno[m.alumno_id] = m; });
+        }
+
+        matriculaPorAlumnoCache = {};
+        alumnosCache = encontrados
+            .filter(a => matriculaPorAlumno[a.id])
+            .map(a => {
+                matriculaPorAlumnoCache[a.id] = matriculaPorAlumno[a.id];
+                return { ...a, grados: matriculaPorAlumno[a.id].grados };
+            })
+            .sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || ''));
+
+        alumnosTotalCount = alumnosCache.length;
+        alumnosPagina = 1;
+        renderTablaAlumnos();
+        renderPaginacionAlumnos();
+    } catch (err) {
+        if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => cargarBusquedaAlumnos(texto)); return; }
+        notificarError(err, 'Error buscando alumnos');
+    }
+}
+
+window.filtrarAlumnosBusqueda = debounce(async () => {
+    const texto = document.getElementById('buscar-alumno').value.trim();
+    if (!texto) { alumnosPagina = 1; await cargarPaginaAlumnos(); return; }
+    await cargarBusquedaAlumnos(texto);
+}, 300);
 
 const CAMPOS_ALUMNO = ['alumno-nie', 'alumno-nombres', 'alumno-apellidos', 'alumno-grado'];
 
@@ -2714,7 +2802,7 @@ window.guardarAlumno = async () => {
     mostrarToast(id ? 'Alumno actualizado' : 'Alumno creado', 'exito');
     cerrarModal('modal-alumno');
     if (vistaActual === 'matricula') await cargarPaginaMatricula();
-    else await cargarPaginaAlumnos();
+    else await recargarVistaAlumnos();
 };
 
 window.eliminarAlumno = async (id) => {
@@ -2723,7 +2811,7 @@ window.eliminarAlumno = async (id) => {
     const { error } = await supabase.from('alumnos').delete().eq('id', id);
     if (error) return notificarError(error, 'Error eliminando el alumno');
     mostrarToast('Alumno eliminado', 'exito');
-    await cargarPaginaAlumnos();
+    await recargarVistaAlumnos();
 };
 
 window.eliminarAlumnosMasivo = async () => {
@@ -2743,11 +2831,11 @@ window.eliminarAlumnosMasivo = async () => {
     if (eMat) return notificarError(eMat, 'Error buscando los alumnos del grado');
 
     const alumnoIds = (matriculas || []).map(m => m.alumno_id);
-    if (!alumnoIds.length) { await cargarPaginaAlumnos(); return; }
+    if (!alumnoIds.length) { await recargarVistaAlumnos(); return; }
 
     const { error } = await supabase.from('alumnos').delete().in('id', alumnoIds);
     if (error) return notificarError(error, 'Error eliminando alumnos');
-    await cargarPaginaAlumnos();
+    await recargarVistaAlumnos();
     mostrarToast('Alumnos eliminados', 'exito');
 };
 

@@ -1268,14 +1268,14 @@ async function cargarResumenMensualAdmin() {
 
     cont.innerHTML = `
     <table>
-        <thead><tr><th>Alumno</th><th>Grado</th><th>Ausencias</th><th>Justificadas</th><th>Tardanzas</th></tr></thead>
+        <thead><tr><th>Alumno</th><th>Grado</th><th>Ausencias</th><th>Permisos</th><th>Tardanzas</th></tr></thead>
         <tbody>
             ${alerta.map(({ alumno: al, totales: t }) => `
                 <tr>
                     <td class="td-bold">${al.apellidos}, ${al.nombres}</td>
                     <td>${al.grados?.nombre || ''} ${al.grados?.seccion || ''}</td>
                     <td><span class="badge" style="background:#fde8e8;color:#b52828">${t.A}</span></td>
-                    <td>${t.J}</td>
+                    <td>${t.M}</td>
                     <td>${t.T}</td>
                 </tr>`).join('')}
         </tbody>

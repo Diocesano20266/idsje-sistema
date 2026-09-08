@@ -123,8 +123,13 @@
         .asis-pill:hover{border-color:#cbd5e1}
         .asis-pill-P.activo{background:#059669;border-color:#059669;color:#fff}
         .asis-pill-A.activo{background:#dc2626;border-color:#dc2626;color:#fff}
-        .asis-pill-J.activo{background:#2563eb;border-color:#2563eb;color:#fff}
+        .asis-pill-M.activo{background:#2563eb;border-color:#2563eb;color:#fff}
         .asis-pill-T.activo{background:#d97706;border-color:#d97706;color:#fff}
+
+        /* ── LEYENDA DE ASISTENCIA ── */
+        .asis-leyenda{display:flex;flex-wrap:wrap;gap:16px;padding:12px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:14px}
+        .asis-leyenda-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#475569}
+        .asis-leyenda-ico{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
         .asis-reporte-card{background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:18px;margin-top:20px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
 
         /* ── EXPEDIENTE DISCIPLINARIO ── */
@@ -492,6 +497,12 @@
                     <div class="filtros">
                         <select id="asis-grado" onchange="cambiarGradoAsistencia()"></select>
                         <input type="date" id="asis-fecha" onchange="cambiarFechaAsistencia()">
+                    </div>
+                    <div class="asis-leyenda">
+                        <div class="asis-leyenda-item"><span class="asis-leyenda-ico" style="background:#059669">✓</span> Presente — el alumno asistió</div>
+                        <div class="asis-leyenda-item"><span class="asis-leyenda-ico" style="background:#dc2626">✗</span> Ausente — no asistió sin justificación</div>
+                        <div class="asis-leyenda-item"><span class="asis-leyenda-ico" style="background:#2563eb">M</span> Permiso — no asistió pero presentó permiso válido</div>
+                        <div class="asis-leyenda-item"><span class="asis-leyenda-ico" style="background:#d97706">T</span> Tardanza — llegó tarde</div>
                     </div>
                     <div id="asis-banner" class="asis-banner hidden"></div>
                     <div class="asis-lista" id="lista-asistencia"></div>

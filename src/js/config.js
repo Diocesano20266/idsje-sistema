@@ -63,10 +63,10 @@ export const BLOQUES_HORARIO = [
 
 // ── Asistencias ───────────────────────────────
 export const ESTADOS_ASISTENCIA = [
-    { codigo: 'P', label: 'Presente',    color: '#059669', bg: '#d1fae5' },
-    { codigo: 'A', label: 'Ausente',     color: '#dc2626', bg: '#fee2e2' },
-    { codigo: 'J', label: 'Justificado', color: '#2563eb', bg: '#dbeafe' },
-    { codigo: 'T', label: 'Tardanza',    color: '#a16207', bg: '#fef3c7' },
+    { codigo: 'P', label: 'Presente', color: '#059669', bg: '#d1fae5' },
+    { codigo: 'A', label: 'Ausente',  color: '#dc2626', bg: '#fee2e2' },
+    { codigo: 'M', label: 'Permiso',  color: '#2563eb', bg: '#dbeafe' },
+    { codigo: 'T', label: 'Tardanza', color: '#a16207', bg: '#fef3c7' },
 ];
 
 // ── Expediente disciplinario (módulos independientes) ────────

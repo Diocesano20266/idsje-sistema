@@ -1169,11 +1169,8 @@ function renderListaAsistenciaAdmin() {
 
     cont.innerHTML = alumnosAsis.map((al, idx) => {
         const estado = asisEdit[al.id] || asisCache[al.id]?.estado || 'P';
-        const pills = ESTADOS_ASISTENCIA.map(e => {
-            const simbolo = e.codigo === 'P' ? '✓' : (e.codigo === 'A' ? '✗' : e.codigo);
-            return `<button type="button" class="asis-pill asis-pill-${e.codigo} ${estado === e.codigo ? 'activo' : ''}"
-                onclick="marcarAsistenciaAdmin('${al.id}', '${e.codigo}')" title="${e.label}">${simbolo}</button>`;
-        }).join('');
+        const pills = ESTADOS_ASISTENCIA.map(e => `<button type="button" class="asis-pill asis-pill-${e.codigo} ${estado === e.codigo ? 'activo' : ''}"
+                onclick="marcarAsistenciaAdmin('${al.id}', '${e.codigo}')" title="${e.label}">${e.simbolo}</button>`).join('');
 
         return `
         <div class="asis-fila">

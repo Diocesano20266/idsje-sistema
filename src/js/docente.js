@@ -95,12 +95,15 @@ async function cargarDatosDocente() {
         anioActivoCache = await getAñoActivo(supabase);
         renderAnioActivoHeaderDocente();
 
-        const [{ data: gm, error: eGm }, { data: guia, error: eGuia }] = await Promise.all([
+        const [{ data: gm, error: eGm }, { data: guia, error: eGuia }, { data: periodos, error: ePer }] = await Promise.all([
             supabase.from('grado_materia').select('*, grados(id, nombre, seccion, modalidad, anio), materias(id, nombre)').eq('docente_id', usuarioActual.id),
-            supabase.from('grados').select('*').eq('docente_guia_id', usuarioActual.id).order('nombre')
+            supabase.from('grados').select('*').eq('docente_guia_id', usuarioActual.id).order('nombre'),
+            anioActivoCache
+                ? supabase.from('periodos_academicos').select('*').eq('anio', anioActivoCache.anio)
+                : Promise.resolve({ data: [], error: null })
         ]);
 
-        if ((eGm && esErrorDeRed(eGm)) || (eGuia && esErrorDeRed(eGuia))) {
+        if ((eGm && esErrorDeRed(eGm)) || (eGuia && esErrorDeRed(eGuia)) || (ePer && esErrorDeRed(ePer))) {
             mostrarBannerSinConexion(() => cargarDatosDocente().then(() => mostrarVista(vistaActualDocente())));
             return;
         }
@@ -108,6 +111,7 @@ async function cargarDatosDocente() {
 
         gradoMatCache   = gm   || [];
         gradosGuiaCache = guia || [];
+        periodoActual   = calcularPeriodoActual(periodos);
 
         const gradoIds = [...new Set([
             ...gradoMatCache.map(x => x.grado_id),
@@ -146,6 +150,22 @@ function renderAnioActivoHeaderDocente() {
     if (!el) return;
     el.textContent = anioActivoCache ? `Año ${anioActivoCache.anio}` : '⚠ Sin año activo';
     el.classList.toggle('anio-badge-alerta', !anioActivoCache);
+}
+
+// Determina el período académico (1-4) vigente según las fechas configuradas
+// en `periodos_academicos` (admin > Configuración) — es el período que ya
+// empezó más recientemente respecto a hoy. Si ninguno tiene fecha_inicio, o
+// hoy es anterior al primero, cae en el período 1 por defecto.
+function calcularPeriodoActual(periodos, hoyStr) {
+    const configurados = (periodos || [])
+        .filter(p => p.fecha_inicio)
+        .sort((a, b) => a.periodo - b.periodo);
+    if (!configurados.length) return 1;
+
+    hoyStr = hoyStr || new Date().toISOString().slice(0, 10);
+    let actual = configurados[0].periodo;
+    configurados.forEach(p => { if (hoyStr >= p.fecha_inicio) actual = p.periodo; });
+    return actual;
 }
 
 function vistaActualDocente() {
@@ -1010,6 +1030,8 @@ function initVistaNotas() {
         notasMateriaId = materiasGrado[0]?.id || null;
     }
     document.getElementById('notas-materia').value = notasMateriaId || '';
+
+    document.querySelectorAll('.periodo-btn').forEach((b, i) => b.classList.toggle('active', i + 1 === periodoActual));
 
     cargarCriteriosYTabla();
 }

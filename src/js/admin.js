@@ -1070,11 +1070,17 @@ function mesActualISO() {
 }
 
 function renderVistaAsistencias() {
-    const opciones = gradosCache.map(g => `<option value="${g.id}">${g.nombre} ${g.modalidad} — Sección ${g.seccion}</option>`).join('');
+    // gradosDelAnioActivo() (no gradosCache directo) — mismo motivo que en
+    // Reportes: gradosCache trae grados de TODOS los años académicos.
+    const gradosAnio = gradosDelAnioActivo();
+    const opciones = gradosAnio.map(g => `<option value="${g.id}">${g.nombre} ${g.modalidad} — Sección ${g.seccion}</option>`).join('');
 
     const selGrado = document.getElementById('asis-grado');
     selGrado.innerHTML = opciones;
-    if (!asisGradoId && gradosCache.length) asisGradoId = gradosCache[0].id;
+    // Si el grado que estaba elegido no es del año activo (p.ej. se cambió
+    // el año activo desde la última visita), se descarta y se usa el primero.
+    if (asisGradoId && !gradosAnio.some(g => g.id === asisGradoId)) asisGradoId = null;
+    if (!asisGradoId && gradosAnio.length) asisGradoId = gradosAnio[0].id;
     if (asisGradoId) selGrado.value = asisGradoId;
 
     if (!asisFecha) asisFecha = fechaHoyISO();
@@ -2490,13 +2496,15 @@ window.imprimirMatriculaAdmin = () => {
     window.open(`./reporte-matricula.html?grado=${gradoId}`, '_blank');
 };
 
+// `gradosCache` trae TODOS los grados creados alguna vez (de todos los años
+// académicos, ver cargarTodo()) — usar poblarSelectGrados() acá en vez de
+// volcarlo directo evita que los 3 selectores de Reportes muestren grados de
+// años anteriores mezclados con los del año activo (mismo helper que ya usan
+// Deméritos/Anecdóticos/Amonestaciones/Reconocimientos/Expedientes/Matrícula).
 function renderVistaReportes() {
-    const opciones = '<option value="">— Seleccioná un grado —</option>' +
-        gradosCache.map(g => `<option value="${g.id}">${g.nombre} ${g.modalidad} — Sección ${g.seccion}</option>`).join('');
-
-    document.getElementById('rep-matricula-grado').innerHTML = opciones;
-    document.getElementById('rep-notas-grado').innerHTML = opciones;
-    document.getElementById('rep-act-grado').innerHTML = opciones;
+    poblarSelectGrados('rep-matricula-grado', null, '— Seleccioná un grado —');
+    poblarSelectGrados('rep-notas-grado', null, '— Seleccioná un grado —');
+    poblarSelectGrados('rep-act-grado', null, '— Seleccioná un grado —');
     document.getElementById('rep-act-materia').innerHTML = '<option value="">— Elegí un grado primero —</option>';
 }
 

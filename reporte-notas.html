@@ -48,6 +48,19 @@
         .tabla-notas-finales tbody tr td.td-nf-roja{background:#ffcccc}
         .fila-promedio td{background:#eef2fb!important;font-weight:700;color:#1B3A6B;border-top:2px solid #1B3A6B}
 
+        /* Modo "final": cada materia con sus 4 períodos + promedio (ver
+           generarHTMLFinal en reporte-notas.js) */
+        .tabla-notas-final-anual{font-size:8.5px}
+        .th-materia{background:#0a1628}
+        .th-sub{background:#2E5FAC;font-size:8px;padding:3px 2px}
+        .th-prom{background:#0a1628}
+        .td-nf-sub{font-size:8.5px}
+        .td-nf-prom{font-weight:700;background:#eef2fb}
+        .tabla-notas-final-anual tbody tr:nth-child(even) td.td-nf-prom{background:#e2e8f0}
+        .th-materia-inicio,
+        .tabla-notas-final-anual td.td-materia-inicio,
+        .tabla-notas-final-anual th.th-materia{border-left:2px solid #0a1628}
+
         .boleta-toolbar{text-align:right;margin-bottom:10px}
         .btn-imprimir-boleta{background:#1B3A6B;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-weight:600;font-size:11px;cursor:pointer;transition:background .2s}
         .btn-imprimir-boleta:hover{background:#2E5FAC}

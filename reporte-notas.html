@@ -48,25 +48,27 @@
         .tabla-notas-finales tbody tr td.td-nf-roja{background:#ffcccc}
         .fila-promedio td{background:#eef2fb!important;font-weight:700;color:#1B3A6B;border-top:2px solid #1B3A6B}
 
-        /* Modo "final": cada materia con sus 4 períodos + promedio (ver
-           generarHTMLFinal en reporte-notas.js) */
-        .tabla-notas-final-anual{font-size:8.5px}
-        .th-materia{background:#0a1628}
-        .th-sub{background:#2E5FAC;font-size:8px;padding:3px 2px}
-        .th-prom{background:#0a1628}
-        .td-nf-sub{font-size:8.5px}
-        .td-nf-prom{font-weight:700;background:#eef2fb}
-        .tabla-notas-final-anual tbody tr:nth-child(even) td.td-nf-prom{background:#e2e8f0}
-        .th-materia-inicio,
-        .tabla-notas-final-anual td.td-materia-inicio,
-        .tabla-notas-final-anual th.th-materia{border-left:2px solid #0a1628}
+        /* Modo "final": un bloque por alumno, materias como filas, P1-P4 +
+           Promedio como columnas (ver generarHTMLFinal en reporte-notas.js) */
+        .alumno-bloque{margin-bottom:18px}
+        .alumno-bloque-salto{page-break-inside:avoid}
+        .alumno-bloque-header{display:flex;align-items:baseline;gap:8px;background:#1B3A6B;color:#fff;padding:5px 10px;border-radius:4px 4px 0 0;font-family:'DM Sans',sans-serif}
+        .alumno-bloque-num{font-weight:600;opacity:.8}
+        .alumno-bloque-nombre{font-weight:700;font-size:11px}
+        .alumno-bloque-nie{margin-left:auto;font-size:9.5px;opacity:.85}
+        .tabla-notas-alumno{width:100%;border-collapse:collapse;font-size:10px}
+        .tabla-notas-alumno th{background:#2E5FAC;color:#fff;padding:5px 4px;text-align:center;font-weight:700}
+        .tabla-notas-alumno td{border:1px solid #e2e8f0;padding:5px 4px;text-align:center;vertical-align:middle}
+        .th-materia-col{text-align:left!important;width:38%}
+        .td-materia-nombre{text-align:left;font-weight:600}
+        .tabla-notas-alumno tbody tr:nth-child(even) td{background:#f8fafc}
+        .fila-promedio-alumno td{background:#eef2fb!important;font-weight:700;color:#1B3A6B;border-top:2px solid #1B3A6B}
 
         .boleta-toolbar{text-align:right;margin-bottom:10px}
         .btn-imprimir-boleta{background:#1B3A6B;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-weight:600;font-size:11px;cursor:pointer;transition:background .2s}
         .btn-imprimir-boleta:hover{background:#2E5FAC}
 
         @media print {
-            @page { size: landscape; }
             .no-print{display:none!important}
             body{background:white}
             .boleta-page{box-shadow:none;margin:0;padding:14px 16px;border-radius:0;max-width:100%}

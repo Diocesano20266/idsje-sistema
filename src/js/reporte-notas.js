@@ -82,6 +82,10 @@ async function renderReporte(gradoId, periodo) {
             if (!notasPorAlumnoMateria[n.alumno_id]) notasPorAlumnoMateria[n.alumno_id] = {};
             notasPorAlumnoMateria[n.alumno_id][n.grado_materia_id] = n.nota_final_rec ?? n.nota_final ?? null;
         });
+        const style = document.createElement('style');
+        style.textContent = '@media print { @page { size: landscape; } }';
+        document.head.appendChild(style);
+
         cont.innerHTML = generarHTML(titulo, alumnos || [], gradoMaterias || [], notasPorAlumnoMateria, periodo);
     } catch (err) {
         if (esErrorDeRed(err)) { mostrarBannerSinConexion(() => renderReporte(gradoId, periodo)); return; }
@@ -159,9 +163,10 @@ function generarHTML(titulo, alumnos, gradoMaterias, notasPorAlumnoMateria, peri
     </div>`;
 }
 
-// Modo "final": cada materia ocupa 5 sub-columnas (P1, P2, P3, P4, Promedio)
-// en vez de una sola nota — así se ve la evolución del alumno período a
-// período, materia por materia, en un solo cuadro anual.
+// Modo "final": un bloque por alumno, con sus materias como filas y P1-P4 +
+// Promedio como columnas — así se ve la evolución de cada alumno, período a
+// período, materia por materia, sin saturar la pantalla con todos los
+// alumnos y materias en una sola tabla ancha.
 function generarHTMLFinal(titulo, alumnos, gradoMaterias, notasPorAlumnoMateriaPeriodo) {
     const promedioMateria = (alumnoId, gmId) => {
         const valores = PERIODOS
@@ -171,56 +176,60 @@ function generarHTMLFinal(titulo, alumnos, gradoMaterias, notasPorAlumnoMateriaP
         return valores.reduce((a, b) => a + b, 0) / valores.length;
     };
 
-    const filasAlumnos = alumnos.map((al, idx) => {
-        const celdas = gradoMaterias.map(gm => {
-            const celdasPeriodo = PERIODOS.map((p, i) => {
+    const bloquesAlumnos = alumnos.map((al, idx) => {
+        const filasMaterias = gradoMaterias.map(gm => {
+            const celdasPeriodo = PERIODOS.map(p => {
                 const v = notasPorAlumnoMateriaPeriodo[al.id]?.[gm.id]?.[p];
-                const inicio = i === 0 ? ' td-materia-inicio' : '';
-                if (v === undefined || v === null) return `<td class="td-nf td-nf-sub${inicio}">—</td>`;
-                return `<td class="td-nf td-nf-sub${inicio} ${v < 6 ? 'td-nf-roja' : ''}">${v.toFixed(1)}</td>`;
+                if (v === undefined || v === null) return '<td class="td-nf">—</td>';
+                return `<td class="td-nf ${v < 6 ? 'td-nf-roja' : ''}">${v.toFixed(1)}</td>`;
             }).join('');
             const prom = promedioMateria(al.id, gm.id);
             const celdaProm = prom === null
                 ? '<td class="td-nf td-nf-prom">—</td>'
                 : `<td class="td-nf td-nf-prom ${prom < 6 ? 'td-nf-roja' : ''}">${prom.toFixed(1)}</td>`;
-            return celdasPeriodo + celdaProm;
+
+            return `
+            <tr>
+                <td class="td-materia-nombre">${gm.materias?.nombre || ''}</td>
+                ${celdasPeriodo}
+                ${celdaProm}
+            </tr>`;
         }).join('');
+
+        const promsAlumno = gradoMaterias
+            .map(gm => promedioMateria(al.id, gm.id))
+            .filter(v => v !== null);
+        const promedioGeneral = promsAlumno.length
+            ? (promsAlumno.reduce((a, b) => a + b, 0) / promsAlumno.length)
+            : null;
+        const celdaPromedioGeneral = promedioGeneral === null
+            ? '<td class="td-nf-prom">—</td>'
+            : `<td class="td-nf-prom ${promedioGeneral < 6 ? 'td-nf-roja' : ''}">${promedioGeneral.toFixed(1)}</td>`;
 
         return `
-        <tr>
-            <td class="td-num">${idx + 1}</td>
-            <td class="td-nombre">${al.apellidos}, ${al.nombres}</td>
-            ${celdas}
-        </tr>`;
+        <div class="alumno-bloque${idx > 0 ? ' alumno-bloque-salto' : ''}">
+            <div class="alumno-bloque-header">
+                <span class="alumno-bloque-num">${idx + 1}.</span>
+                <span class="alumno-bloque-nombre">${al.apellidos}, ${al.nombres}</span>
+                <span class="alumno-bloque-nie">NIE ${al.nie || '—'}</span>
+            </div>
+            <table class="tabla-notas-alumno">
+                <thead>
+                    <tr>
+                        <th class="th-materia-col">Materia</th>
+                        <th>P1</th><th>P2</th><th>P3</th><th>P4</th><th class="th-prom">Promedio</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${filasMaterias}
+                    <tr class="fila-promedio-alumno">
+                        <td colspan="5">PROMEDIO GENERAL DEL ALUMNO</td>
+                        ${celdaPromedioGeneral}
+                    </tr>
+                </tbody>
+            </table>
+        </div>`;
     }).join('');
-
-    const celdasPromedioGeneral = gradoMaterias.map(gm => {
-        const celdasPeriodo = PERIODOS.map((p, i) => {
-            const valores = alumnos
-                .map(al => notasPorAlumnoMateriaPeriodo[al.id]?.[gm.id]?.[p])
-                .filter(v => v !== undefined && v !== null);
-            const inicio = i === 0 ? ' td-materia-inicio' : '';
-            if (!valores.length) return `<td class="td-nf-sub${inicio}">—</td>`;
-            const prom = valores.reduce((a, b) => a + b, 0) / valores.length;
-            return `<td class="td-nf-sub${inicio}">${prom.toFixed(1)}</td>`;
-        }).join('');
-
-        const promsFinales = alumnos
-            .map(al => promedioMateria(al.id, gm.id))
-            .filter(v => v !== null);
-        const celdaFinal = promsFinales.length
-            ? `<td class="td-nf-prom">${(promsFinales.reduce((a, b) => a + b, 0) / promsFinales.length).toFixed(1)}</td>`
-            : '<td class="td-nf-prom">—</td>';
-
-        return celdasPeriodo + celdaFinal;
-    }).join('');
-
-    const headerMaterias = gradoMaterias.map(gm =>
-        `<th colspan="5" class="th-materia">${gm.materias?.nombre || ''}</th>`
-    ).join('');
-    const headerSub = gradoMaterias.map(() => `
-        <th class="th-sub th-materia-inicio">P1</th><th class="th-sub">P2</th><th class="th-sub">P3</th><th class="th-sub">P4</th><th class="th-sub th-prom">PROM</th>
-    `).join('');
 
     return `
     <div class="boleta-page">
@@ -245,23 +254,7 @@ function generarHTMLFinal(titulo, alumnos, gradoMaterias, notasPorAlumnoMateriaP
         <div class="boleta-titulo">Reporte de Notas Finales — Todos los períodos</div>
         <div class="boleta-subtitulo">${titulo} — AÑO ${INSTITUTO.anio}</div>
 
-        <table class="tabla-notas-finales tabla-notas-final-anual">
-            <thead>
-                <tr>
-                    <th class="th-num" rowspan="2">No</th>
-                    <th class="th-nombre" rowspan="2">Alumno</th>
-                    ${headerMaterias}
-                </tr>
-                <tr>${headerSub}</tr>
-            </thead>
-            <tbody>
-                ${filasAlumnos}
-                <tr class="fila-promedio">
-                    <td colspan="2">PROMEDIO GENERAL POR MATERIA Y PERÍODO</td>
-                    ${celdasPromedioGeneral}
-                </tr>
-            </tbody>
-        </table>
+        ${bloquesAlumnos}
     </div>`;
 }
 

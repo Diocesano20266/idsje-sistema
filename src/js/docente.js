@@ -1215,6 +1215,13 @@ function calcularResumen(det) {
     return { promCotRaw, promIntRaw, promExaRaw, promCot, promInt, promExa, nf };
 }
 
+// Solo para mostrar el promedio final (nf) en la tabla — redondea a la
+// décima más cercana (8.47 → 8.5, 8.43 → 8.4). El valor guardado en BD sigue
+// siendo el nf completo sin redondear (ver guardarTodasLasNotas).
+function redondearDecima(n) {
+    return (Math.round(n * 10) / 10).toFixed(1);
+}
+
 const GRUPOS_NOTAS = [
     { clave: 'cotidianas',   card: 'Cotidianas',   item: 'Cotidiana',   peso: '35%' },
     { clave: 'integradoras', card: 'Integradoras', item: 'Integradora', peso: '35%' },
@@ -1284,7 +1291,7 @@ function filaNotas(al, idx) {
         <td class="td-prom-color ${colorEscala(promCotRaw)}" id="promcot-${al.id}">${promCotRaw.toFixed(2)}</td>
         <td class="td-prom-color ${colorEscala(promIntRaw)}" id="promint-${al.id}">${promIntRaw.toFixed(2)}</td>
         <td class="td-prom-color ${colorEscala(promExaRaw)}" id="promexa-${al.id}">${promExaRaw.toFixed(2)}</td>
-        <td class="td-final ${colorEscala(nf)}" id="nf-${al.id}">${nf.toFixed(2)}</td>
+        <td class="td-final ${colorEscala(nf)}" id="nf-${al.id}">${redondearDecima(nf)}</td>
         <td class="td-detalle-btn">
             <button class="btn-detalle ${abierta ? 'activo' : ''}" id="btn-detalle-${al.id}" onclick="toggleDetalleAlumno('${al.id}')">${ICONO_ESTRELLA}</button>
         </td>
@@ -1339,7 +1346,7 @@ function actualizarResumenAlumno(alumnoId) {
 
     const celdaNF = document.getElementById(`nf-${alumnoId}`);
     if (celdaNF) {
-        celdaNF.textContent = nf.toFixed(2);
+        celdaNF.textContent = redondearDecima(nf);
         celdaNF.className = 'td-final ' + colorEscala(nf);
     }
 
@@ -1378,9 +1385,44 @@ window.actualizarRecuperacionLocal = (alumnoId, valor) => {
     notasRecEdit[alumnoId] = valor;
 };
 
+// Revisa cotidianas/integradoras/examenes + recuperación de todos los
+// alumnos y devuelve el primer valor fuera de 0-10 (los campos vacíos se
+// ignoran — se guardan como 0, ver guardarTodasLasNotas). null = todo válido.
+function validarNotasFueraDeRango() {
+    for (const al of alumnosNotas) {
+        const det = notasDetalle[al.id];
+        for (const grupo of GRUPOS_NOTAS) {
+            const valores = det[grupo.clave];
+            for (let i = 0; i < valores.length; i++) {
+                const raw = valores[i];
+                if (raw === '' || raw === null || raw === undefined) continue;
+                const num = parseFloat(raw);
+                if (isNaN(num) || num < 0 || num > 10) {
+                    return { alumno: al, etiqueta: `${grupo.item} ${i + 1}` };
+                }
+            }
+        }
+
+        const recValor = notasRecEdit[al.id] ?? notasCache[al.id]?.recuperacion ?? '';
+        if (recValor !== '' && recValor !== null && recValor !== undefined) {
+            const num = parseFloat(recValor);
+            if (isNaN(num) || num < 0 || num > 10) {
+                return { alumno: al, etiqueta: 'Recuperación' };
+            }
+        }
+    }
+    return null;
+}
+
 window.guardarTodasLasNotas = async () => {
     if (!notasGradoId || !notasMateriaId || !criteriosActuales) return mostrarToast('Generá la tabla primero', 'advertencia');
     if (!alumnosNotas.length) return;
+
+    const invalida = validarNotasFueraDeRango();
+    if (invalida) {
+        mostrarToast(`La nota de ${invalida.alumno.apellidos}, ${invalida.alumno.nombres} en ${invalida.etiqueta} debe estar entre 0 y 10`, 'error');
+        return;
+    }
 
     const btn = document.getElementById('btn-guardar-notas');
     setBotonCargando(btn, true);

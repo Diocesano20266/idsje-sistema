@@ -448,15 +448,15 @@
                         <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5" fill="#d4af37" opacity=".25"/><path d="M5 5h6M5 8h6M5 11h3" stroke="#d4af37" stroke-width="1.2"/></svg>
                         <span class="nav-txt">Generar Boletas</span>
                     </div>
-                    <div class="nav-item" data-vista="reportes" onclick="mostrarVista('reportes')">
+                    <div class="nav-item" data-vista="reporte-matricula" onclick="mostrarVista('reporte-matricula')">
                         <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M5 5h6M5 8h4M5 11h5" stroke="rgba(255,255,255,.6)" stroke-width="1.2"/></svg>
                         <span class="nav-txt">Reporte Matrícula</span>
                     </div>
-                    <div class="nav-item" data-vista="reportes" onclick="mostrarVista('reportes')">
+                    <div class="nav-item" data-vista="reporte-notas" onclick="mostrarVista('reporte-notas')">
                         <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M5 5h6M5 8h4M5 11h5" stroke="rgba(255,255,255,.6)" stroke-width="1.2"/></svg>
                         <span class="nav-txt">Notas Finales</span>
                     </div>
-                    <div class="nav-item" data-vista="reportes" onclick="mostrarVista('reportes')">
+                    <div class="nav-item" data-vista="reporte-actividades" onclick="mostrarVista('reporte-actividades')">
                         <svg class="nav-ico" viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5" stroke="rgba(255,255,255,.6)" stroke-width="1.2" fill="none"/><path d="M5 5h6M5 8h4M5 11h5" stroke="rgba(255,255,255,.6)" stroke-width="1.2"/></svg>
                         <span class="nav-txt">Lista de Actividades</span>
                     </div>
@@ -853,38 +853,45 @@
             </div>
 
             <!-- OTROS REPORTES -->
-            <div id="vista-reportes" class="hidden">
-                <div class="reportes-grid">
-                    <div class="dash-card">
-                        <div class="dash-card-header"><div class="dash-card-title"><span class="gs-dot"></span>Reporte de Matrícula</div></div>
-                        <div class="dash-card-body">
-                            <div class="field"><label>Grado</label><select id="rep-matricula-grado"></select></div>
-                            <button class="btn-primary" style="width:100%;justify-content:center;margin-top:8px" onclick="imprimirMatriculaDesdeReportes()">🖨 Imprimir</button>
-                        </div>
+            <!-- REPORTE DE MATRÍCULA -->
+            <div id="vista-reporte-matricula" class="hidden">
+                <div class="dash-card" style="max-width:420px">
+                    <div class="dash-card-header"><div class="dash-card-title"><span class="gs-dot"></span>Reporte de Matrícula</div></div>
+                    <div class="dash-card-body">
+                        <div class="field"><label>Grado</label><select id="rep-matricula-grado"></select></div>
+                        <button class="btn-primary" style="width:100%;justify-content:center;margin-top:8px" onclick="imprimirMatriculaDesdeReportes()">🖨 Imprimir</button>
                     </div>
-                    <div class="dash-card">
-                        <div class="dash-card-header"><div class="dash-card-title"><span class="gs-dot"></span>Notas Finales</div></div>
-                        <div class="dash-card-body">
-                            <div class="field"><label>Grado</label><select id="rep-notas-grado"></select></div>
-                            <div class="field"><label>Período</label>
-                                <select id="rep-notas-periodo"><option value="1">Período 1</option><option value="2">Período 2</option><option value="3">Período 3</option><option value="4">Período 4</option></select>
-                            </div>
-                            <button class="btn-primary" style="width:100%;justify-content:center;margin-top:8px" onclick="imprimirReporteNotasAdmin()">🖨 Imprimir</button>
+                </div>
+            </div>
+
+            <!-- NOTAS FINALES -->
+            <div id="vista-reporte-notas" class="hidden">
+                <div class="dash-card" style="max-width:420px">
+                    <div class="dash-card-header"><div class="dash-card-title"><span class="gs-dot"></span>Notas Finales</div></div>
+                    <div class="dash-card-body">
+                        <div class="field"><label>Grado</label><select id="rep-notas-grado"></select></div>
+                        <div class="field"><label>Período</label>
+                            <select id="rep-notas-periodo"><option value="1">Período 1</option><option value="2">Período 2</option><option value="3">Período 3</option><option value="4">Período 4</option></select>
                         </div>
+                        <button class="btn-primary" style="width:100%;justify-content:center;margin-top:8px" onclick="imprimirReporteNotasAdmin()">🖨 Imprimir</button>
                     </div>
-                    <div class="dash-card">
-                        <div class="dash-card-header"><div class="dash-card-title"><span class="gs-dot"></span>Lista de Actividades</div></div>
-                        <div class="dash-card-body">
-                            <div class="field"><label>Grado</label><select id="rep-act-grado" onchange="cambiarGradoActividadesAdmin()"></select></div>
-                            <div class="field"><label>Materia</label><select id="rep-act-materia"><option value="">— Elegí un grado primero —</option></select></div>
-                            <div class="field"><label>Período</label>
-                                <select id="rep-act-periodo"><option value="1">Período 1</option><option value="2">Período 2</option><option value="3">Período 3</option><option value="4">Período 4</option></select>
-                            </div>
-                            <div class="field"><label>Cotidianas (máx. 10)</label><input type="number" id="rep-act-cotidianas" value="4" min="0" max="10"></div>
-                            <div class="field"><label>Integradoras (máx. 5)</label><input type="number" id="rep-act-integradoras" value="2" min="0" max="5"></div>
-                            <div class="field"><label>Exámenes (máx. 3)</label><input type="number" id="rep-act-examenes" value="1" min="0" max="3"></div>
-                            <button class="btn-primary" style="width:100%;justify-content:center;margin-top:8px" onclick="imprimirListaActividadesAdmin()">🖨 Imprimir</button>
+                </div>
+            </div>
+
+            <!-- LISTA DE ACTIVIDADES -->
+            <div id="vista-reporte-actividades" class="hidden">
+                <div class="dash-card" style="max-width:420px">
+                    <div class="dash-card-header"><div class="dash-card-title"><span class="gs-dot"></span>Lista de Actividades</div></div>
+                    <div class="dash-card-body">
+                        <div class="field"><label>Grado</label><select id="rep-act-grado" onchange="cambiarGradoActividadesAdmin()"></select></div>
+                        <div class="field"><label>Materia</label><select id="rep-act-materia"><option value="">— Elegí un grado primero —</option></select></div>
+                        <div class="field"><label>Período</label>
+                            <select id="rep-act-periodo"><option value="1">Período 1</option><option value="2">Período 2</option><option value="3">Período 3</option><option value="4">Período 4</option></select>
                         </div>
+                        <div class="field"><label>Cotidianas (máx. 10)</label><input type="number" id="rep-act-cotidianas" value="4" min="0" max="10"></div>
+                        <div class="field"><label>Integradoras (máx. 5)</label><input type="number" id="rep-act-integradoras" value="2" min="0" max="5"></div>
+                        <div class="field"><label>Exámenes (máx. 3)</label><input type="number" id="rep-act-examenes" value="1" min="0" max="3"></div>
+                        <button class="btn-primary" style="width:100%;justify-content:center;margin-top:8px" onclick="imprimirListaActividadesAdmin()">🖨 Imprimir</button>
                     </div>
                 </div>
             </div>

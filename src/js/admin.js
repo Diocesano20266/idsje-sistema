@@ -184,7 +184,9 @@ const TITULOS = {
     amonestaciones: 'Amonestaciones',
     reconocimientos: 'Reconocimientos',
     configuracion: 'Configuración',
-    reportes: 'Reportes',
+    'reporte-matricula': 'Reporte de Matrícula',
+    'reporte-notas': 'Notas Finales',
+    'reporte-actividades': 'Lista de Actividades',
     'anio-academico': 'Año Académico',
     matricula: 'Matrícula de Alumnos',
     'categorias-grado': 'Categorías de Grados',
@@ -203,7 +205,9 @@ const VISTA_CONFIG = {
     amonestaciones: { titulo: 'Amonestaciones',    accion: '' },
     reconocimientos: { titulo: 'Reconocimientos',  accion: '' },
     configuracion: { titulo: 'Configuración',      accion: '' },
-    reportes:    { titulo: 'Reportes',             accion: '' },
+    'reporte-matricula':   { titulo: 'Reporte de Matrícula', accion: '' },
+    'reporte-notas':       { titulo: 'Notas Finales',        accion: '' },
+    'reporte-actividades': { titulo: 'Lista de Actividades', accion: '' },
     'anio-academico': { titulo: 'Año Académico', accion: `<button class="btn-secondary" onclick="abrirModalCambiarAnio()">Cambiar año activo</button><button class="btn-primary" onclick="abrirModalNuevoAnio()">+ Nuevo Año Académico</button>` },
     matricula:   { titulo: 'Matrícula de Alumnos', accion: `<button class="btn-primary" onclick="abrirModalAlumno()">+ Alumno nuevo</button>` },
     'categorias-grado': { titulo: 'Categorías de Grados', accion: `<button class="btn-primary" onclick="abrirModalCategoriaGrado()">+ Nueva Categoría</button>` },
@@ -239,7 +243,9 @@ window.mostrarVista = async (vista) => {
     if (vista === 'amonestaciones') renderVistaModulo('amonestaciones');
     if (vista === 'reconocimientos') renderVistaModulo('reconocimientos');
     if (vista === 'configuracion') renderVistaConfiguracion();
-    if (vista === 'reportes') renderVistaReportes();
+    if (vista === 'reporte-matricula') renderVistaReporteMatricula();
+    if (vista === 'reporte-notas') renderVistaReporteNotas();
+    if (vista === 'reporte-actividades') renderVistaReporteActividades();
     if (vista === 'anio-academico') renderVistaAnioAcademico();
     if (vista === 'matricula') renderVistaMatricula();
     if (vista === 'categorias-grado') renderVistaCategoriasGrado();
@@ -2496,14 +2502,26 @@ window.imprimirMatriculaAdmin = () => {
     window.open(`./reporte-matricula.html?grado=${gradoId}`, '_blank');
 };
 
+// Los 3 reportes tenían sidebar items separados pero todos apuntaban a la
+// misma vista compartida ('reportes'), así que sin importar cuál se
+// clickeara siempre aparecían los tres formularios juntos en una sola
+// pantalla. Ahora cada uno es su propia vista (reporte-matricula/
+// reporte-notas/reporte-actividades) con su propio nav-item.
+//
 // `gradosCache` trae TODOS los grados creados alguna vez (de todos los años
 // académicos, ver cargarTodo()) — usar poblarSelectGrados() acá en vez de
-// volcarlo directo evita que los 3 selectores de Reportes muestren grados de
-// años anteriores mezclados con los del año activo (mismo helper que ya usan
+// volcarlo directo evita que los selectores de grado muestren grados de años
+// anteriores mezclados con los del año activo (mismo helper que ya usan
 // Deméritos/Anecdóticos/Amonestaciones/Reconocimientos/Expedientes/Matrícula).
-function renderVistaReportes() {
+function renderVistaReporteMatricula() {
     poblarSelectGrados('rep-matricula-grado', null, '— Seleccioná un grado —');
+}
+
+function renderVistaReporteNotas() {
     poblarSelectGrados('rep-notas-grado', null, '— Seleccioná un grado —');
+}
+
+function renderVistaReporteActividades() {
     poblarSelectGrados('rep-act-grado', null, '— Seleccioná un grado —');
     document.getElementById('rep-act-materia').innerHTML = '<option value="">— Elegí un grado primero —</option>';
 }

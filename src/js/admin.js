@@ -289,7 +289,7 @@ async function cargarAlumnosDashboard() {
 
     const { data, error } = await supabase
         .from('matriculas')
-        .select('*, alumnos(*), grados(nombre, seccion)')
+        .select('*, alumnos(*), grados(nombre, seccion, modalidad)')
         .eq('año_academico_id', anioActivoCache.id)
         .eq('activo', true)
         .order('fecha_matricula', { ascending: false });
@@ -298,6 +298,7 @@ async function cargarAlumnosDashboard() {
 
     return (data || []).map(m => ({
         ...m.alumnos,
+        grado_id: m.grado_id, // de la matrícula, no de `alumnos` (que no tiene esa columna)
         grados: m.grados,
         created_at: m.alumnos?.created_at || m.fecha_matricula,
     }));
@@ -391,7 +392,7 @@ async function renderDashboard() {
             <div class="dash-recientes-item">
                 <div>
                     <div class="dr-nombre">${a.nombres} ${a.apellidos}</div>
-                    <div class="dr-grado">${a.grados ? `${a.grados.nombre} ${a.grados.seccion}` : 'Sin grado'}</div>
+                    <div class="dr-grado">${a.grados ? `${a.grados.nombre} ${a.grados.modalidad} — Sección ${a.grados.seccion}` : 'Sin grado'}</div>
                 </div>
                 <div class="dr-fecha">${formatFechaAlumno(a)}</div>
             </div>
@@ -406,8 +407,7 @@ async function renderDashboard() {
             <div class="grado-card">
                 <div class="gc-top">
                     <div>
-                        <div class="gc-nombre">${g.nombre}</div>
-                        <div class="gc-seccion">Sección ${g.seccion}</div>
+                        <div class="gc-nombre">${g.nombre} ${g.modalidad} — Sección ${g.seccion}</div>
                     </div>
                     <div class="gc-count-wrap">
                         <div class="gc-count">${conteoPorGrado[g.id] || 0}</div>
@@ -763,7 +763,7 @@ window.eliminarGrado = async (id) => {
 // ── GESTIÓN MATERIAS POR GRADO ───────────────
 window.gestionarMateriaGrado = async (gradoId) => {
     const grado = gradosCache.find(g => g.id === gradoId);
-    document.getElementById('mgrado-titulo').textContent = `${grado.nombre} ${grado.seccion} — Materias`;
+    document.getElementById('mgrado-titulo').textContent = `${grado.nombre} ${grado.modalidad} — Sección ${grado.seccion} — Materias`;
     document.getElementById('mgrado-id').value = gradoId;
 
     const { data: asignadas, error } = await supabase
@@ -1230,7 +1230,7 @@ async function cargarResumenMensualAdmin() {
 
     if (!anioActivoCache) { cont.innerHTML = '<div class="info-box">⚠ No hay un año académico activo.</div>'; return; }
 
-    let queryMatriculas = supabase.from('matriculas').select('*, alumnos(*), grados(nombre, seccion)')
+    let queryMatriculas = supabase.from('matriculas').select('*, alumnos(*), grados(nombre, seccion, modalidad)')
         .eq('año_academico_id', anioActivoCache.id).eq('activo', true);
     if (gradoFiltro) queryMatriculas = queryMatriculas.eq('grado_id', gradoFiltro);
     const { data: matriculas, error: eAl } = await queryMatriculas;
@@ -1270,7 +1270,7 @@ async function cargarResumenMensualAdmin() {
             ${alerta.map(({ alumno: al, totales: t }) => `
                 <tr>
                     <td class="td-bold">${al.apellidos}, ${al.nombres}</td>
-                    <td>${al.grados?.nombre || ''} ${al.grados?.seccion || ''}</td>
+                    <td>${al.grados ? `${al.grados.nombre} ${al.grados.modalidad} — Sección ${al.grados.seccion}` : ''}</td>
                     <td><span class="badge" style="background:#fde8e8;color:#b52828">${t.A}</span></td>
                     <td>${t.M}</td>
                     <td>${t.T}</td>
@@ -1641,7 +1641,7 @@ window.abrirDrawerDemerito = async (alumnoId) => {
     const item = demRosterAlumnos.find(x => x.alumno.id === alumnoId);
     const grado = gradosCache.find(g => g.id === demGradoFiltro);
     document.getElementById('dem-drawer-nombre').textContent = item ? `${item.alumno.apellidos}, ${item.alumno.nombres}` : '';
-    document.getElementById('dem-drawer-grado').textContent = grado ? `${grado.nombre} ${grado.seccion}` : '';
+    document.getElementById('dem-drawer-grado').textContent = grado ? `${grado.nombre} ${grado.modalidad} — Sección ${grado.seccion}` : '';
     document.getElementById('demerito-drawer-overlay').classList.add('open');
     await cargarDrawerDemerito(alumnoId);
 };
@@ -2271,7 +2271,7 @@ async function cargarPaginaMatricula() {
 
     cont.innerHTML = '<div class="empty-bubbles">Cargando…</div>';
     const grado = gradosCache.find(g => g.id === matGradoSel);
-    if (titulo) titulo.textContent = grado ? `📋 Alumnos matriculados en ${grado.nombre} ${grado.seccion}` : '📋 Alumnos matriculados';
+    if (titulo) titulo.textContent = grado ? `📋 Alumnos matriculados en ${grado.nombre} ${grado.modalidad} — Sección ${grado.seccion}` : '📋 Alumnos matriculados';
 
     const inicio = (matriculaPagina - 1) * MATRICULA_POR_PAGINA;
     const fin = inicio + MATRICULA_POR_PAGINA - 1;
@@ -2360,7 +2360,7 @@ async function ejecutarBusquedaMatricula() {
         // Estado de matrícula (año activo) de cada resultado, para mostrar
         // "Matriculado en X" o "No matriculado este año" junto a cada uno.
         const { data: matriculasRes, error: eMat } = await supabase.from('matriculas')
-            .select('*, grados(nombre, seccion)')
+            .select('*, grados(nombre, seccion, modalidad)')
             .eq('año_academico_id', anioActivoCache.id).eq('activo', true)
             .in('alumno_id', resultados.map(a => a.id));
         if (eMat) { notificarError(eMat, 'Error verificando matrículas'); return; }
@@ -2371,7 +2371,7 @@ async function ejecutarBusquedaMatricula() {
         cont.innerHTML = resultados.map(a => {
             const mat = matriculaPorAlumno[a.id];
             const estado = mat
-                ? `<span class="badge" style="background:#e8fdf0;color:#1a7a40">Matriculado en ${mat.grados?.nombre || ''} ${mat.grados?.seccion || ''}</span>`
+                ? `<span class="badge" style="background:#e8fdf0;color:#1a7a40">Matriculado en ${mat.grados?.nombre || ''} ${mat.grados?.modalidad || ''} — Sección ${mat.grados?.seccion || ''}</span>`
                 : `<span class="badge" style="background:#f1f5f9;color:#94a3b8">No matriculado este año</span>`;
             return `
             <div class="mat-fila">
@@ -2383,7 +2383,7 @@ async function ejecutarBusquedaMatricula() {
                 <div class="mat-acciones">
                     <select id="mat-buscar-grado-${a.id}">
                         <option value="">— Elegir grado —</option>
-                        ${gradosDelAnioActivo().map(g => `<option value="${g.id}" ${g.id === mat?.grado_id ? 'selected' : ''}>${g.nombre} ${g.seccion}</option>`).join('')}
+                        ${gradosDelAnioActivo().map(g => `<option value="${g.id}" ${g.id === mat?.grado_id ? 'selected' : ''}>${g.nombre} ${g.modalidad} — Sección ${g.seccion}</option>`).join('')}
                     </select>
                     <button class="btn-sm btn-info" onclick="matricularDesdeBusqueda('${a.id}')">${mat ? 'Cambiar' : 'Matricular'}</button>
                 </div>
@@ -2587,7 +2587,7 @@ async function cargarPaginaAlumnos() {
     const inicio = (alumnosPagina - 1) * ALUMNOS_POR_PAGINA;
     const fin = inicio + ALUMNOS_POR_PAGINA - 1;
 
-    let query = supabase.from('matriculas').select('*, alumnos(*), grados(nombre, seccion)', { count: 'exact' })
+    let query = supabase.from('matriculas').select('*, alumnos(*), grados(nombre, seccion, modalidad)', { count: 'exact' })
         .eq('año_academico_id', anioActivoCache.id).eq('activo', true);
     if (gradoFiltro) query = query.eq('grado_id', gradoFiltro);
     query = query.order('apellidos', { foreignTable: 'alumnos' }).range(inicio, fin);
@@ -2644,7 +2644,7 @@ function renderTablaAlumnos() {
             <td>${a.apellidos}</td>
             <td>${a.nombres}</td>
             <td>${a.nie}</td>
-            <td>${a.grados ? `${a.grados.nombre} ${a.grados.seccion}` : '—'}</td>
+            <td>${a.grados ? `${a.grados.nombre} ${a.grados.modalidad} — Sección ${a.grados.seccion}` : '—'}</td>
             <td>
                 <button class="btn-sm btn-edit" onclick="editarAlumno('${a.id}')">Editar</button>
                 <button class="btn-sm btn-del" onclick="eliminarAlumno('${a.id}')">Eliminar</button>
@@ -2691,7 +2691,7 @@ async function cargarBusquedaAlumnos(texto) {
         const gradoFiltro = document.getElementById('filtro-grado')?.value || '';
         const matriculaPorAlumno = {};
         if (encontrados.length) {
-            let queryMat = supabase.from('matriculas').select('*, grados(nombre, seccion)')
+            let queryMat = supabase.from('matriculas').select('*, grados(nombre, seccion, modalidad)')
                 .eq('año_academico_id', anioActivoCache.id).eq('activo', true)
                 .in('alumno_id', encontrados.map(a => a.id));
             if (gradoFiltro) queryMat = queryMat.eq('grado_id', gradoFiltro);
@@ -2741,7 +2741,7 @@ window.abrirModalAlumno = async (id = null) => {
 
     const sel = document.getElementById('alumno-grado');
     sel.innerHTML = '<option value="">— Seleccionar grado —</option>' +
-        gradosCache.map(g => `<option value="${g.id}" ${g.id === matriculaActual?.grado_id ? 'selected' : ''}>${g.nombre} ${g.seccion}</option>`).join('');
+        gradosCache.map(g => `<option value="${g.id}" ${g.id === matriculaActual?.grado_id ? 'selected' : ''}>${g.nombre} ${g.modalidad} — Sección ${g.seccion}</option>`).join('');
 
     abrirModal('modal-alumno');
 };
@@ -2817,7 +2817,7 @@ window.eliminarAlumnosMasivo = async () => {
     if (!anioActivoCache) return mostrarToast('No hay un año académico activo', 'advertencia');
     const grado = gradosCache.find(g => g.id === gradoId);
     const ok = await mostrarConfirm(
-        `¿Eliminar TODOS los alumnos matriculados en ${grado.nombre} ${grado.seccion} este año? Esta acción no se puede deshacer.`,
+        `¿Eliminar TODOS los alumnos matriculados en ${grado.nombre} ${grado.modalidad} — Sección ${grado.seccion} este año? Esta acción no se puede deshacer.`,
         { textoConfirmar: 'Eliminar todos' }
     );
     if (!ok) return;
